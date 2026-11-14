@@ -12,3 +12,4 @@ voiceClipboard
 voiceSpeed
 voiceSpeedE2e
 voiceParakeet
+voiceSpeedWhisper

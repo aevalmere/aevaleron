@@ -26,9 +26,10 @@ pub struct Spec {
 /// The models in use, GGUF files for transcribe.cpp from the repositories
 /// Handy publishes (huggingface.co/handy-computer), each pinned to the commit
 /// it was read at. English-only Whisper models are a little better at
-/// English; the others take any language. Parakeet is English only. Sizes
-/// and hashes are the repositories' LFS object ids, read 2026-11-14.
-pub static MODELS: [Spec; 7] = [
+/// English; the others take any language. Parakeet 110M is English only;
+/// Parakeet 0.6B (v3) takes 25 European languages. Sizes and hashes are the
+/// repositories' LFS object ids, read 2026-11-14.
+pub static MODELS: [Spec; 8] = [
     Spec {
         id: "tiny.en",
         repo: "handy-computer/whisper-tiny.en-gguf",
@@ -84,6 +85,14 @@ pub static MODELS: [Spec; 7] = [
         file: "parakeet-tdt_ctc-110m-Q5_K_M.gguf",
         bytes: 101_335_520,
         sha256: "1552e707fddb59e3741b66ea917fc91a9381e336a4730739b1d2d448cb013a2e",
+    },
+    Spec {
+        id: "parakeet-0.6b-v3",
+        repo: "handy-computer/parakeet-tdt-0.6b-v3-gguf",
+        rev: "d8d8c32cb2017c57e5307767343e97870f8a7f53",
+        file: "parakeet-tdt-0.6b-v3-Q5_K_M.gguf",
+        bytes: 548_946_272,
+        sha256: "cc722e76adc1a629fc0b2535de879d99b8160d07ad4c0215e2ca7d7ea0ae4b8f",
     },
 ];
 
@@ -196,9 +205,14 @@ pub fn spec_for(size: &str, language: &str) -> &'static Spec {
     by_id(id).unwrap_or(&MODELS[2])
 }
 
-/// Parakeet, which hears English only.
+/// Parakeet 110M, which hears English only.
 pub fn parakeet() -> &'static Spec {
     &MODELS[6]
+}
+
+/// Parakeet 0.6B, which hears English and 24 other European languages.
+pub fn parakeet_v3() -> &'static Spec {
+    &MODELS[7]
 }
 
 pub fn by_id(id: &str) -> Option<&'static Spec> {
@@ -387,6 +401,7 @@ mod tests {
         assert_eq!(spec_for("small", "fr").id, "small");
         assert_eq!(spec_for("huge", "en").id, "base.en");
         assert_eq!(parakeet().id, "parakeet-110m");
+        assert_eq!(parakeet_v3().id, "parakeet-0.6b-v3");
         for m in MODELS.iter() {
             assert_eq!((m.sha256.len(), m.rev.len()), (64, 40), "{}", m.id);
             assert!(m.file.ends_with(".gguf"), "{}", m.id);
@@ -406,6 +421,7 @@ mod tests {
         assert_eq!(old(spec_for("tiny", "fr")), ["tiny-q5_1", "tiny-f16"]);
         assert_eq!(old(spec_for("small", "en")), ["small.en-q5_1"]);
         assert!(old(parakeet()).is_empty());
+        assert!(old(parakeet_v3()).is_empty());
         let bin = by_id("tiny.en-q5_1").map(|l| l.file);
         assert_eq!(bin, Some("ggml-tiny.en-q5_1.bin"));
     }

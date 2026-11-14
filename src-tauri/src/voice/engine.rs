@@ -1,5 +1,5 @@
-//! Turns a recording into text with the engine Settings chose: Whisper on
-//! this PC (the default, free and offline), Parakeet on this PC, or Gemini
+//! Turns a recording into text with the engine Settings chose: Parakeet on
+//! this PC (the default, free and offline), Whisper on this PC, or Gemini
 //! with the person's key.
 
 use std::path::{Path, PathBuf};
@@ -13,18 +13,28 @@ pub struct Heard {
     pub cleaned: bool,
 }
 
-/// The model an engine on this PC uses; None for Gemini. Parakeet hears
-/// English only, so with another language chosen its place is taken by
-/// Whisper's base model, which keeps the Language setting true.
+/// The languages Settings offers that Parakeet 0.6B hears; `auto` is left
+/// to it, and it tells its 25 languages apart by itself.
+const V3_HEARS: [&str; 9] = ["en", "auto", "es", "fr", "de", "it", "pt", "nl", "pl"];
+
+/// The model an engine on this PC uses; None for Gemini. Parakeet 110M
+/// hears English only and Parakeet 0.6B some languages: asked for one it
+/// does not hear, a Parakeet engine's place is taken by Whisper's base
+/// model, which keeps the Language setting true.
 pub fn spec(s: &VoiceSettings) -> Option<&'static model::Spec> {
-    if s.engine == settings::PARAKEET {
-        if s.language == "en" {
-            return Some(model::parakeet());
-        }
-        return Some(model::spec_for("base", &s.language));
+    let language = s.language.as_str();
+    match s.engine.as_str() {
+        settings::PARAKEET if language == "en" => Some(model::parakeet()),
+        settings::PARAKEET_V3 if V3_HEARS.contains(&language) => Some(model::parakeet_v3()),
+        settings::PARAKEET | settings::PARAKEET_V3 => Some(model::spec_for("base", language)),
+        _ => s.whisper_size().map(|w| model::spec_for(w, language)),
     }
-    s.whisper_size()
-        .map(|size| model::spec_for(size, &s.language))
+}
+
+/// Whether Whisper is standing in for the Parakeet engine chosen.
+pub fn stand_in(s: &VoiceSettings) -> bool {
+    let own = spec(s).is_some_and(|m| m.id.starts_with("parakeet"));
+    s.engine.starts_with("parakeet") && !own
 }
 
 /// The model file to run now, if one is on disk (a file an earlier build
@@ -79,11 +89,14 @@ pub fn trim(samples: &[f32]) -> Option<&[f32]> {
 
 /// What the model at `path` is handed of `samples`; None when nothing was
 /// said. Whisper gets the speech with the silence cut off. Parakeet gets all
-/// of it: cut that close it wrote the fixture's "tomorrow" as "to morrow"
-/// and left out every comma, and its time grows with the clip by little.
+/// of it: cut that close, the 110M model wrote the fixture's "tomorrow" as
+/// "to morrow" and left out every comma, and its time grows with the clip by
+/// little.
 pub fn piece<'a>(path: &Path, samples: &'a [f32]) -> Option<&'a [f32]> {
     let speech = trim(samples)?;
-    let whole = path == model::path(model::parakeet());
+    let whole = [model::parakeet(), model::parakeet_v3()]
+        .iter()
+        .any(|m| path == model::path(m));
     Some(if whole { samples } else { speech })
 }
 

@@ -21,9 +21,10 @@ const CLIP: &str = "voice probe clipboard";
 pub fn run(cx: &mut Cx) {
     runtime(cx);
     let before = crate::store::get().raw(settings::KEY);
-    // The small model keeps the run quick; the default is base.
+    // Whisper's small model for the first checks; the default engine is
+    // timed in `speed`.
     let mut s = settings::get();
-    s.engine = "whisper-tiny".into();
+    s.pick("whisper-tiny");
     s.language = "en".into();
     settings::save(&s);
     capture::set_fixture(Some(PathBuf::from(FIXTURE)));
@@ -233,14 +234,17 @@ fn dictation(cx: &mut Cx) {
     let _ = cx.on_main(|app| voice::cancel(app, true));
 }
 
-/// What the speed gate allows on the runner (4 vCPUs of an EPYC 9V74, no
-/// GPU), in ms, about 1.5 times what whisper.cpp measured (a4a6634: 566 and
-/// 790): Whisper on the fixture (7.9 s of speech) with the default model kept
-/// loaded, and the whole release-to-text of a 17 s utterance with a pause.
-/// transcribe.cpp measures 807 to 830 and 832 to 849 (3add819): inside both,
-/// the first with little to spare (lanes/voice-transcribe.md).
-const SPEED_BUDGET_MS: u64 = 900;
-const E2E_BUDGET_MS: u64 = 1100;
+/// What the speed gates allow on the runner (4 vCPUs of an EPYC 9V74, no
+/// GPU), in ms (measurements in lanes/voice-transcribe.md). The default
+/// engine, Parakeet 110M, kept loaded: the fixture (7.9 s), the better of two
+/// passes, measured 217 to 251; and the whole release-to-text of a 17 s
+/// utterance with a pause, measured 235 to 237. Each is allowed a little
+/// under twice that, so a slower runner passes and a build twice as slow does
+/// not. Whisper base on the fixture measured 807 to 836 and is allowed one
+/// and a half times that.
+const SPEED_BUDGET_MS: u64 = 400;
+const E2E_BUDGET_MS: u64 = 450;
+const WHISPER_BUDGET_MS: u64 = 1250;
 
 fn fixture_16k() -> Result<Vec<f32>, String> {
     std::fs::read(FIXTURE)
@@ -296,14 +300,26 @@ fn said(took: u64, text: &Result<String, String>) -> String {
     format!("transcribe={took}ms {stages} text={text:?}")
 }
 
-/// The default model on the fixture, kept loaded and with the silence cut;
-/// then a three-second phrase, the smallest model, Parakeet on the same two
-/// clips and a file an earlier build fetched. Last, the release-to-text time
-/// of a long utterance through the real pipeline, which transcribes its first
-/// half while it is held, with the default engine and with Parakeet.
+/// What the person is given of a pass: its text after the local tidy.
+fn tidied(text: &Result<String, String>) -> String {
+    match text {
+        Ok(t) => {
+            let words = voice::cleanup::strip_noise(t);
+            format!("{:?}", voice::cleanup::tidy(&words))
+        }
+        Err(e) => format!("failed: {e}"),
+    }
+}
+
+/// Whisper base on the fixture, kept loaded and with the silence cut; then a
+/// three-second phrase, the smallest model, the default engine (Parakeet) on
+/// the same two clips and a file an earlier build fetched. Last, the
+/// release-to-text time of a long utterance through the real pipeline, which
+/// transcribes its first half while it is held, with the default engine and
+/// with Whisper base.
 fn speed(cx: &Cx) {
     let Ok(clip) = fixture_16k() else {
-        cx.must("voiceSpeed", false, "the fixture did not read");
+        cx.must("voiceSpeedWhisper", false, "the fixture did not read");
         return;
     };
 
@@ -312,7 +328,7 @@ fn speed(cx: &Cx) {
     let path = match cx.block_on(model::ensure(base, &|_, _| {})) {
         Ok(p) => p,
         Err(e) => {
-            cx.must("voiceSpeed", false, e);
+            cx.must("voiceSpeedWhisper", false, e);
             return;
         }
     };
@@ -328,6 +344,7 @@ fn speed(cx: &Cx) {
     let heard = said(run_ms, &text);
     let line = format!("load={load_ms}ms (once) trim={trim_ms}ms ({kept}) {heard}");
     cx.log("voiceSpeedAfter", line);
+    cx.log("voiceSpeedWhisperTidy", tidied(&text));
     // A three-second phrase is most of dictation.
     let short = &clip[..clip.len().min(3 * wav::RATE as usize)];
     let (short_ms, phrase) = pass(&path, short);
@@ -350,19 +367,17 @@ fn speed(cx: &Cx) {
     }
     parakeet(cx, &clip, short);
     legacy(cx, speech);
-    // Back to the default model, as the app keeps it.
-    whisper::preload(&path);
     cx.log("voiceCalibrate", format!("{}ms", calibrate()));
     let threads = whisper::threads();
     let system = whisper::system_info();
     cx.log("voiceSystem", format!("threads={threads} {system}"));
     cx.must(
-        "voiceSpeed",
-        tomorrow(&text) && total <= SPEED_BUDGET_MS,
-        format!("{total}ms of {SPEED_BUDGET_MS}ms"),
+        "voiceSpeedWhisper",
+        tomorrow(&text) && total <= WHISPER_BUDGET_MS,
+        format!("{total}ms of {WHISPER_BUDGET_MS}ms"),
     );
 
-    let (started, timings, field) = e2e(cx, &clip, "whisper-base");
+    let (started, timings, field) = e2e(cx, &clip, settings::ENGINES[0]);
     let json = serde_json::to_string(&timings).unwrap_or_default();
     cx.log("voiceSpeedTimings", &json);
     cx.log("voiceSpeedHeard", format!("{field:?}"));
@@ -373,21 +388,23 @@ fn speed(cx: &Cx) {
         format!("started={started} {json} budget={E2E_BUDGET_MS}ms"),
     );
 
-    let (_, timings, field) = e2e(cx, &clip, settings::PARAKEET);
+    let (_, timings, field) = e2e(cx, &clip, "whisper-base");
     let json = serde_json::to_string(&timings).unwrap_or_default();
-    cx.log("voiceSpeedParakeetTimings", &json);
-    cx.log("voiceSpeedParakeetHeard", format!("{field:?}"));
+    cx.log("voiceSpeedWhisperTimings", &json);
+    cx.log("voiceSpeedWhisperHeard", format!("{field:?}"));
 }
 
-/// Parakeet on the fixture and on its first three seconds, kept loaded as
-/// the default model is. It is handed the clip as the app hands it, silence
-/// left on; the same clip cut to the speech, and cut then given half a second
-/// of quiet either side, are logged beside it.
+/// The default engine, Parakeet 110M, on the fixture and on its first three
+/// seconds, kept loaded as the app keeps it. It is handed the clip as the app
+/// hands it, silence left on; the same clip cut to the speech, and cut then
+/// given half a second of quiet either side, are logged beside it. The gate
+/// takes the better of two passes: the first after a load is uneven.
 fn parakeet(cx: &Cx, clip: &[f32], short: &[f32]) {
     let spec = model::parakeet();
     let path = match cx.block_on(model::ensure(spec, &|_, _| {})) {
         Ok(p) => p,
         Err(e) => {
+            cx.must("voiceSpeed", false, &e);
             cx.must("voiceParakeet", false, e);
             return;
         }
@@ -402,6 +419,13 @@ fn parakeet(cx: &Cx, clip: &[f32], short: &[f32]) {
     let (again_ms, _) = pass(&path, whole);
     let line = format!("load={load_ms}ms {heard} again={again_ms}ms");
     cx.log("voiceSpeedParakeet", line);
+    cx.log("voiceSpeedParakeetTidy", tidied(&text));
+    let best = run_ms.min(again_ms);
+    cx.must(
+        "voiceSpeed",
+        tomorrow(&text) && best <= SPEED_BUDGET_MS,
+        format!("{best}ms of {SPEED_BUDGET_MS}ms"),
+    );
     let (short_ms, phrase) = pass(&path, short);
     cx.log("voiceSpeedParakeetShort", said(short_ms, &phrase));
     if let Some(speech) = engine::trim(clip) {
@@ -447,9 +471,10 @@ fn bar_text(cx: &Cx) -> String {
 }
 
 /// The fixture, a second of silence and the fixture again, recorded through
-/// the bar's mic path with `engine`: whether it started, its timings and the
-/// text that reached the bar's field.
-fn e2e(cx: &Cx, clip: &[f32], engine: &str) -> (bool, Option<voice::Timings>, String) {
+/// the bar's mic path with the engine `id`, its model loaded beforehand as
+/// the app keeps it: whether it started, its timings and the text that
+/// reached the bar's field.
+fn e2e(cx: &Cx, clip: &[f32], id: &str) -> (bool, Option<voice::Timings>, String) {
     let mut long = clip.to_vec();
     long.resize(long.len() + wav::RATE as usize, 0.0);
     long.extend_from_slice(clip);
@@ -459,9 +484,12 @@ fn e2e(cx: &Cx, clip: &[f32], engine: &str) -> (bool, Option<voice::Timings>, St
     }
     let mut s = settings::get();
     let was = s.clone();
-    s.engine = engine.into();
+    s.pick(id);
     s.cleanup = false;
     settings::save(&s);
+    if let Some(path) = engine::usable(&s) {
+        whisper::preload(&path);
+    }
     capture::set_fixture(Some(file.clone()));
     let _ = voice::take_timings();
     let started = cx.on_main(|app| voice::start(app, Origin::Bar));

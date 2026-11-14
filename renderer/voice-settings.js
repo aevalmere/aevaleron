@@ -5,10 +5,11 @@
 (() => {
   if (!document.getElementById('pg-voice')) return;
   const ENGINE_NAMES = {
-    'whisper-base': 'On this PC',
-    'whisper-tiny': 'On this PC, fastest',
-    'whisper-small': 'On this PC, most accurate',
-    'parakeet-110m': 'On this PC, Parakeet',
+    'parakeet-110m': 'Parakeet 110M',
+    'whisper-base': 'Whisper base',
+    'whisper-tiny': 'Whisper tiny',
+    'whisper-small': 'Whisper small',
+    'parakeet-0.6b': 'Parakeet 0.6B',
     gemini: 'Gemini',
   };
   const MODS = { Control: 'Ctrl', Alt: 'Alt', Shift: 'Shift', Meta: 'Super' };
@@ -78,8 +79,8 @@
       let extra = '';
       if (e.local) extra = e.ready ? ' Downloaded.' : ` Downloads ${mb(e.bytes)} the first time.`;
       else if (!e.available) extra = ' Add a Gemini key under Providers first.';
-      // Parakeet hears English only; with another language Whisper stands in.
-      if (e.id === 'parakeet-110m' && s.language !== 'en') extra = ' With a language other than English chosen, Whisper is used.' + extra;
+      // A Parakeet engine asked for a language it does not hear.
+      if (e.standIn) extra = ' For the language chosen, Whisper base is used.' + extra;
       note.textContent = note.dataset.base + extra;
     }
     const chosen = engineOf(s.engine);
