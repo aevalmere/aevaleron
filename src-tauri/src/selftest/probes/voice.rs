@@ -234,17 +234,17 @@ fn dictation(cx: &mut Cx) {
     let _ = cx.on_main(|app| voice::cancel(app, true));
 }
 
-/// What the speed gates allow on the runner (4 vCPUs of an EPYC 9V74, no
-/// GPU), in ms (measurements in lanes/voice-transcribe.md). The default
-/// engine, Parakeet 110M, kept loaded: the fixture (7.9 s), the better of two
-/// passes, measured 217 to 251; and the whole release-to-text of a 17 s
-/// utterance with a pause, measured 235 to 237. Each is allowed a little
-/// under twice that, so a slower runner passes and a build twice as slow does
-/// not. Whisper base on the fixture measured 807 to 836 and is allowed one
-/// and a half times that.
+/// What the speed gates allow on the runner (4 vCPUs, no GPU), in ms
+/// (measurements in lanes/voice-transcribe.md). The runner is one of two
+/// processors, an EPYC 9V74 or the slower EPYC 7763, and the times below are
+/// in that order. The default engine, Parakeet 110M, kept loaded: the fixture
+/// (7.9 s), the better of two passes, 217 to 227 and 277; and the whole
+/// release-to-text of a 17 s utterance with a pause, 235 to 237 and 315.
+/// Whisper base on the fixture: 807 to 836 and 980. Each is allowed a little
+/// over 1.4 times what the slower processor took.
 const SPEED_BUDGET_MS: u64 = 400;
 const E2E_BUDGET_MS: u64 = 450;
-const WHISPER_BUDGET_MS: u64 = 1250;
+const WHISPER_BUDGET_MS: u64 = 1400;
 
 fn fixture_16k() -> Result<Vec<f32>, String> {
     std::fs::read(FIXTURE)
