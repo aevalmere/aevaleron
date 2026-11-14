@@ -1,16 +1,16 @@
 {
   "workflow": "ui-shots",
   "workflow_name": "ui-shots",
-  "run_id": 43594967057,
+  "run_id": 43652925468,
   "run_attempt": 1,
-  "run_url": "https://github.com/aevalmere/aevaleron/actions/runs/43594967057",
+  "run_url": "https://github.com/aevalmere/aevaleron/actions/runs/43652925468",
   "event": "push",
-  "sha": "42684a1d97c4e39a11c542b44f4f8c227192d978",
+  "sha": "58447bc0b297191e7651c8ad8261e40b53f90ac0",
   "ref": "rust/voice-transcribe",
   "ref_dir": "rust-voice-transcribe",
   "conclusion": "success",
   "failed": [],
-  "finished": "2026-11-14T12:41:19Z",
+  "finished": "2026-11-14T23:35:48Z",
   "error_lines": 0,
   "steps": [
     {

@@ -1,12 +1,12 @@
 # ui-shots: success
 
 - Workflow: ui-shots
-- Run: [43594967057](https://github.com/aevalmere/aevaleron/actions/runs/43594967057), attempt 1, on push
-- Commit: 42684a1d97c4e39a11c542b44f4f8c227192d978
+- Run: [43652925468](https://github.com/aevalmere/aevaleron/actions/runs/43652925468), attempt 1, on push
+- Commit: 58447bc0b297191e7651c8ad8261e40b53f90ac0
 - Ref: rust/voice-transcribe
 - Conclusion: **success**
-- Finished: 2026-11-14T12:41:19Z
-- Screenshots: https://github.com/aevalmere/aevaleron/tree/shots/rust-d-ui/rust/voice-transcribe/42684a1d97c4e39a11c542b44f4f8c227192d978 (/ in the ref becomes -)
+- Finished: 2026-11-14T23:35:48Z
+- Screenshots: https://github.com/aevalmere/aevaleron/tree/shots/rust-d-ui/rust/voice-transcribe/58447bc0b297191e7651c8ad8261e40b53f90ac0 (/ in the ref becomes -)
 
 | Step | Outcome | Log |
 |---|---|---|

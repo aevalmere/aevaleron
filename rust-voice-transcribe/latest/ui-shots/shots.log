@@ -218,13 +218,13 @@
 [UI] noDockUi=ok
 [UI] resizeZones=ok
 [UI] globFrameCost=ok
-[UI] globShapeMs=0.015
+[UI] globShapeMs=0.020
 [UI] shot 04a-glob-08.png
 [UI] shot 04b-glob-30.png
 [UI] shot 04c-glob-52.png
 [UI] shot 04d-glob-70.png
 [UI] shot 04e-glob-90.png
-[UI] globOpen ms=507 frames=27 longestFrameMs=33.4
+[UI] globOpen ms=491 frames=24 longestFrameMs=33.4
 [UI] globOpens=ok
 [UI] globSmooth=ok
 [UI] globReducedMotion=ok
@@ -586,10 +586,12 @@
 [UI] scene voice/voice-settings
 [UI] shot voice-08-settings-engine.png
 [UI] voiceSettingsPage=ok
+[UI] voiceSettingsEngines=ok
 [UI] voiceSettingsSaves=ok
 [UI] scene voice/voice-settings-ts200
 [UI] shot voice-08-settings-engine-ts200.png
 [UI] voiceSettingsPage-ts200=ok
+[UI] voiceSettingsEngines-ts200=ok
 [UI] voiceSettingsSaves-ts200=ok
 [UI] scene polish/menu-bounds-bar
 [UI] menuInsideWindow.barIntent=ok
@@ -910,7 +912,7 @@
 [UI] shot 04c-glob-52-150.png
 [UI] shot 04d-glob-70-150.png
 [UI] shot 04e-glob-90-150.png
-[UI] globOpen-150 ms=508 frames=27 longestFrameMs=33.4
+[UI] globOpen-150 ms=519 frames=25 longestFrameMs=33.4
 [UI] globOpens-150=ok
 [UI] globReducedMotion-150=ok
 [UI] scene sheet/multi-150
@@ -1255,10 +1257,12 @@
 [UI] scene voice/voice-settings-150
 [UI] shot voice-08-settings-engine-150.png
 [UI] voiceSettingsPage-150=ok
+[UI] voiceSettingsEngines-150=ok
 [UI] voiceSettingsSaves-150=ok
 [UI] scene voice/voice-settings-150-ts200
 [UI] shot voice-08-settings-engine-150-ts200.png
 [UI] voiceSettingsPage-150-ts200=ok
+[UI] voiceSettingsEngines-150-ts200=ok
 [UI] voiceSettingsSaves-150-ts200=ok
 [UI] scene polish/menu-bounds-bar-150
 [UI] menuInsideWindow.barIntent-150=ok
