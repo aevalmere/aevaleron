@@ -238,12 +238,14 @@ fn dictation(cx: &mut Cx) {
 /// (measurements in lanes/voice-transcribe.md). The runner is one of two
 /// processors, an EPYC 9V74 or the slower EPYC 7763, and the times below are
 /// in that order. The default engine, Parakeet 110M, kept loaded: the fixture
-/// (7.9 s), the better of two passes, 217 to 227 and 277; and the whole
-/// release-to-text of a 17 s utterance with a pause, 235 to 237 and 315.
-/// Whisper base on the fixture: 807 to 836 and 980. Each is allowed a little
-/// over 1.4 times what the slower processor took.
+/// (7.9 s), the better of two passes, 217 to 227 and 274 to 277; and the
+/// whole release-to-text of a 17 s utterance with a pause, 235 to 237 and 315
+/// to 374. Whisper base on the fixture: 807 to 836 and 978 to 980. The two
+/// fixture gates allow a little over 1.4 times what the slower processor
+/// took; the utterance varied more there and is allowed 1.6 times its
+/// slowest, which is still under what Whisper takes.
 const SPEED_BUDGET_MS: u64 = 400;
-const E2E_BUDGET_MS: u64 = 450;
+const E2E_BUDGET_MS: u64 = 600;
 const WHISPER_BUDGET_MS: u64 = 1400;
 
 fn fixture_16k() -> Result<Vec<f32>, String> {

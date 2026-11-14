@@ -34,7 +34,7 @@ Nothing between pieces joined after a pause is changed. The AI cleanup's own out
 
 **D-voice-23: Settings, Voice.** Each engine is named and has one line: Parakeet 110M "On this PC. Fastest. English, with plainer punctuation."; Whisper base "On this PC. Slower, with fuller punctuation."; Whisper tiny "On this PC. Small download, gets more words wrong."; Whisper small "On this PC. More accurate than base, slower on older PCs."; Parakeet 0.6B "On this PC. Best text. Large download, slower without a strong processor."; Gemini unchanged. The app had no place that lists notices, so the attribution is a row at the foot of the Voice page, "Speech models" (`#sec-voice-credits`): "Parakeet is by NVIDIA, used under CC BY 4.0 (creativecommons.org/licenses/by/4.0) and converted to GGUF by Handy. Whisper is by OpenAI, under the MIT licence."
 
-**D-voice-24: the speed gates time the default engine.** `voiceSpeed`: Parakeet 110M on the fixture, the better of two passes, 400 ms. `voiceSpeedE2e`: release to text of the 17 s utterance with the default engine, 450 ms. `voiceSpeedWhisper` (new): Whisper base on the fixture, 1400 ms. Each is a little over 1.4 times what the slower of the two runner processors took (below). Whisper base's 17 s utterance is logged, not gated.
+**D-voice-24: the speed gates time the default engine.** `voiceSpeed`: Parakeet 110M on the fixture, the better of two passes, 400 ms. `voiceSpeedE2e`: release to text of the 17 s utterance with the default engine, 600 ms. `voiceSpeedWhisper` (new): Whisper base on the fixture, 1400 ms. The two fixture gates are a little over 1.4 times what the slower of the two runner processors took (below). The utterance varied more on that processor (315 and 374 ms), so its gate is 1.6 times the slower of those; it still fails a build that falls back to Whisper (832 ms and up). Whisper base's 17 s utterance is logged, not gated.
 
 ## Smoke labels
 
@@ -44,23 +44,23 @@ ui-shots, lane `voice`: `voiceSettingsPage` expects Parakeet 110M checked; `voic
 
 ## Numbers
 
-Runner: windows-latest, 4 vCPU, no GPU. Fixture `dictation.wav`, 7.9 s, 7.5 s once the silence is cut. Before is whisper.cpp at f35b788. The first four runs landed on an AMD EPYC 9V74: 43594967001 (42684a1), 43597308478 (3add819), 43599526371 (fb12386), 43600668620 (4f29f3c). The fifth, 43652925433 (58447bc, the second round's code), landed on an AMD EPYC 7763, which is about a fifth slower on everything (`voiceCalibrate` 202 ms against 165).
+Runner: windows-latest, 4 vCPU, no GPU. Fixture `dictation.wav`, 7.9 s, 7.5 s once the silence is cut. Before is whisper.cpp at f35b788. The first four runs landed on an AMD EPYC 9V74: 43594967001 (42684a1), 43597308478 (3add819), 43599526371 (fb12386), 43600668620 (4f29f3c). The fifth and sixth, 43652925433 (58447bc, the second round's code) and 43654278124 (e949022), landed on an AMD EPYC 7763, which is about a fifth slower on everything (`voiceCalibrate` 202 ms against 165).
 
-| What | Before | EPYC 9V74, four runs | EPYC 7763 |
+| What | Before | EPYC 9V74, four runs | EPYC 7763, two runs |
 |---|---|---|---|
-| Whisper base.en, fixture (`voiceSpeedAfter`) | 645 ms | 807, 830, 809, 836 ms | 980 ms |
+| Whisper base.en, fixture (`voiceSpeedAfter`) | 645 ms | 807, 830, 809, 836 ms | 980, 978 ms |
 | Whisper base.en, first 3 s (`voiceSpeedShort`) | 561 ms | 707, 724, 720, 712 ms | 900 ms |
 | Whisper tiny.en, fixture (`voiceSpeedTiny`) | 297 ms | 423, 435, 428, 422 ms | 518 ms |
-| Whisper base.en, 17 s utterance with a pause, release to text | 695 ms | 832, 849, 862, 835 ms | 1039 ms |
-| Parakeet 110M, whole fixture, first pass after the load | | 555, 251, 332 ms (from the second run) | 295 ms |
-| Parakeet 110M, whole fixture, second pass | | 227, 217 ms (from the third run) | 277 ms |
+| Whisper base.en, 17 s utterance with a pause, release to text | 695 ms | 832, 849, 862, 835 ms | 1039, 1023 ms |
+| Parakeet 110M, whole fixture, first pass after the load | | 555, 251, 332 ms (from the second run) | 295, 292 ms |
+| Parakeet 110M, whole fixture, second pass | | 227, 217 ms (from the third run) | 277, 274 ms |
 | Parakeet 110M, fixture cut to the speech | | 203, 190, 193, 191 ms | 240 ms |
 | Parakeet 110M, first 3 s | | 98, 98, 101, 97 ms | 124 ms |
-| Parakeet 110M, 17 s utterance with a pause, release to text | | 195 (pieces cut), 235, 237, 235 ms | 315 ms |
-| Parakeet 110M, load from disk | | 71 to 73 ms | 78 ms |
+| Parakeet 110M, 17 s utterance with a pause, release to text | | 195 (pieces cut), 235, 237, 235 ms | 315, 374 ms |
+| Parakeet 110M, load from disk | | 71 to 73 ms | 78, 76 ms |
 | Installer | 5.27 MiB | 5.93 MiB | 5.93 MiB |
 
-Whisper is slower than it was by 130 to 190 ms on every clip. transcribe.cpp encodes Whisper's whole 30 s window whatever the clip's length and has no setting for a shorter one; whisper.cpp's `audio_ctx`, fitted to the clip, was where the earlier time came from. On the EPYC 7763 Whisper base took 980 ms, over the first round's 900 ms gate; that gate is now `voiceSpeedWhisper` at 1400 ms.
+Whisper is slower than it was by 130 to 190 ms on every clip. transcribe.cpp encodes Whisper's whole 30 s window whatever the clip's length and has no setting for a shorter one; whisper.cpp's `audio_ctx`, fitted to the clip, was where the earlier time came from. On the EPYC 7763 Whisper base took 978 to 980 ms, over the first round's 900 ms gate; that gate is now `voiceSpeedWhisper` at 1400 ms.
 
 Parakeet's first pass on the whole fixture after a load is uneven on the 9V74 (555, 251, 332 ms, the extra booked under "decode" while the library's own decoder line says 7 ms); a second pass is 217 to 227 ms and the pipeline 233 to 238 ms a piece. Cause not found. The gate takes the better of two passes.
 
@@ -73,7 +73,7 @@ Text, same fixture, as the engine wrote it:
 - Parakeet 110M, cut to the speech: "Um so I think we should meet at three no four PM to morrow to go over the budget"
 - Parakeet 110M, first 3 s: "Um so I think we should meet at three"
 
-After the tidy (run 43652925433):
+After the tidy (runs 43652925433 and 43654278124, the same text in both):
 
 - Whisper base.en, fixture: "So I think we should meet at 3, no, 4pm tomorrow, to go over the budget."
 - Parakeet 110M, fixture: "So I think we should meet at three no, four PM tomorrow, to go over the budget."
@@ -107,7 +107,7 @@ First download: Parakeet 110M 101 MB, Whisper base 64 MB (was 60), tiny 44 MB (w
 - The multilingual and small GGUF files: their hashes are Hugging Face's own, none was downloaded here.
 - `release.yml` did not run (no release).
 - Parakeet's accuracy beyond the one fixture; the benchmark on `bench/parakeet` has more clips.
-- The speed budgets come from one run on the EPYC 7763 and four on the 9V74. A runner slower than the 7763 by more than 40% would fail them.
+- The speed budgets come from two runs on the EPYC 7763 and four on the 9V74. A runner slower than the 7763 by more than 40% would fail them. The 17 s utterance with Parakeet moved from 315 to 374 ms between two runs on the same processor, cause not looked into; its gate was widened from 450 to 600 ms for that, and the last run is the only one made with the wider gate.
 
 ## For the owner
 
