@@ -1,12 +1,12 @@
 # ui-shots: success
 
 - Workflow: ui-shots
-- Run: [43736299038](https://github.com/aevalmere/aevaleron/actions/runs/43736299038), attempt 1, on push
-- Commit: 943aa1017ec57e27b7017c380f6af102fb7f6216
+- Run: [43738524901](https://github.com/aevalmere/aevaleron/actions/runs/43738524901), attempt 1, on push
+- Commit: ec8f2aa4ddb1020eac7e19497cef8f1398cc19a1
 - Ref: rust-rewrite
 - Conclusion: **success**
-- Finished: 2026-11-15T16:49:13Z
-- Screenshots: https://github.com/aevalmere/aevaleron/tree/shots/rust-d-ui/rust-rewrite/943aa1017ec57e27b7017c380f6af102fb7f6216 (/ in the ref becomes -)
+- Finished: 2026-11-15T17:14:13Z
+- Screenshots: https://github.com/aevalmere/aevaleron/tree/shots/rust-d-ui/rust-rewrite/ec8f2aa4ddb1020eac7e19497cef8f1398cc19a1 (/ in the ref becomes -)
 
 | Step | Outcome | Log |
 |---|---|---|
