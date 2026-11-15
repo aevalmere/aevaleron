@@ -1,0 +1,27 @@
+Diff in \\?\D:\a\aevaleron\aevaleron\src-tauri\src\region_text\mod.rs:208:
+         .filter_map(|s| {
+             let n = |k: &str| s["rect"][k].as_f64();
+             let text = s["text"].as_str()?;
+-            Some(Piece::new(text, n("x")?, n("y")?, n("width")?, n("height")?))
++            Some(Piece::new(
++                text,
++                n("x")?,
++                n("y")?,
++                n("width")?,
++                n("height")?,
++            ))
+         })
+         .collect()
+ }
+Diff in \\?\D:\a\aevaleron\aevaleron\src-tauri\src\region_text\note.rs:322:
+         assert_eq!(n.lead, "Invoice 2291 for March Please settle…");
+         assert_eq!(n.spoken(), "Copied 8 words.");
+         let n = Note::none();
+-        assert_eq!(n.spoken(), "No text found here. The clipboard is unchanged.");
++        assert_eq!(
++            n.spoken(),
++            "No text found here. The clipboard is unchanged."
++        );
+         let no_ocr = DesktopError::new("NO_OCR", "no Windows OCR language is installed");
+         assert!(Note::failed(&no_ocr).lead.contains("Windows Settings"));
+         let down = DesktopError::new("HELPER_DOWN", "the helper is not running");
