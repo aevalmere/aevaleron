@@ -1,19 +1,17 @@
 {
   "workflow": "rust",
   "workflow_name": "rust",
-  "run_id": 43655509204,
+  "run_id": 43656874715,
   "run_attempt": 1,
-  "run_url": "https://github.com/aevalmere/aevaleron/actions/runs/43655509204",
+  "run_url": "https://github.com/aevalmere/aevaleron/actions/runs/43656874715",
   "event": "push",
-  "sha": "37b1e43846426b94ab87299f89ffe313d878a693",
+  "sha": "98d1f60a86e567ceed932fcdf68d53798de4ea17",
   "ref": "rust/voice-transcribe",
   "ref_dir": "rust-voice-transcribe",
-  "conclusion": "failure",
-  "failed": [
-    "Smoke"
-  ],
-  "finished": "2026-11-15T00:07:30Z",
-  "error_lines": 4,
+  "conclusion": "success",
+  "failed": [],
+  "finished": "2026-11-15T00:23:30Z",
+  "error_lines": 0,
   "steps": [
     {
       "name": "Checkout",
@@ -92,7 +90,7 @@
     },
     {
       "name": "Smoke",
-      "outcome": "failure",
+      "outcome": "success",
       "log": "smoke.log"
     },
     {
@@ -107,7 +105,7 @@
     },
     {
       "name": "Upload installer",
-      "outcome": "skipped",
+      "outcome": "success",
       "log": ""
     }
   ]
