@@ -107,7 +107,9 @@ pub fn display_name(exe: &str) -> String {
     }
     let file = file_name(exe.trim()).trim();
     let at = file.len().saturating_sub(4);
-    let has_exe = file.get(at..).is_some_and(|t| t.eq_ignore_ascii_case(".exe"));
+    let has_exe = file
+        .get(at..)
+        .is_some_and(|t| t.eq_ignore_ascii_case(".exe"));
     let stem = if has_exe { &file[..at] } else { file };
     let mut letters = stem.chars();
     match letters.next() {
@@ -524,7 +526,8 @@ mod win {
 
     #[link(name = "dwmapi")]
     extern "system" {
-        fn DwmGetWindowAttribute(hwnd: isize, attribute: u32, value: *mut c_void, size: u32) -> i32;
+        fn DwmGetWindowAttribute(hwnd: isize, attribute: u32, value: *mut c_void, size: u32)
+            -> i32;
     }
 
     const PROCESS_QUERY_LIMITED_INFORMATION: u32 = 0x1000;
@@ -797,7 +800,13 @@ mod tests {
         ] {
             assert!(is_listed(&list, hit), "{hit}");
         }
-        for miss in ["notepad2.exe", "wordpad", "password.exe", "", r"C:\notepad\calc.exe"] {
+        for miss in [
+            "notepad2.exe",
+            "wordpad",
+            "password.exe",
+            "",
+            r"C:\notepad\calc.exe",
+        ] {
             assert!(!is_listed(&list, miss), "{miss}");
         }
     }
@@ -846,7 +855,10 @@ mod tests {
         // No window, or a program that could not be named: nothing to refuse.
         assert_eq!(verdict(&list, ""), Ok(()));
         let helper: DesktopError = no.clone().into();
-        assert_eq!((helper.code.as_str(), helper.message.as_str()), (CODE, line));
+        assert_eq!(
+            (helper.code.as_str(), helper.message.as_str()),
+            (CODE, line)
+        );
         let seam: DeskError = no.into();
         assert_eq!((seam.code.as_str(), seam.message.as_str()), (CODE, line));
     }
@@ -868,21 +880,29 @@ mod tests {
         assert_eq!(op_reads("readTree", &json!({})), [Read::Screen]);
         let null = json!({ "windowHandle": null });
         assert_eq!(op_reads("docText", &null), [Read::Screen]);
-        assert_eq!(op_reads("findText", &json!({ "windowHandle": "w1234" })), [
-            Read::Window(0x1234)
-        ]);
+        assert_eq!(
+            op_reads("findText", &json!({ "windowHandle": "w1234" })),
+            [Read::Window(0x1234)]
+        );
         // Pixels are the screen's, and the named window's too.
-        assert_eq!(op_reads("capture", &json!({ "rect": [0, 0, 9, 9] })), [
-            Read::Screen
-        ]);
+        assert_eq!(
+            op_reads("capture", &json!({ "rect": [0, 0, 9, 9] })),
+            [Read::Screen]
+        );
         assert_eq!(op_reads("ocr", &named), [Read::Screen, Read::Window(4660)]);
         // The pointer and the keyboard.
         let at = json!({ "x": 10.4, "y": 20.6 });
         assert_eq!(op_reads("elementAt", &at), [Read::Point(10, 21)]);
         assert_eq!(op_reads("click", &at), [Read::Point(10, 21)]);
         let drag = json!({ "from": { "x": 1, "y": 2 }, "to": { "x": 3, "y": 4 } });
-        assert_eq!(op_reads("drag", &drag), [Read::Point(1, 2), Read::Point(3, 4)]);
-        assert_eq!(op_reads("key", &json!({ "keys": "ctrl+c" })), [Read::Screen]);
+        assert_eq!(
+            op_reads("drag", &drag),
+            [Read::Point(1, 2), Read::Point(3, 4)]
+        );
+        assert_eq!(
+            op_reads("key", &json!({ "keys": "ctrl+c" })),
+            [Read::Screen]
+        );
         assert_eq!(op_reads("type", &named), [Read::Window(4660)]);
         // A ref was made by a read that was checked.
         let by_ref = json!({ "ref": "ref_3", "windowHandle": null });
@@ -890,7 +910,13 @@ mod tests {
         assert_eq!(op_reads("type", &by_ref), none);
         assert_eq!(op_reads("readTree", &by_ref), none);
         // Nothing of an app's is read by these.
-        for op in ["listWindows", "foregroundWindow", "monitors", "ping", "config"] {
+        for op in [
+            "listWindows",
+            "foregroundWindow",
+            "monitors",
+            "ping",
+            "config",
+        ] {
             assert_eq!(op_reads(op, &named), none, "{op}");
         }
     }
@@ -900,7 +926,10 @@ mod tests {
         // No list is open in a unit test, so this is the shape alone: an
         // answer with no window, or from an op that reads nothing, passes.
         assert_eq!(check_reply("getText", &json!({ "text": "x" })), Ok(()));
-        assert_eq!(check_reply("click", &json!({ "windowHandle": "w1" })), Ok(()));
+        assert_eq!(
+            check_reply("click", &json!({ "windowHandle": "w1" })),
+            Ok(())
+        );
         assert!(reads_front("getText") && reads_front("capture"));
         assert!(!reads_front("key") && !reads_front("focused"));
     }
