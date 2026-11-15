@@ -32,7 +32,7 @@ pub type Probe = fn(&mut Cx);
 /// Every lane's probe, in the order they run: the harness first (it checks
 /// the API the others use, then runs the desktop selfcheck), the `v2desktop`
 /// lanes last.
-pub const LANES: [(&str, Probe); 12] = [
+pub const LANES: [(&str, Probe); 13] = [
     ("harness", harness::run),
     ("platform", platform::run),
     ("windows", windows::run),
