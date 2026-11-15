@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'none'; script-src 'self'; style-src 'self'; connect-src ipc: http://ipc.localhost" />
+  <title>Aevaleron copy text</title>
+  <link rel="stylesheet" href="glass.css" />
+  <link rel="stylesheet" href="region-note.css" />
+</head>
+<body data-kind="idle">
+  <!-- The confirmation for "Copy text from screen": a capsule beside the
+       rectangle the person drew, never focused, clicks pass through. It says
+       how much was copied and how it starts, or that nothing readable was
+       there, and goes away by itself. -->
+  <div id="note">
+    <span id="mark" aria-hidden="true">
+      <svg viewBox="0 0 16 16" focusable="false">
+        <path d="M3.5 8.5l3 3 6-7" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" />
+      </svg>
+    </span>
+    <span id="words" role="status" aria-live="polite">
+      <span id="title"></span>
+      <span id="lead"></span>
+    </span>
+  </div>
+  <script src="region-note.js"></script>
+</body>
+</html>

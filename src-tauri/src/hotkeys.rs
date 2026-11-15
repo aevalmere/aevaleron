@@ -26,6 +26,8 @@ pub fn action_label(action: &str) -> Option<&'static str> {
     Some(match action {
         "captureQuery" => "Ask, find, or do",
         "captureRegion" => "Ask about an area",
+        // region-text lane
+        "copyRegionText" => "Copy text from screen",
         "findOnScreen" => "Find on screen",
         "agentTask" => "Do a task",
         "toggleVisibility" => "Hide or show the overlay",

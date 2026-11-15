@@ -151,6 +151,9 @@ const INVOKE_CHANNELS = new Set([
   'agents:set',
   'agents:test',
   // end agents lane
+  // region-text lane
+  'region:note-ready',
+  // end region-text lane
 ]);
 
 const LISTEN_CHANNELS = new Set([
@@ -214,6 +217,9 @@ const LISTEN_CHANNELS = new Set([
   'agents:hide',
   'agents:state',
   // end agents lane
+  // region-text lane
+  'region:note',
+  // end region-text lane
 ]);
 
 contextBridge.exposeInMainWorld('aeval', {

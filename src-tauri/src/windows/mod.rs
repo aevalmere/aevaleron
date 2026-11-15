@@ -1061,6 +1061,8 @@ pub fn on_hotkey(app: &AppHandle, action: &str) {
             latch_display(app);
             shared(app).call(app, |h| h.start_region.as_ref());
         }
+        // region-text lane: the picker, then the text under it is copied.
+        "copyRegionText" => crate::region_text::start(app),
         "toggleVisibility" => toggle_visibility(app),
         "escape" => on_escape(app),
         _ => {}

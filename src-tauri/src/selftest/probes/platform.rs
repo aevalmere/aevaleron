@@ -405,6 +405,8 @@ fn tray_data(cx: &Cx) {
     let base = [
         "Ask, find, or do…",
         "Ask about an area…",
+        // region-text lane
+        "Copy text from screen…",
         "Find on screen…",
         "Do a task…",
         "-",

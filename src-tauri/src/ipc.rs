@@ -164,6 +164,9 @@ pub const INVOKE_CHANNELS: &[&str] = &[
     "agents:set",
     "agents:test",
     // end agents lane
+    // region-text lane
+    "region:note-ready",
+    // end region-text lane
 ];
 
 /// Channels a page may listen on. Must equal `LISTEN_CHANNELS` in preload.js.
@@ -228,6 +231,9 @@ pub const LISTEN_CHANNELS: &[&str] = &[
     "agents:hide",
     "agents:state",
     // end agents lane
+    // region-text lane
+    "region:note",
+    // end region-text lane
 ];
 
 const BRIDGE_JS: &str = include_str!("../bridge/aeval-bridge.js");
@@ -264,6 +270,8 @@ pub enum Caller {
     Region,
     /// The agents card (agents lane).
     Agents,
+    /// The copy-text confirmation (region-text lane).
+    Note,
     /// Anything else (a test fixture page).
     Other,
 }
@@ -277,6 +285,7 @@ impl Caller {
             "buddy" => Caller::Buddy,
             "region" => Caller::Region,
             crate::agents::LABEL => Caller::Agents,
+            crate::region_text::note::LABEL => Caller::Note,
             l if outputs::is_output(l) => Caller::Output,
             l if l.starts_with("lens-") => Caller::Lens,
             _ => Caller::Other,
@@ -317,6 +326,8 @@ const LENS: &[Caller] = &[Caller::Lens];
 const REGION: &[Caller] = &[Caller::Bar, Caller::Region];
 // agents lane: the card's own calls and Settings' Agents page.
 const AGENTS: &[Caller] = &[Caller::Settings, Caller::Agents];
+// region-text lane: the confirmation says its listener is in place, no more.
+const NOTE: &[Caller] = &[Caller::Note];
 
 /// Channels whose callers differ from their prefix's row. A table, not
 /// match arms, so `every_invoke_channel_has_a_route` never takes a rule
@@ -345,6 +356,8 @@ const EXCEPTIONS: &[(&str, &[Caller])] = &[
     // llm lane: Settings' Connect OpenRouter and custom answer styles.
     ("auth:openrouter-connect", APP),
     ("skills:open-folder", APP),
+    // region-text lane: from the confirmation only, not the bar or picker.
+    ("region:note-ready", NOTE),
 ];
 
 /// B-089: the windows that may call `channel`; None for a channel with no
@@ -1244,6 +1257,19 @@ mod tests {
         assert!(stale.is_empty(), "stale rules: {stale:?}");
     }
 
+    /// region-text lane: the copy-text confirmation may say its listener is
+    /// in place and nothing else, and no other window may say it for it.
+    #[test]
+    fn the_copy_text_note_calls_only_its_own_channel() {
+        let note = Caller::of(crate::region_text::note::LABEL);
+        assert_eq!(note, Caller::Note);
+        for c in INVOKE_CHANNELS {
+            assert_eq!(permitted(note, c), *c == "region:note-ready", "{c}");
+        }
+        assert!(!permitted(Caller::Region, "region:note-ready"));
+        assert!(!permitted(Caller::Bar, "region:note-ready"));
+    }
+
     /// The quoted channels a page script passes to `invoke(`.
     fn invoked(js: &str) -> Vec<&str> {
         let mut out = Vec::new();
@@ -1265,7 +1291,7 @@ mod tests {
     fn pages_may_call_what_they_call() {
         let glass = include_str!("../../renderer/glass.js");
         let frame = include_str!("../../renderer/frame.js");
-        let pages: [(Caller, Vec<&str>); 8] = [
+        let pages: [(Caller, Vec<&str>); 9] = [
             (
                 Caller::Bar,
                 vec![
@@ -1314,6 +1340,11 @@ mod tests {
             (
                 Caller::Agents,
                 vec![glass, include_str!("../../renderer/agents.js")],
+            ),
+            // region-text lane
+            (
+                Caller::Note,
+                vec![include_str!("../../renderer/region-note.js")],
             ),
         ];
         let mut refused = Vec::new();
