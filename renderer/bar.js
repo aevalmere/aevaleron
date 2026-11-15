@@ -762,6 +762,12 @@ listenSoft('find:hits', (h) => {
   findHits = h && Array.isArray(h.hits) ? h : null;
 });
 
+// The last step asked of Rust, so Enter can wait for it to land.
+let findStepped = Promise.resolve();
+function stepFind(by) {
+  findStepped = Promise.resolve(window.aeval.invoke('find:step', { by })).catch(() => null);
+}
+
 // Find has matches to walk: the arrows and F3 move between them. A recall
 // of earlier entries that is under way keeps the arrows.
 function findStepping() {
@@ -773,16 +779,20 @@ function findStepping() {
 // and the row on show, so a list that changed under the key is left alone.
 // When nothing was done, the status row says why.
 function actOnHit() {
-  const h = findHits && findHits.current >= 0 ? findHits.hits[findHits.current] : null;
-  if (!h) {
-    // Nothing is selected yet: the first match, if there is one.
-    if (findState && findState.total > 0) window.aeval.invoke('find:step', { by: 1 });
-    return;
-  }
-  const failed = () => showNote("Couldn't do that. Press Enter to try again.");
-  window.aeval.invoke('find:act', { gen: findHits.gen, index: findHits.current, match: h.match }).then((r) => {
-    if (r && r.message) showNote(r.message);
-  }, failed);
+  // After a step that is still on its way: Down then Enter means the row
+  // the arrow went to.
+  findStepped.then(() => {
+    const h = findHits && findHits.current >= 0 ? findHits.hits[findHits.current] : null;
+    if (!h) {
+      // Nothing is selected yet: the first match, if there is one.
+      if (findState && findState.total > 0) stepFind(1);
+      return;
+    }
+    const failed = () => showNote("Couldn't do that. Press Enter to try again.");
+    window.aeval.invoke('find:act', { gen: findHits.gen, index: findHits.current, match: h.match }).then((r) => {
+      if (r && r.message) showNote(r.message);
+    }, failed);
+  });
 }
 
 // --------------------------------------------------------------- examples
@@ -1095,7 +1105,7 @@ input.addEventListener('keydown', (e) => {
     // the matches, which Enter did before it acted on one.
     if (findStepping()) {
       e.preventDefault();
-      window.aeval.invoke('find:step', { by: dir });
+      stepFind(dir);
       return;
     }
     if (caretAtEdge(dir) && recallKey(dir)) e.preventDefault();
@@ -1103,7 +1113,7 @@ input.addEventListener('keydown', (e) => {
   }
   if (e.key === 'F3' && !e.altKey && !e.ctrlKey && findStepping()) {
     e.preventDefault();
-    window.aeval.invoke('find:step', { by: e.shiftKey ? -1 : 1 });
+    stepFind(e.shiftKey ? -1 : 1);
     return;
   }
   if (e.key === 'Escape') {

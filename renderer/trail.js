@@ -215,21 +215,20 @@ function goTo(i, focus) {
       r.scrollIntoView({ block: 'nearest' });
     }
   }
-  send('find:step', { by: { index: i } });
+  findStepped = send('find:step', { by: { index: i } });
 }
 
+// The last step asked of Rust, so Enter can wait for it to land.
+let findStepped = Promise.resolve();
+
 // Enter on a row acts on that match, as Enter in the bar does. The row is
-// the current one first, so what is sent is what Rust has marked.
+// the current one first, and the step that made it so has landed, so what
+// is sent is what Rust has marked.
 function actOn(i) {
   const h = findHits.find((x) => x.i === i);
   if (!h) return;
-  const act = () => send('find:act', { gen: findGen, index: i, match: h.match });
-  if (i === findCurrent) {
-    act();
-    return;
-  }
-  findCurrent = i;
-  send('find:step', { by: { index: i } }).then(act);
+  if (i !== findCurrent) goTo(i, false);
+  findStepped.then(() => send('find:act', { gen: findGen, index: i, match: h.match }));
 }
 
 findView.addEventListener('keydown', (e) => {
