@@ -19,10 +19,10 @@
       Adding windows-sys v0.59.0 (available: v0.61.2)
       Adding winreg v0.55.0 (available: v0.56.0)
  Downloading crates ...
-  Downloaded brotli v9.1.2
   Downloaded jiff-core v0.1.7
   Downloaded rand v0.10.4
   Downloaded jiff v0.2.45
+  Downloaded brotli v9.1.2
    Compiling brotli v9.1.2
     Checking tauri-utils v2.10.2
     Checking tauri-runtime v2.12.2
@@ -32,8 +32,8 @@
    Compiling tauri-codegen v2.7.4
    Compiling tauri v2.12.5
    Compiling tauri-macros v2.7.4
-   Compiling tauri-plugin-opener v2.7.3
-   Compiling tauri-plugin-clipboard-manager v2.5.0
    Compiling tauri-plugin-global-shortcut v2.4.1
+   Compiling tauri-plugin-clipboard-manager v2.5.0
+   Compiling tauri-plugin-opener v2.7.3
    Compiling aevaleron v1.1.1 (D:\a\aevaleron\aevaleron\src-tauri)
-    Finished `dev` profile [unoptimized + debuginfo] target(s) in 42.40s
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 33.09s

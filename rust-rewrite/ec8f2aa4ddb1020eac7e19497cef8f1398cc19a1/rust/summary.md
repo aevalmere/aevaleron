@@ -1,17 +1,18 @@
 # rust: success
 
 - Workflow: rust
-- Run: [42737599865](https://github.com/aevalmere/aevalbuddy/actions/runs/42737599865), attempt 1, on push
-- Commit: b6e5611aee9444013d6ab5a80676e713700343e8
+- Run: [43738524890](https://github.com/aevalmere/aevaleron/actions/runs/43738524890), attempt 1, on push
+- Commit: ec8f2aa4ddb1020eac7e19497cef8f1398cc19a1
 - Ref: rust-rewrite
 - Conclusion: **success**
-- Finished: 2026-11-10T01:55:03Z
+- Finished: 2026-11-15T17:13:41Z
 
 | Step | Outcome | Log |
 |---|---|---|
 | Checkout | success |  |
 | Node | success |  |
 | Rust toolchain | success |  |
+| Voice build flags | success |  |
 | Cache cargo | success |  |
 | Gate helper | success |  |
 | Prebuild desktop helper | success | [prebuild.log](prebuild.log) |
