@@ -1,19 +1,17 @@
 {
   "workflow": "rust",
   "workflow_name": "rust",
-  "run_id": 43754732956,
+  "run_id": 43755565269,
   "run_attempt": 1,
-  "run_url": "https://github.com/aevalmere/aevaleron/actions/runs/43754732956",
+  "run_url": "https://github.com/aevalmere/aevaleron/actions/runs/43755565269",
   "event": "push",
-  "sha": "ea5fca7f09b01749ad6d89c7ef6ecbc56e99d04b",
+  "sha": "ab66ebbb8c01c67a0329f96af8060fdabc4788f3",
   "ref": "rust/next",
   "ref_dir": "rust-next",
-  "conclusion": "cancelled",
-  "failed": [
-    "Format"
-  ],
-  "finished": "2026-11-15T20:00:32Z",
-  "error_lines": 19,
+  "conclusion": "success",
+  "failed": [],
+  "finished": "2026-11-15T20:33:15Z",
+  "error_lines": 0,
   "steps": [
     {
       "name": "Checkout",
@@ -52,13 +50,13 @@
     },
     {
       "name": "Format",
-      "outcome": "failure",
-      "log": "fmt.log"
+      "outcome": "success",
+      "log": ""
     },
     {
       "name": "Format patch",
-      "outcome": "success",
-      "log": "fmt.patch"
+      "outcome": "skipped",
+      "log": ""
     },
     {
       "name": "Clippy",
@@ -67,47 +65,47 @@
     },
     {
       "name": "Unit tests",
-      "outcome": "cancelled",
+      "outcome": "success",
       "log": "test.log"
     },
     {
       "name": "Restore NSIS toolset",
-      "outcome": "skipped",
+      "outcome": "success",
       "log": ""
     },
     {
       "name": "Seed NSIS toolset",
-      "outcome": "skipped",
-      "log": ""
+      "outcome": "success",
+      "log": "nsis.log"
     },
     {
       "name": "Save NSIS toolset",
-      "outcome": "skipped",
+      "outcome": "success",
       "log": ""
     },
     {
       "name": "Build installer",
-      "outcome": "skipped",
-      "log": ""
+      "outcome": "success",
+      "log": "build.log"
     },
     {
       "name": "Smoke",
-      "outcome": "skipped",
-      "log": ""
+      "outcome": "success",
+      "log": "smoke.log"
     },
     {
       "name": "Capture check",
-      "outcome": "skipped",
-      "log": ""
+      "outcome": "success",
+      "log": "capture.log"
     },
     {
       "name": "Desktop selfcheck",
-      "outcome": "skipped",
-      "log": ""
+      "outcome": "success",
+      "log": "desktop.log"
     },
     {
       "name": "Upload installer",
-      "outcome": "skipped",
+      "outcome": "success",
       "log": ""
     }
   ]
