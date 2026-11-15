@@ -322,7 +322,10 @@ mod tests {
         assert_eq!(n.lead, "Invoice 2291 for March Please settle…");
         assert_eq!(n.spoken(), "Copied 8 words.");
         let n = Note::none();
-        assert_eq!(n.spoken(), "No text found here. The clipboard is unchanged.");
+        assert_eq!(
+            n.spoken(),
+            "No text found here. The clipboard is unchanged."
+        );
         let no_ocr = DesktopError::new("NO_OCR", "no Windows OCR language is installed");
         assert!(Note::failed(&no_ocr).lead.contains("Windows Settings"));
         let down = DesktopError::new("HELPER_DOWN", "the helper is not running");

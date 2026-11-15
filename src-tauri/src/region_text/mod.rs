@@ -208,7 +208,13 @@ fn pieces(spans: &Value) -> Vec<Piece> {
         .filter_map(|s| {
             let n = |k: &str| s["rect"][k].as_f64();
             let text = s["text"].as_str()?;
-            Some(Piece::new(text, n("x")?, n("y")?, n("width")?, n("height")?))
+            Some(Piece::new(
+                text,
+                n("x")?,
+                n("y")?,
+                n("width")?,
+                n("height")?,
+            ))
         })
         .collect()
 }

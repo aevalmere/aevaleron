@@ -453,9 +453,8 @@ pub fn lead(text: &str) -> String {
     const WORDS: usize = 6;
     const CHARS: usize = 40;
     let mut out = String::new();
-    let mut taken = 0;
     let mut more = false;
-    for word in text.split_whitespace() {
+    for (taken, word) in text.split_whitespace().enumerate() {
         let longer = out.chars().count() + word.chars().count() + 1;
         if taken == WORDS || (taken > 0 && longer > CHARS) {
             more = true;
@@ -465,7 +464,6 @@ pub fn lead(text: &str) -> String {
             out.push(' ');
         }
         out.push_str(word);
-        taken += 1;
     }
     if out.chars().count() > CHARS {
         out = out.chars().take(CHARS).collect();

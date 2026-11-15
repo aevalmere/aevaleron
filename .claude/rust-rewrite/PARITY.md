@@ -851,6 +851,7 @@ Folded from the lanes' entries files at the final merges. Each line names the ba
 
 - B-080: Wording follows tasks and conversations (C-83, C-84): `Stop the task` (Esc) replaces `Stop agent`, `New conversation` replaces `New chat`, and `Close all answer windows` (C-85, U38) follows it and calls `outputs::close_all` (K-04). The idle order is now `Ask, find, or do…`, `Ask about an area…`, `Find on screen…`, `Do a task…`, `-`, `Hide the overlay`, `New conversation`, `Close all answer windows`, `History…`, `-`, `Settings…`, `Help and feedback…`, check item, `-`, `Quit AevalBuddy`.
 - B-080: status: UNIT tray::tests::idle_order, tray::tests::ready_running_hidden; SMOKE trayOrder pending the platform probe
+- region-text lane (new in the rewrite, nothing in Electron to match): `Copy text from screen…` follows `Ask about an area…`. Its action is `copyRegionText`, named "Copy text from screen", with no default chord (lanes/region-text.md).
 
 ### TRAY-05
 
