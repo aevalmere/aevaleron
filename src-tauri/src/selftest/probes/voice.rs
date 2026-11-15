@@ -244,8 +244,16 @@ fn dictation(cx: &mut Cx) {
 /// fixture gates allow a little over 1.4 times what the slower processor
 /// took; the utterance varied more there and is allowed 1.6 times its
 /// slowest, which is still under what Whisper takes.
+///
+/// A runner is at times busy with something else for several seconds (run
+/// 43655509204: every pass two to five times its usual for about ten
+/// seconds, then as before), so a time that comes out over its budget is
+/// taken again after a wait, `RETRIES` times at most, and the best counts. A
+/// build that is slow stays slow through all of them.
 const SPEED_BUDGET_MS: u64 = 400;
 const E2E_BUDGET_MS: u64 = 600;
+const RETRIES: usize = 2;
+const QUIET_MS: u64 = 5000;
 const WHISPER_BUDGET_MS: u64 = 1400;
 
 fn fixture_16k() -> Result<Vec<f32>, String> {
@@ -293,6 +301,26 @@ fn pass(path: &Path, samples: &[f32]) -> (u64, Result<String, String>) {
     let t = Instant::now();
     let text = whisper::transcribe(path, samples, "en");
     (ms(t), text)
+}
+
+/// `first`, or the best of it and the takes of `again` made while the best
+/// is over `budget`.
+fn settled(cx: &Cx, first: u64, budget: u64, mut again: impl FnMut() -> u64) -> u64 {
+    let mut best = first;
+    for _ in 0..RETRIES {
+        if best <= budget {
+            break;
+        }
+        cx.sleep(QUIET_MS);
+        best = best.min(again());
+    }
+    best
+}
+
+/// Whether a 17 s utterance came out inside the default engine's budget.
+fn in_time(timings: &Option<voice::Timings>) -> bool {
+    let took = timings.as_ref().map(|t| t.total_ms);
+    took.is_some_and(|t| t <= E2E_BUDGET_MS)
 }
 
 /// The pass just done, as a log line: its time, where the engine spent it
@@ -347,6 +375,8 @@ fn speed(cx: &Cx) {
     let line = format!("load={load_ms}ms (once) trim={trim_ms}ms ({kept}) {heard}");
     cx.log("voiceSpeedAfter", line);
     cx.log("voiceSpeedWhisperTidy", tidied(&text));
+    // Taken again if the runner was busy; the gate is further down.
+    let total = settled(cx, total, WHISPER_BUDGET_MS, || pass(&path, speech).0);
     // A three-second phrase is most of dictation.
     let short = &clip[..clip.len().min(3 * wav::RATE as usize)];
     let (short_ms, phrase) = pass(&path, short);
@@ -379,15 +409,22 @@ fn speed(cx: &Cx) {
         format!("{total}ms of {WHISPER_BUDGET_MS}ms"),
     );
 
-    let (started, timings, field) = e2e(cx, &clip, settings::ENGINES[0]);
+    let id = settings::ENGINES[0];
+    let mut run = e2e(cx, &clip, id);
+    let mut tries = 1;
+    while !in_time(&run.1) && tries <= RETRIES {
+        cx.sleep(QUIET_MS);
+        run = e2e(cx, &clip, id);
+        tries += 1;
+    }
+    let (started, timings, field) = run;
     let json = serde_json::to_string(&timings).unwrap_or_default();
     cx.log("voiceSpeedTimings", &json);
     cx.log("voiceSpeedHeard", format!("{field:?}"));
-    let in_time = timings.is_some_and(|t| t.total_ms <= E2E_BUDGET_MS);
     cx.must(
         "voiceSpeedE2e",
-        started && in_time,
-        format!("started={started} {json} budget={E2E_BUDGET_MS}ms"),
+        started && in_time(&timings),
+        format!("started={started} {json} budget={E2E_BUDGET_MS}ms tries={tries}"),
     );
 
     let (_, timings, field) = e2e(cx, &clip, "whisper-base");
@@ -400,7 +437,8 @@ fn speed(cx: &Cx) {
 /// seconds, kept loaded as the app keeps it. It is handed the clip as the app
 /// hands it, silence left on; the same clip cut to the speech, and cut then
 /// given half a second of quiet either side, are logged beside it. The gate
-/// takes the better of two passes: the first after a load is uneven.
+/// takes the better of two passes: the first after a load is uneven. Over
+/// its budget, it is taken again (`settled`).
 fn parakeet(cx: &Cx, clip: &[f32], short: &[f32]) {
     let spec = model::parakeet();
     let path = match cx.block_on(model::ensure(spec, &|_, _| {})) {
@@ -422,11 +460,12 @@ fn parakeet(cx: &Cx, clip: &[f32], short: &[f32]) {
     let line = format!("load={load_ms}ms {heard} again={again_ms}ms");
     cx.log("voiceSpeedParakeet", line);
     cx.log("voiceSpeedParakeetTidy", tidied(&text));
-    let best = run_ms.min(again_ms);
+    let first = run_ms.min(again_ms);
+    let best = settled(cx, first, SPEED_BUDGET_MS, || pass(&path, whole).0);
     cx.must(
         "voiceSpeed",
         tomorrow(&text) && best <= SPEED_BUDGET_MS,
-        format!("{best}ms of {SPEED_BUDGET_MS}ms"),
+        format!("{best}ms of {SPEED_BUDGET_MS}ms, first {first}ms"),
     );
     let (short_ms, phrase) = pass(&path, short);
     cx.log("voiceSpeedParakeetShort", said(short_ms, &phrase));
