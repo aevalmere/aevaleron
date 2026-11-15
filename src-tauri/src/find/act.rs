@@ -188,7 +188,7 @@ pub fn element_action(t: &Target) -> Option<Act> {
         ("expandcollapse", "expand"),
     ];
     let first = ORDER.iter().find(|(has, _)| t.has(has));
-    first.map(|(_, action)| pattern(*action))
+    first.map(|(_, action)| pattern(action))
 }
 
 /// A pattern on an element the application has turned off does nothing.
@@ -683,8 +683,14 @@ mod tests {
     #[test]
     fn menu_names_read_as_a_person_reads_them() {
         assert_eq!(clean_menu_name("&Word Wrap", true), "Word Wrap");
-        assert_eq!(clean_menu_name("Save &As...\tCtrl+Shift+S", true), "Save As");
-        assert_eq!(clean_menu_name("Find && Replace\u{2026}", true), "Find & Replace");
+        assert_eq!(
+            clean_menu_name("Save &As...\tCtrl+Shift+S", true),
+            "Save As"
+        );
+        assert_eq!(
+            clean_menu_name("Find && Replace\u{2026}", true),
+            "Find & Replace"
+        );
         assert_eq!(clean_menu_name("  ", true), "");
         // A menu read through UI Automation has no access-key marks.
         assert_eq!(clean_menu_name("Save & Close", false), "Save & Close");
@@ -806,8 +812,10 @@ mod tests {
             let point = Act::ClickPoint { x: 30.5, y: 40.2 };
             perform(&d, &plan(point)).await.unwrap();
             let mut menu = plan(Act::Menu { index: 0 });
-            menu.menu = Some(json!({ "source": "win32", "path": ["F&ormat", "&Word Wrap"],
-                "pos": [2, 0] }));
+            menu.menu = Some(
+                json!({ "source": "win32", "path": ["F&ormat", "&Word Wrap"],
+                "pos": [2, 0] }),
+            );
             perform(&d, &menu).await.unwrap();
 
             let calls = d.calls.lock().clone();
@@ -815,7 +823,10 @@ mod tests {
                 ("invoke", json!({ "ref": "ref_2", "action": "toggle" })),
                 ("invoke", json!({ "ref": "ref_3", "action": "focusNear" })),
                 // A numbered match is selected by its number alone.
-                ("selectText", json!({ "ref": "ref_4", "query": "total", "n": 2 })),
+                (
+                    "selectText",
+                    json!({ "ref": "ref_4", "query": "total", "n": 2 }),
+                ),
                 (
                     "selectText",
                     json!({ "ref": "ref_4", "query": "total", "n": 0, "x": 10.0, "y": 21.0 }),

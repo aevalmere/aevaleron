@@ -990,9 +990,7 @@ impl State {
     fn set_menu(&mut self, commands: Vec<act::MenuCommand>, limit: Option<&'static str>) {
         // Each name is a span of its own "window", so a phrase is never
         // matched across two commands that happen to be neighbours.
-        let name = |(i, c): (usize, &act::MenuCommand)| {
-            json!({ "text": c.path.last(), "source": "menu", "window": i + 1 })
-        };
+        let name = |(i, c): (usize, &act::MenuCommand)| json!({ "text": c.path.last(), "source": "menu", "window": i + 1 });
         let names: Vec<Value> = commands.iter().enumerate().map(name).collect();
         self.menu_spans = index_spans(&names);
         self.menu = commands;
@@ -2002,7 +2000,8 @@ impl Inner {
         // the side, once per window, and never holds a match back.
         if let Some((key, window)) = menu {
             let inner = self.clone();
-            self.rt.spawn(async move { inner.read_menu(key, window).await });
+            self.rt
+                .spawn(async move { inner.read_menu(key, window).await });
         }
     }
 
@@ -2017,12 +2016,12 @@ impl Inner {
         // On a task of its own: a read Find stops waiting for still runs to
         // its end, so the helper is never left half way through a call.
         let desktop = self.desktop.clone();
-        let task = self.rt.spawn(async move { desktop.op("menuItems", args).await });
+        let task = self
+            .rt
+            .spawn(async move { desktop.op("menuItems", args).await });
         let wait = Duration::from_millis(act::MENU_WAIT_MS);
         let (commands, limit) = match tokio::time::timeout(wait, task).await {
-            Ok(Ok(Ok(read))) => {
-                act::menu_commands(&read, &window, act::MENU_DEPTH, act::MENU_MAX)
-            }
+            Ok(Ok(Ok(read))) => act::menu_commands(&read, &window, act::MENU_DEPTH, act::MENU_MAX),
             // No menu, or one that cannot be read: nothing to list or say.
             Ok(_) => (Vec::new(), None),
             Err(_) => (Vec::new(), Some("skipped")),
@@ -3215,7 +3214,10 @@ mod tests {
             // Nothing on screen says it, and the menu does.
             find.query("word wrap", true);
             let st = host.events.last("find:state").unwrap();
-            assert_eq!(st["status"], json!("Nothing on screen \u{b7} 1 menu command"));
+            assert_eq!(
+                st["status"],
+                json!("Nothing on screen \u{b7} 1 menu command")
+            );
             assert_eq!(st["total"], json!(1));
             // Enter runs it: the helper gets the names as the app wrote them.
             let plan = enter(&find, &host).await.unwrap();
@@ -3251,7 +3253,10 @@ mod tests {
             find.query("word wrap", true);
             // What is on screen never waits for the menu.
             let st = host.events.last("find:state").unwrap();
-            assert_eq!(st["status"], json!("Nothing on screen matches \"word wrap\"."));
+            assert_eq!(
+                st["status"],
+                json!("Nothing on screen matches \"word wrap\".")
+            );
             settle(act::MENU_WAIT_MS + 100).await;
             let st = host.events.last("find:state").unwrap();
             assert_eq!(st["counts"]["menu"], json!(0));

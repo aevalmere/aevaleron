@@ -484,7 +484,9 @@ pub async fn find_act(app: &AppHandle, p: &Value) -> Value {
         return refused(engine::act::Refusal::NoHit);
     };
     let index = hit_index(p.get("index"));
-    let planned = sv.find.plan_act(p["gen"].as_i64(), index, p["match"].as_str());
+    let planned = sv
+        .find
+        .plan_act(p["gen"].as_i64(), index, p["match"].as_str());
     let plan = match planned.await {
         Ok(plan) => plan,
         Err(r) => return refused(r),
@@ -501,7 +503,12 @@ pub async fn find_act(app: &AppHandle, p: &Value) -> Value {
         Err(e) => {
             let (status, message) = engine::act::failure(&e);
             windows::open_bar(app, Some("find"), Some(plan.query.clone()));
-            windows::emit(app, windows::OVERLAY, "bar:note", json!({ "text": message }));
+            windows::emit(
+                app,
+                windows::OVERLAY,
+                "bar:note",
+                json!({ "text": message }),
+            );
             json!({ "status": status, "message": message, "code": e.code })
         }
     }

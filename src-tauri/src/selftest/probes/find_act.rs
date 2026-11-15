@@ -215,7 +215,9 @@ fn popup_of(pid: u32) -> bool {
 /// The window's text as UI Automation reads it, lowercased.
 fn window_text(cx: &Cx, handle: &Value) -> String {
     let read = cx.block_on(desktop::client().get_text(Some(handle), &Value::Null, 20000, false));
-    let text = read.ok().and_then(|r| r["text"].as_str().map(str::to_lowercase));
+    let text = read
+        .ok()
+        .and_then(|r| r["text"].as_str().map(str::to_lowercase));
     text.unwrap_or_default()
 }
 
@@ -379,9 +381,7 @@ fn menu_command(cx: &Cx, handle: &Value) {
     };
     // After what is on screen: no row that is on screen comes later.
     let all = list["rows"].as_array().map_or(0, Vec::len);
-    let last_on_screen = (0..all)
-        .rev()
-        .find(|i| row_at(&list, *i)["kind"] != "menu");
+    let last_on_screen = (0..all).rev().find(|i| row_at(&list, *i)["kind"] != "menu");
     let ordered = last_on_screen < Some(at);
     let list = pick(cx, at);
     let row = current_row(&list);
