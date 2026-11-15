@@ -286,6 +286,12 @@ fn loupe(app: &AppHandle, label: &str, cur: &Hit, display: u32) {
     if !fresh {
         return;
     }
+    // Private apps: no loupe is cut from the screen over a listed app, and
+    // the bar says why (`privacy.rs`).
+    if crate::privacy::check(crate::privacy::Read::Screen).is_err() {
+        crate::privacy::tell(app, false);
+        return;
+    }
     let rect = Rect::new(
         (r.x - LOUPE_PAD).round(),
         (r.y - LOUPE_PAD).round(),

@@ -196,14 +196,20 @@ pub fn skill_exists(id: &str) -> bool {
 }
 
 /// `overlay:state` fields only this side knows (K-07): who receives the
-/// screen, first first, so the bar's disclosure names them (B-045).
+/// screen, first first, so the bar's disclosure names them (B-045), and the
+/// bar's line while the app in front is on the private apps list (empty
+/// otherwise).
 fn overlay_extra(_app: &AppHandle) -> Value {
+    let private = crate::privacy::notice();
     let Some(sv) = try_services() else {
-        return json!({});
+        return json!({ "privateNotice": private });
     };
     let all = sv.llm.known_catalogue();
     let all = all.as_deref().map(Vec::as_slice);
-    json!({ "recipients": crate::llm::recipients_with(&*sv.settings, all) })
+    json!({
+        "recipients": crate::llm::recipients_with(&*sv.settings, all),
+        "privateNotice": private,
+    })
 }
 
 /// `settings:get` fields only this side knows: the healed model ids, the

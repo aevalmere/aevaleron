@@ -369,6 +369,9 @@ impl Outcome {
 struct Info {
     t: Touches,
     point: Option<Point>,
+    /// The call touches an app on the private apps list: the desktop's
+    /// refusal, which ends the step before anything asks or moves.
+    private: Option<DeskError>,
 }
 
 struct Obs {
@@ -1218,6 +1221,7 @@ impl Ctx {
             ..Touches::default()
         };
         let mut point = None;
+        let mut private = None;
         let shot = self.shot();
         let or_target = |h: &Value| or_value(h, &target);
         if let Some(r) = arg_ref(a) {
@@ -1227,6 +1231,7 @@ impl Ctx {
                     t.window_handle = or_target(&res["windowHandle"]);
                     t.node = Some(res["node"].clone());
                 }
+                Err(e) if e.code == crate::privacy::CODE => private = Some(e),
                 _ => t.error = true,
             }
         } else if is_pointer_tool(&call.name) {
@@ -1238,9 +1243,13 @@ impl Ctx {
             };
             if let Some(p) = arg_point(a, key, shot.as_ref()) {
                 point = Some(p);
-                if let Ok(at) = self.op("elementAt", p.to_json()).await {
-                    t.node = Some(at["node"].clone()).filter(truthy);
-                    t.window_handle = or_target(&at["windowHandle"]);
+                match self.op("elementAt", p.to_json()).await {
+                    Ok(at) => {
+                        t.node = Some(at["node"].clone()).filter(truthy);
+                        t.window_handle = or_target(&at["windowHandle"]);
+                    }
+                    Err(e) if e.code == crate::privacy::CODE => private = Some(e),
+                    Err(_) => {}
                 }
             }
         }
@@ -1259,14 +1268,18 @@ impl Ctx {
         if call.name == "left_click_drag" {
             let mut end = DragEnd::default();
             if let Some(p) = arg_point(a, "coordinate", shot.as_ref()) {
-                if let Ok(at) = self.op("elementAt", p.to_json()).await {
-                    end.node = Some(at["node"].clone()).filter(truthy);
-                    end.app = self.app_name(&at["windowHandle"]).await;
+                match self.op("elementAt", p.to_json()).await {
+                    Ok(at) => {
+                        end.node = Some(at["node"].clone()).filter(truthy);
+                        end.app = self.app_name(&at["windowHandle"]).await;
+                    }
+                    Err(e) if e.code == crate::privacy::CODE => private = Some(e),
+                    Err(_) => {}
                 }
             }
             t.end = Some(end);
         }
-        Info { t, point }
+        Info { t, point, private }
     }
 
     /// The control with keyboard focus in `handle`'s window: the helper's
@@ -1429,6 +1442,11 @@ impl Ctx {
                     let head = cut(&text, OBS_CHARS);
                     text = format!("{head}\n[cut; use find or read_page with a ref]");
                 }
+            }
+            // Private apps: the trail says why the window was not read.
+            Err(e) if e.code == crate::privacy::CODE => {
+                self.row(json!({ "kind": "note", "text": e.message }));
+                text = format!("(not read: {})", e.message);
             }
             Err(e) => text = format!("(could not read the window: {} {})", e.code, e.message),
         }
@@ -2008,6 +2026,20 @@ impl Ctx {
         let mut info = self.inspect(call).await;
         if self.ended() {
             return Outcome::text("Stopped.");
+        }
+        // Private apps: a step that would touch a listed app goes no
+        // further, and the trail says which app and why.
+        if let Some(e) = info.private.take() {
+            let error = friendly_err(&e);
+            let row = json!({
+                "kind": "action",
+                "text": self.describe(call, &info),
+                "state": "failed",
+                "error": error,
+                "planIndex": plan_index,
+            });
+            self.row(row);
+            return Outcome::failed(format!("Error: {error}"));
         }
         let settings = self.settings();
         let target = self.target();

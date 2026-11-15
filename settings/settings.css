@@ -1426,3 +1426,45 @@ html[data-motion="reduced"] .state[data-status="checking"] svg {
   display: flex;
   gap: var(--sp-2);
 }
+
+/* ---- private apps lane: Privacy's Private apps row (#sec-private) ---- */
+
+.private-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+}
+
+.private-list[hidden] {
+  display: none;
+}
+
+/* An app by the name people know it by, its program's name under it, and
+   the button that takes it off the list at the end of the line. */
+.private-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  min-height: var(--ctl);
+}
+
+.private-app {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--fs-row);
+  color: var(--label);
+}
+
+.private-exe {
+  display: block;
+  font-size: var(--t-meta);
+  line-height: var(--lh-meta);
+  color: var(--label-2);
+}
+
+.private-add {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+}

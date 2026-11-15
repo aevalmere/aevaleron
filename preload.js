@@ -151,6 +151,11 @@ const INVOKE_CHANNELS = new Set([
   'agents:set',
   'agents:test',
   // end agents lane
+  // private apps lane
+  'privacy:get',
+  'privacy:add',
+  'privacy:remove',
+  // end private apps lane
 ]);
 
 const LISTEN_CHANNELS = new Set([

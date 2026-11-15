@@ -173,8 +173,11 @@ fn forced_backend() -> Option<Backend> {
     }
 }
 
-/// The display as composed now, in physical pixels: DXGI, else GDI.
+/// The display as composed now, in physical pixels: DXGI, else GDI. Refused
+/// while a private app is in front: every screenshot, crop and backdrop
+/// frame comes through here, so none of them holds its window.
 pub fn grab(display: &Display) -> Result<Arc<Frame>, String> {
+    crate::privacy::check(crate::privacy::Read::Screen).map_err(|r| r.message())?;
     let device = display.device.clone();
     let phys = display.phys;
     let forced = forced_backend();

@@ -916,20 +916,31 @@ pub async fn submit_to(
     super::send_overlay_state(app);
     outputs::show(app, &label);
 
+    // Private apps: with a listed app in front the question goes alone. No
+    // screenshot is taken and no window text is read, here or by the gates
+    // under them, and the answer's "What was sent" says so.
+    let private = crate::privacy::check(crate::privacy::Read::Screen).err();
+    let alone = private.is_some();
     let early = fresh_bar_text(region);
     let exact_f = async {
+        if alone {
+            return None;
+        }
         match early.await {
             Some(Some(x)) => Some(x),
             _ => read_exact_text(region).await,
         }
     };
     let cap_region = region.map(|r| capture::Rect::new(r.x, r.y, r.width, r.height));
-    let pending = if region.is_some() {
+    let pending = if region.is_some() && !alone {
         take_fresh(pending_shot(), Instant::now())
     } else {
         None
     };
     let shot_f = async move {
+        if alone {
+            return None;
+        }
         match pending {
             Some(s) => Some(s),
             None => capture::capture_screen_async(cap_region).await,
@@ -949,7 +960,9 @@ pub async fn submit_to(
         None => (act, model),
     };
     *last_exact().lock() = exact.clone();
-    shared(app).lock().capture_ok = shot_taken.is_some();
+    // Nothing failed when the screen was left alone on purpose: the bar says
+    // which app is private instead (`overlay:state.privateNotice`).
+    shared(app).lock().capture_ok = shot_taken.is_some() || alone;
     super::send_overlay_state(app);
 
     let exact_len = exact
@@ -1329,6 +1342,8 @@ pub async fn submit_to(
                 "windowText": window_text,
                 "history": prior.len(),
                 "reader": reader,
+                // Private apps: why nothing from the screen went, or null.
+                "private": private.as_ref().map(crate::privacy::Refused::message),
                 "msgId": gen,
             });
             if let Some(s) = &shot {

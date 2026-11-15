@@ -2109,6 +2109,8 @@ const SURFACE_WHY = {
   'high-contrast': 'A contrast theme is on, so surfaces are solid.',
   'capture-visible': 'This Windows build cannot hide Aevaleron from capture, so glass, which needs that, is off.',
   'capture-failed': 'The screen could not be read for the glass, so surfaces are solid for now.',
+  // private apps lane
+  'private-app': 'An app on your private apps list is in front, so the screen is not read for the glass and surfaces are solid for now.',
 };
 const TRANSPARENCY_NOTE = 'Windows transparency effects are off. Aevaleron keeps its glass; choose None for solid panels.';
 const GLASS_NAMES = ['None', 'Frosted', 'Soft', 'Liquid', 'Very liquid'];

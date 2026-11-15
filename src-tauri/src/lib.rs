@@ -26,6 +26,8 @@ mod lens;
 mod llm;
 pub mod notify;
 pub mod paths;
+// private apps lane: programs Aevaleron never reads.
+mod privacy;
 mod region;
 mod selftest;
 mod skills;

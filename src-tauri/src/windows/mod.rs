@@ -1583,6 +1583,10 @@ pub fn on_window_event(w: &tauri::Window, event: &tauri::WindowEvent) {
             if outputs::is_output(&label) {
                 outputs::touch(&app, &label);
             }
+            // Private apps: the app under the bar may be another one now.
+            if label == OVERLAY {
+                crate::privacy::bar_focused(&app);
+            }
         }
         E::Resized(_) => on_resized(&app, &label),
         E::Moved(_) => on_moved(&app, &label),
