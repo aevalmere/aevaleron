@@ -224,7 +224,7 @@
 [UI] shot 04c-glob-52.png
 [UI] shot 04d-glob-70.png
 [UI] shot 04e-glob-90.png
-[UI] globOpen ms=504 frames=27 longestFrameMs=33.4
+[UI] globOpen ms=505 frames=28 longestFrameMs=33.4
 [UI] globOpens=ok
 [UI] globSmooth=ok
 [UI] globReducedMotion=ok
@@ -707,6 +707,42 @@
 [UI] watchSettingsSaves-ts200=ok
 [UI] shot watch-settings-awake-ts200.png
 [UI] watchLidNoteSaysItSleeps-ts200=ok
+[UI] scene private-apps/private-apps-empty
+[UI] shot private-apps-empty.png
+[UI] privateAppsEmpty=ok
+[UI] scene private-apps/private-apps-list
+[UI] shot private-apps-list.png
+[UI] privateAppsList=ok
+[UI] privateAppsRemove=ok
+[UI] shot private-apps-removed.png
+[UI] scene private-apps/private-apps-list-ts200
+[UI] shot private-apps-list-ts200.png
+[UI] privateAppsList-ts200=ok
+[UI] privateAppsRemove-ts200=ok
+[UI] shot private-apps-removed-ts200.png
+[UI] scene private-apps/private-apps-adding
+[UI] shot private-apps-typing.png
+[UI] privateAppsAddByName=ok
+[UI] shot private-apps-added.png
+[UI] privateAppsAddTwice=ok
+[UI] scene private-apps/private-apps-front
+[UI] privateAppsAddFront=ok
+[UI] privateAppsAddNothing=ok
+[UI] privateAppsBadName=ok
+[UI] shot private-apps-error.png
+[UI] scene private-apps/private-apps-bar
+[UI] shot private-apps-bar.png
+[UI] privateAppsBarNotice=ok
+[UI] privateAppsBarOpensTheList=ok
+[UI] privateAppsBarNoticeComesAndGoes=ok
+[UI] scene private-apps/private-apps-bar-ts200
+[UI] shot private-apps-bar-ts200.png
+[UI] privateAppsBarNotice-ts200=ok
+[UI] privateAppsBarOpensTheList-ts200=ok
+[UI] privateAppsBarNoticeComesAndGoes-ts200=ok
+[UI] scene private-apps/private-apps-sent
+[UI] shot private-apps-sent.png
+[UI] privateAppsSentSaysNothingWasRead=ok
 [UI] scene harness/backdrop-dark-editor-150
 [UI] shot 11-dark-editor-bar-output-150.png
 [UI] scene harness/backdrop-photo-busy-150
@@ -921,7 +957,7 @@
 [UI] shot 04c-glob-52-150.png
 [UI] shot 04d-glob-70-150.png
 [UI] shot 04e-glob-90-150.png
-[UI] globOpen-150 ms=499 frames=27 longestFrameMs=33.4
+[UI] globOpen-150 ms=526 frames=28 longestFrameMs=33.4
 [UI] globOpens-150=ok
 [UI] globReducedMotion-150=ok
 [UI] scene sheet/multi-150
@@ -1387,6 +1423,42 @@
 [UI] watchSettingsSaves-150-ts200=ok
 [UI] shot watch-settings-awake-150-ts200.png
 [UI] watchLidNoteSaysItSleeps-150-ts200=ok
+[UI] scene private-apps/private-apps-empty-150
+[UI] shot private-apps-empty-150.png
+[UI] privateAppsEmpty-150=ok
+[UI] scene private-apps/private-apps-list-150
+[UI] shot private-apps-list-150.png
+[UI] privateAppsList-150=ok
+[UI] privateAppsRemove-150=ok
+[UI] shot private-apps-removed-150.png
+[UI] scene private-apps/private-apps-list-150-ts200
+[UI] shot private-apps-list-150-ts200.png
+[UI] privateAppsList-150-ts200=ok
+[UI] privateAppsRemove-150-ts200=ok
+[UI] shot private-apps-removed-150-ts200.png
+[UI] scene private-apps/private-apps-adding-150
+[UI] shot private-apps-typing-150.png
+[UI] privateAppsAddByName-150=ok
+[UI] shot private-apps-added-150.png
+[UI] privateAppsAddTwice-150=ok
+[UI] scene private-apps/private-apps-front-150
+[UI] privateAppsAddFront-150=ok
+[UI] privateAppsAddNothing-150=ok
+[UI] privateAppsBadName-150=ok
+[UI] shot private-apps-error-150.png
+[UI] scene private-apps/private-apps-bar-150
+[UI] shot private-apps-bar-150.png
+[UI] privateAppsBarNotice-150=ok
+[UI] privateAppsBarOpensTheList-150=ok
+[UI] privateAppsBarNoticeComesAndGoes-150=ok
+[UI] scene private-apps/private-apps-bar-150-ts200
+[UI] shot private-apps-bar-150-ts200.png
+[UI] privateAppsBarNotice-150-ts200=ok
+[UI] privateAppsBarOpensTheList-150-ts200=ok
+[UI] privateAppsBarNoticeComesAndGoes-150-ts200=ok
+[UI] scene private-apps/private-apps-sent-150
+[UI] shot private-apps-sent-150.png
+[UI] privateAppsSentSaysNothingWasRead-150=ok
 [UI] lane harness sceneRuns=8
 [UI] lane platform sceneRuns=0
 [UI] lane windows sceneRuns=0
@@ -1399,6 +1471,7 @@
 [UI] lane voice sceneRuns=8
 [UI] lane polish sceneRuns=28
 [UI] lane watch sceneRuns=10
+[UI] lane private-apps sceneRuns=16
 [UI] sheetCssLint=ok
 [UI] markdownNeverInjects=ok
 [UI] cssOnSystem.settings=ok
@@ -1407,8 +1480,9 @@
 [UI] iconsFromSprite=ok
 [UI] voicePillOnlyListens=ok
 [UI] watchCardNeedsNoFocus=ok
-[UI] axe audits=146 ms=15575
+[UI] privateLineIsWrittenOnce=ok
+[UI] axe audits=152 ms=16137
 [UI] axeClean=ok
 [UI] axeAllowListFresh=ok
 [UI] noPageErrors=ok
-[UI] done failed=0 shots=442
+[UI] done failed=0 shots=464

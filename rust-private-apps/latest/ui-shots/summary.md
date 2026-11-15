@@ -1,12 +1,12 @@
-# ui-shots: cancelled
+# ui-shots: success
 
 - Workflow: ui-shots
-- Run: [43722582026](https://github.com/aevalmere/aevaleron/actions/runs/43722582026), attempt 1, on push
-- Commit: f615a76bda22c8a7e8635795e48b414127a6eb6d
+- Run: [43724003143](https://github.com/aevalmere/aevaleron/actions/runs/43724003143), attempt 1, on push
+- Commit: ee2cfa7b4a91c297af18e1136b2e8a1e4b680b8b
 - Ref: rust/private-apps
-- Conclusion: **cancelled**
-- Finished: 2026-11-15T14:24:59Z
-- Screenshots: https://github.com/aevalmere/aevaleron/tree/shots/rust-d-ui/rust/private-apps/f615a76bda22c8a7e8635795e48b414127a6eb6d (/ in the ref becomes -)
+- Conclusion: **success**
+- Finished: 2026-11-15T14:41:44Z
+- Screenshots: https://github.com/aevalmere/aevaleron/tree/shots/rust-d-ui/rust/private-apps/ee2cfa7b4a91c297af18e1136b2e8a1e4b680b8b (/ in the ref becomes -)
 
 | Step | Outcome | Log |
 |---|---|---|
