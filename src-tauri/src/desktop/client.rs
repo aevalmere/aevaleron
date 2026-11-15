@@ -702,6 +702,11 @@ impl Desktop {
         timeout_ms: u64,
     ) -> DResult<Value> {
         let _q = self.queue.lock().await;
+        // Asked first, so a refused op does not even start the helper, and
+        // again just before the op is sent.
+        if let Some(op) = op {
+            crate::privacy::check_op(op, &mut args)?;
+        }
         self.ensure().await?;
         let own = self.own_config();
         let key = own.to_string();

@@ -11,6 +11,8 @@ pub mod llm;
 pub mod platform;
 // polish lane
 pub mod polish;
+// private apps lane
+pub mod private_apps;
 pub mod settings;
 pub mod sheet;
 // voice lane
@@ -28,7 +30,7 @@ pub type Probe = fn(&mut Cx);
 /// Every lane's probe, in the order they run: the harness first (it checks
 /// the API the others use, then runs the desktop selfcheck), the `v2desktop`
 /// lanes last.
-pub const LANES: [(&str, Probe); 11] = [
+pub const LANES: [(&str, Probe); 12] = [
     ("harness", harness::run),
     ("platform", platform::run),
     ("windows", windows::run),
@@ -42,6 +44,9 @@ pub const LANES: [(&str, Probe); 11] = [
     ("llm", llm::run),
     // voice lane: works in the smoke's Notepad, so it runs last.
     ("voice", voice::run),
+    // private apps lane: lists the smoke's Notepad for a moment, so it
+    // runs after the lanes that read it.
+    ("private-apps", private_apps::run),
 ];
 
 /// Electron's four block labels (main.js:3881-3914), each standing for a
@@ -58,7 +63,8 @@ pub const BLOCKS: [(&str, &[&str]); 4] = [
 ];
 
 /// The `v2desktop` block: the lanes that work in the smoke's Notepad.
-const NOTEPAD_LANES: &[&str] = &["llm", "voice"]; // voice lane
+// voice lane, private apps lane
+const NOTEPAD_LANES: &[&str] = &["llm", "voice", "private-apps"];
 
 /// The Notepad half of the smoke runs on CI, or when asked (main.js:3837).
 pub fn notepad_enabled() -> bool {
@@ -107,7 +113,7 @@ mod tests {
         let mut sorted = lanes.clone();
         sorted.sort_unstable();
         sorted.dedup();
-        assert_eq!(sorted.len(), 11); // voice lane, polish lane
+        assert_eq!(sorted.len(), 12); // voice, polish and private apps lanes
         assert_eq!(lanes[0], "harness");
         let grouped: Vec<&str> = BLOCKS.iter().flat_map(|b| b.1.iter().copied()).collect();
         for lane in &lanes[1..] {

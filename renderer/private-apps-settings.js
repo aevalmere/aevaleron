@@ -6,6 +6,10 @@
 (() => {
   if (!document.getElementById('sec-private')) return;
   let snap = null;
+  // Changes sent so far, and those not yet answered: a reload that started
+  // before a change, or lands during one, is out of date and is dropped.
+  let changes = 0;
+  let pending = 0;
 
   const p = {
     list: $('private-list'),
@@ -27,6 +31,10 @@
   function render() {
     if (!snap) return;
     const apps = snap.apps;
+    // A reload redraws the rows; the Remove button that had the keyboard
+    // keeps it.
+    const active = document.activeElement;
+    const held = active && p.list.contains(active) ? active.dataset.exe : null;
     p.list.textContent = '';
     for (const a of apps) {
       const row = el('li', { class: 'private-row' });
@@ -37,6 +45,10 @@
       remove.addEventListener('click', () => removeApp(a));
       row.append(text, remove);
       p.list.appendChild(row);
+    }
+    if (held) {
+      const again = [...p.list.querySelectorAll('button')].find((b) => b.dataset.exe === held);
+      if (again) again.focus();
     }
     p.list.hidden = !apps.length;
     p.empty.hidden = !!apps.length;
@@ -59,11 +71,23 @@
   }
 
   function load() {
-    return call('privacy:get').then(take);
+    const at = changes;
+    return call('privacy:get').then((r) => {
+      if (at === changes && !pending) take(r);
+    });
+  }
+
+  function change(channel, payload) {
+    changes += 1;
+    pending += 1;
+    return call(channel, payload, 8000).then((r) => {
+      pending -= 1;
+      return r;
+    });
   }
 
   function addApp(payload, back) {
-    return call('privacy:add', payload, 8000).then((r) => {
+    return change('privacy:add', payload).then((r) => {
       if (!take(r)) {
         unsaved(status);
         return;
@@ -84,7 +108,7 @@
   function removeApp(a) {
     const buttons = [...p.list.querySelectorAll('button')];
     const at = buttons.findIndex((b) => b.dataset.exe === a.exe);
-    call('privacy:remove', { exe: a.exe }, 8000).then((r) => {
+    change('privacy:remove', { exe: a.exe }).then((r) => {
       if (!take(r)) {
         unsaved(status);
         return;
