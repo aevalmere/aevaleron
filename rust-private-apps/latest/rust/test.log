@@ -13,30 +13,30 @@
    Compiling zmij v1.0.23
    Compiling phf_generator v0.13.1
    Compiling thiserror v2.0.21
-   Compiling icu_properties_data v2.4.0
    Compiling icu_normalizer_data v2.4.0
+   Compiling icu_properties_data v2.4.0
    Compiling bytes v1.12.1
    Compiling yoke v0.8.4
    Compiling phf_macros v0.13.1
    Compiling zerovec v0.11.9
    Compiling http v1.5.0
    Compiling windows-sys v0.61.2
+   Compiling hashbrown v0.17.1
    Compiling equivalent v1.0.3
    Compiling log v0.4.35
-   Compiling hashbrown v0.17.1
    Compiling indexmap v2.14.2
    Compiling aho-corasick v1.1.5
-   Compiling time-core v0.1.9
-   Compiling num-conv v0.2.2
-   Compiling scopeguard v1.2.0
    Compiling regex-syntax v0.8.11
+   Compiling time-core v0.1.9
+   Compiling scopeguard v1.2.0
+   Compiling num-conv v0.2.2
    Compiling lock_api v0.4.14
    Compiling serde_json v1.0.154
    Compiling tinystr v0.8.5
    Compiling phf_codegen v0.13.1
-   Compiling winnow v1.0.5
    Compiling powerfmt v0.2.1
    Compiling deranged v0.5.9
+   Compiling winnow v1.0.5
    Compiling toml_parser v1.1.5+spec-1.1.0
    Compiling icu_locale_core v2.4.0
    Compiling potential_utf v0.1.6
@@ -53,8 +53,8 @@
    Compiling string_cache_codegen v0.6.1
    Compiling alloc-no-stdlib v3.0.0
    Compiling dunce v1.0.5
-   Compiling web_atoms v0.2.6
    Compiling alloc-stdlib v0.3.0
+   Compiling web_atoms v0.2.6
    Compiling parking_lot v0.12.5
    Compiling serde v1.0.229
    Compiling icu_properties v2.4.0
@@ -63,8 +63,8 @@
    Compiling stable_deref_trait v1.2.1
    Compiling idna_adapter v1.2.2
    Compiling string_cache v0.9.0
-   Compiling getrandom v0.4.3
    Compiling brotli-decompressor v6.3.1
+   Compiling getrandom v0.4.3
    Compiling toml_datetime v1.1.3+spec-1.1.0
    Compiling serde_spanned v1.1.3
    Compiling bit-vec v0.8.0
@@ -99,24 +99,24 @@
    Compiling plist v1.10.3
    Compiling schemars v0.8.22
    Compiling cargo_metadata v0.19.2
-   Compiling json-patch v4.2.0
    Compiling serde-untagged v0.1.9
+   Compiling json-patch v4.2.0
    Compiling infer v0.22.0
    Compiling walkdir v2.5.0
    Compiling serde_with v3.24.0
-   Compiling windows-result v0.4.1
    Compiling windows-strings v0.5.1
+   Compiling windows-result v0.4.1
    Compiling pin-project-lite v0.2.17
    Compiling bitflags v2.13.2
    Compiling once_cell v1.21.4
    Compiling option-ext v0.2.0
-   Compiling percent-encoding v2.3.2
    Compiling simd-adler32 v0.3.10
+   Compiling percent-encoding v2.3.2
    Compiling vswhom-sys v0.1.3
    Compiling adler2 v2.0.1
    Compiling vswhom v0.1.0
-   Compiling tauri-utils v2.10.2
    Compiling windows-core v0.62.2
+   Compiling tauri-utils v2.10.2
    Compiling winreg v0.56.0
    Compiling crc32fast v1.5.5
    Compiling embed-resource v3.0.12
@@ -135,11 +135,11 @@
    Compiling fdeflate v0.3.7
    Compiling cargo_toml v1.0.1
    Compiling windows-threading v0.2.1
-   Compiling foldhash v0.2.0
    Compiling cpufeatures v0.2.17
+   Compiling foldhash v0.2.0
    Compiling windows-future v0.3.2
-   Compiling tauri-build v2.7.4
    Compiling windows-numerics v0.3.1
+   Compiling tauri-build v2.7.4
    Compiling windows-collections v0.3.2
    Compiling time-macros v0.2.32
    Compiling futures-core v0.3.34
@@ -158,8 +158,8 @@
    Compiling windows_x86_64_msvc v0.52.6
    Compiling windows-version v0.1.7
    Compiling windows-link v0.1.3
-   Compiling tauri v2.12.5
    Compiling windows-targets v0.52.6
+   Compiling tauri v2.12.5
    Compiling subtle v2.6.1
    Compiling unicode-segmentation v1.13.3
    Compiling zeroize v1.9.1
@@ -167,22 +167,22 @@
    Compiling digest v0.10.7
    Compiling cookie v0.18.2
    Compiling png v0.18.1
-   Compiling semver v1.0.28
    Compiling pxfm v0.1.30
+   Compiling semver v1.0.28
    Compiling ico v0.6.0
    Compiling sha2 v0.10.9
-   Compiling windows-strings v0.4.2
    Compiling moxcms v0.8.1
+   Compiling windows-strings v0.4.2
    Compiling windows-result v0.3.4
    Compiling keyboard-types v0.8.3
    Compiling http-body v1.1.0
    Compiling bytemuck v1.25.2
-   Compiling futures-task v0.3.34
    Compiling untrusted v0.9.0
-   Compiling slab v0.4.12
    Compiling byteorder-lite v0.1.0
-   Compiling image v0.25.10
+   Compiling futures-task v0.3.34
+   Compiling slab v0.4.12
    Compiling futures-util v0.3.34
+   Compiling image v0.25.10
    Compiling ring v0.17.14
    Compiling transcribe-cpp-sys v0.4.2
    Compiling muda v0.20.0
@@ -191,19 +191,19 @@
    Compiling softbuffer v0.4.8
    Compiling try-lock v0.2.5
    Compiling tower-service v0.3.3
-   Compiling tauri-macros v2.7.4
    Compiling want v0.3.2
    Compiling serialize-to-javascript v0.1.2
    Compiling tray-icon v0.25.1
-   Compiling rustls-webpki v0.103.17
+   Compiling tauri-macros v2.7.4
    Compiling getrandom v0.3.4
+   Compiling rustls-webpki v0.103.17
    Compiling httparse v1.10.1
    Compiling window-vibrancy v0.8.1
    Compiling inout v0.1.4
-   Compiling atomic-waker v1.1.2
    Compiling mime v0.3.18
-   Compiling cipher v0.4.4
+   Compiling atomic-waker v1.1.2
    Compiling hyper v1.12.0
+   Compiling cipher v0.4.4
    Compiling rustls v0.23.46
    Compiling zerocopy v0.8.63
    Compiling webview2-com v0.39.1
@@ -211,25 +211,25 @@
    Compiling tauri-runtime v2.12.2
    Compiling wry v0.57.2
    Compiling universal-hash v0.5.1
-   Compiling windows-result v0.1.2
-   Compiling windows-sys v0.59.0
+   Compiling tauri-plugin-opener v2.7.3
    Compiling tauri-runtime-wry v2.12.3
    Compiling tauri-plugin-clipboard-manager v2.5.0
-   Compiling tauri-plugin-opener v2.7.3
    Compiling tauri-plugin-global-shortcut v2.4.1
+   Compiling windows-sys v0.59.0
+   Compiling windows-result v0.1.2
    Compiling windows-threading v0.1.0
-   Compiling sync_wrapper v1.0.2
    Compiling futures-channel v0.3.34
+   Compiling sync_wrapper v1.0.2
    Compiling windows-registry v0.6.1
    Compiling schannel v0.1.30
-   Compiling error-code v3.4.0
    Compiling ipnet v2.12.2
-   Compiling opaque-debug v0.3.1
+   Compiling error-code v3.4.0
    Compiling tower-layer v0.3.3
-   Compiling tower v0.5.3
+   Compiling opaque-debug v0.3.1
    Compiling polyval v0.6.2
-   Compiling hyper-util v0.1.21
+   Compiling tower v0.5.3
    Compiling clipboard-win v5.4.3
+   Compiling hyper-util v0.1.21
    Compiling rustls-native-certs v0.8.5
    Compiling windows-future v0.2.1
    Compiling windows-core v0.54.0
@@ -244,8 +244,8 @@
    Compiling tokio-util v0.7.20
    Compiling serde_urlencoded v0.7.1
    Compiling global-hotkey v0.8.0
-   Compiling windows v0.61.3
    Compiling hyper-rustls v0.27.10
+   Compiling windows v0.61.3
    Compiling rand_chacha v0.3.1
    Compiling windows v0.54.0
    Compiling arboard v3.7.0
@@ -257,73 +257,73 @@
    Compiling aevaleron v1.1.1 (D:\a\aevaleron\aevaleron\src-tauri)
    Compiling aead v0.5.2
    Compiling open v5.4.5
-   Compiling dasp_sample v0.11.0
    Compiling tinyvec v1.13.3
-   Compiling base64 v0.22.1
    Compiling bitflags v1.3.2
+   Compiling dasp_sample v0.11.0
+   Compiling base64 v0.22.1
+   Compiling reqwest v0.12.28
    Compiling png v0.17.16
    Compiling unicode-normalization v0.1.26
-   Compiling reqwest v0.12.28
    Compiling fancy-regex v0.14.0
    Compiling aes-gcm v0.10.3
    Compiling tauri-winrt-notification v0.7.3
    Compiling rand v0.8.8
-   Compiling cpal v0.15.3
    Compiling fast_image_resize v5.5.0
+   Compiling cpal v0.15.3
    Compiling winreg v0.55.0
    Compiling chrono v0.4.45
-   Compiling jpeg-encoder v0.6.1
    Compiling jpeg-decoder v0.3.2
+   Compiling jpeg-encoder v0.6.1
    Compiling transcribe-cpp v0.4.2
-    Finished `test` profile [unoptimized + debuginfo] target(s) in 5m 26s
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 6m 16s
      Running unittests src\lib.rs (target\debug\build\aevaleron/2772cc3b5adbed70\out\aevaleron_lib-2772cc3b5adbed70.exe)
 
 running 596 tests
 test agent::auto::tests::blocks_end_automatic_mode_for_the_task ... ok
 test agent::auto::tests::only_a_clear_allow_allows ... ok
-test agent::describe::tests::passwords_are_dotted_and_errors_named ... ok
 test agent::auto::tests::the_prompt_keeps_screen_text_inside_its_block ... ok
-test agent::auto::tests::ordinary_flagged_steps_go_to_the_reviewer ... ok
+test agent::describe::tests::passwords_are_dotted_and_errors_named ... ok
 test agent::auto::tests::money_secrets_commands_and_the_unread_always_ask ... ok
+test agent::auto::tests::ordinary_flagged_steps_go_to_the_reviewer ... ok
 test agent::gate::tests::chords_are_canonical ... ok
 test agent::gate::tests::chord_risks ... ok
 test agent::describe::tests::the_card_value_is_the_whole_text ... ok
 test agent::describe::tests::steps_read_as_sentences ... ok
 test agent::gate::tests::explorer_double_click_asks ... ok
-test agent::gate::tests::harmless_steps_pass_and_risky_ones_ask ... ok
 test agent::gate::tests::open_and_plans_and_keys ... ok
 test agent::gate::tests::quotes_are_cut ... ok
+test agent::gate::tests::harmless_steps_pass_and_risky_ones_ask ... ok
 test agent::gate::tests::space_in_text_field_is_free ... ok
 test agent::gate::tests::typed_space_on_button_asks ... ok
 test agent::gate::tests::space_on_focused_send_button_asks ... ok
-test agent::gate::tests::localized_send_asks ... ok
+test agent::run::tests::a_claim_turns_away_other_starts ... ok
 test agent::gate::tests::unknown_named_button_asks ... ok
+test agent::gate::tests::localized_send_asks ... ok
 test agent::gate::tests::web_dialog_text_is_read ... ok
 test agent::run::tests::app_label_kelvin_and_dotted_i ... ok
-test agent::run::tests::a_claim_turns_away_other_starts ... ok
 test agent::run::tests::automatic_mode_blocks_without_asking_or_acting ... ok
 test agent::run::tests::a_timed_out_step_is_an_unknown_outcome ... ok
 test agent::run::tests::bad_coordinates_are_rejected ... ok
 test agent::run::tests::concurrent_starts_yield_one_run ... ok
 test agent::run::tests::a_send_button_asks_first_and_a_no_skips_it ... ok
 test agent::run::tests::automatic_mode_asks_when_its_check_is_unclear ... ok
-test agent::run::tests::final_text_is_remedy_only_after_failed_step ... ok
+test agent::run::tests::dialect_switch_rewrites_system_prompt ... ok
 test agent::run::tests::only_the_newest_observation_and_image_go_in_full ... ok
 test agent::run::tests::automatic_mode_runs_a_step_its_check_allows ... ok
-test agent::run::tests::dialect_switch_rewrites_system_prompt ... ok
 test agent::run::tests::confirm_payload_carries_full_value ... ok
+test agent::run::tests::final_text_is_remedy_only_after_failed_step ... ok
+test agent::run::tests::point_outside_the_region_is_refused_before_it_asks ... ok
 test agent::run::tests::page_text_is_redacted ... ok
 test agent::run::tests::points_scale_from_the_last_screenshot ... ok
 test agent::run::tests::retry_after_is_honoured ... ok
-test agent::run::tests::point_outside_the_region_is_refused_before_it_asks ... ok
 test agent::run::tests::space_on_focused_send_asks_before_any_key ... ok
 test agent::run::tests::smoke_notepad_plans_focuses_and_types ... ok
 test agent::run::tests::step_payload_has_plan_index ... ok
 test agent::run::tests::stop_while_typing_cancels_the_helper ... ok
+test agent::run::tests::the_step_limit_stops_a_run_that_never_finishes ... ok
 test agent::run::tests::stop_ends_the_run_at_once ... ok
 test agent::run::tests::the_task_is_what_stops ... ok
 test agent::run::tests::trail_text_numbers_the_steps ... ok
-test agent::run::tests::the_step_limit_stops_a_run_that_never_finishes ... ok
 test agent::run::tests::typed_password_in_focused_field_stays_dotted ... ok
 test agent::tools::tests::json_rules_list_every_tool ... ok
 test agent::tools::tests::json_turns_are_found_in_prose ... ok
@@ -338,18 +338,18 @@ test agents::chats::tests::the_card_reads_chat_finished_and_names_the_app ... ok
 test agents::chats::tests::the_method_tables_put_each_call_in_its_slot ... ok
 test agents::hook::tests::only_a_hook_call_is_a_hook_call ... ok
 test agents::hook::tests::the_envelope_reads_back_as_the_event ... ok
+test agent::run::tests::pause_during_dodge_drops_the_action ... ok
 test agents::native::tests::a_recycled_parent_pid_ends_the_walk ... ok
 test agents::native::tests::apps_get_the_names_people_use ... ok
 test agents::native::tests::the_chain_walks_up_and_finds_both_agents ... ok
 test agents::native::tests::this_process_is_alive_and_has_a_start ... ok
-test agent::run::tests::pause_during_dodge_drops_the_action ... ok
 test agents::power::tests::opening_the_lid_or_new_work_calls_a_planned_sleep_off ... ok
-test agents::power::tests::saved_lid_values_round_trip ... ok
 test agents::power::tests::sleep_is_planned_only_for_a_shut_lid_and_nothing_working ... ok
+test agents::power::tests::saved_lid_values_round_trip ... ok
 test agents::power::tests::the_lid_report_is_read_from_its_first_byte ... ok
 test agents::power::tests::the_saved_lid_action_is_read_per_power_source ... ok
-test agents::power::tests::the_request_follows_what_is_asked ... ok
 test agents::power::tests::the_sleep_is_checked_again_when_its_minute_is_up ... ok
+test agents::power::tests::the_request_follows_what_is_asked ... ok
 test agents::sessions::tests::a_permission_prompt_needs_you_and_stays_busy ... ok
 test agents::sessions::tests::a_turn_the_agent_took_on_its_own_is_background ... ok
 test agents::sessions::tests::a_turn_works_then_finishes_with_a_card ... ok
@@ -383,19 +383,19 @@ test backdrop::contrast::tests::alpha_text_is_blended_and_invisible_text_skipped
 test backdrop::contrast::tests::black_on_white_passes_grey_fails ... ok
 test backdrop::contrast::tests::colours_parse ... ok
 test backdrop::contrast::tests::large_text_needs_three ... ok
+test ask::tests::visual_regex_matches_the_renderer ... ok
 test backdrop::contrast::tests::probe_is_the_one_from_lib_contrast ... ok
 test backdrop::contrast::tests::wcag_numbers ... ok
-test backdrop::tests::busy_resets_after_panic ... ok
 test backdrop::tests::fixture_hides_capture_failures ... ok
-test ask::tests::visual_regex_matches_the_renderer ... ok
+test backdrop::tests::busy_resets_after_panic ... ok
 test backdrop::tests::frames_are_served_by_key_and_never_cached ... ok
 test backdrop::tests::frame_protocol_cors_is_app_only ... ok
 test backdrop::tests::intensity_defaults_to_liquid ... ok
 test backdrop::tests::missing_display_frame_skips_window ... ok
 test backdrop::tests::percentiles ... ok
 test backdrop::tests::recovery_rebroadcasts_live ... ok
-test backdrop::tests::solid_profile_at_07_is_live ... ok
 test backdrop::tests::transparency_setting_is_not_a_reason ... ok
+test backdrop::tests::solid_profile_at_07_is_live ... ok
 test buddy::tests::a_put_away_hides_once_and_a_new_session_keeps_the_window ... ok
 test buddy::tests::steps_apply_by_whether_a_key_exists ... ok
 test buddy::tests::walkthrough_order_and_no_double_spaces ... ok
@@ -479,13 +479,13 @@ test desktop::win::tests::our_own_pid_is_always_listed ... ok
 test desktop::win::tests::sheets_never_change_style_through_tauri ... ok
 test find::tests::a_phrase_running_into_the_next_piece_is_found ... ok
 test find::tests::a_query_sent_before_find_opened_is_searched ... ok
-test capture::tests::area_on_the_scaled_display_crops_its_pixels ... ok
 test capture::tests::hung_worker_is_replaced ... ok
+test capture::tests::area_on_the_scaled_display_crops_its_pixels ... ok
 test find::tests::an_unreadable_window_offers_ask ... ok
 test find::tests::ask_mode_says_what_would_leave_the_computer ... ok
 test find::tests::budget_keeps_spans_near_the_hits ... ok
-test find::tests::a_stage_gives_up_after_three_busy_models ... ok
 test find::tests::concepts_come_from_the_correlate_stage ... ok
+test find::tests::a_stage_gives_up_after_three_busy_models ... ok
 test find::tests::fold_strips_accents_and_widths ... ok
 test find::tests::line_reader_takes_objects_only ... ok
 test find::tests::literal_matching_stages ... ok
@@ -497,8 +497,8 @@ test find::tests::sub_rects_follow_lines ... ok
 test find::tests::the_same_words_in_one_place_are_one_hit ... ok
 test find::tests::tokens_split_camel_snake_and_digits ... ok
 test find::tests::words_apart_in_one_line_are_each_a_hit ... ok
-test history::tests::caps_at_two_hundred_newest_first ... ok
 test agent::run::tests::overload_529_retries ... ok
+test history::tests::caps_at_two_hundred_newest_first ... ok
 test history::tests::corrupt_file_is_kept_aside_not_overwritten ... ok
 test history::tests::disabled_writes_nothing_and_keeps_rows ... ok
 test history::tests::emoji_title_cut_on_unit_boundary ... ok
@@ -577,16 +577,16 @@ test ipc::tests::invoke_allowlist_matches_preload ... ok
 test ipc::tests::lane_blocks_match_preload ... ok
 test ipc::tests::listen_allowlist_matches_preload ... ok
 test ipc::tests::output_cannot_start_agent ... ok
-test ipc::tests::pages_may_call_what_they_call ... ok
+test ipc::tests::every_listen_channel_has_a_sender ... ok
 test ipc::tests::panicking_route_returns_err ... ok
 test ipc::tests::payload_helpers_read_like_javascript ... ok
+test ipc::tests::pages_may_call_what_they_call ... ok
 test ipc::tests::settings_get_key_set ... ok
 test ipc::tests::split_d_channels_are_allowed ... ok
 test ipc::tests::unknown_channel_is_refused_with_the_electron_wording ... ok
 test lens::tests::hits_land_on_the_display_their_pixels_are_on ... ok
 test lens::tests::payload_is_display_relative_with_a_4px_floor ... ok
 test llm::auth::tests::callback_parses_code_and_rejects_bad_requests ... ok
-test ipc::tests::every_listen_channel_has_a_sender ... ok
 test llm::auth::tests::pkce_challenge_is_s256_of_verifier ... ok
 test llm::auth::tests::the_approval_url_has_the_documented_parameters ... ok
 test llm::catalogue::tests::curated_table_order_and_tiers ... ok
@@ -659,7 +659,7 @@ test llm::settings::tests::mismatched_key_is_skipped ... ok
 test llm::settings::tests::no_key_is_needs_key ... ok
 test llm::settings::tests::openrouter_stays_the_default_path ... ok
 test llm::settings::tests::order_and_skips ... ok
-test llm::sse::tests::buffer_is_capped ... ok
+test history::tests::flush_now_and_timer_never_overlap ... ok
 test llm::sse::tests::lines_survive_any_split ... ok
 test llm::sse::tests::meter_adds_usage_and_cost ... ok
 test llm::sse::tests::only_data_lines_count ... ok
@@ -684,7 +684,7 @@ test llm::wire::tests::refusals_are_coded ... ok
 test llm::wire::tests::turns_in_every_shape ... ok
 test paths::tests::a_copied_profile_keeps_its_folders ... ok
 test paths::tests::aeval_userdata_overrides ... ok
-test paths::tests::an_old_profile_is_adopted_once ... ok
+test llm::sse::tests::buffer_is_capped ... ok
 test paths::tests::blank_override_is_ignored ... ok
 test paths::tests::user_data_is_under_roaming ... ok
 test paths::tests::webview_profile_is_not_in_the_userdata_root ... ok
@@ -710,11 +710,11 @@ test selftest::notepad::tests::only_a_new_window_with_the_file_name_is_ours ... 
 test selftest::probes::tests::every_lane_runs_once_and_sits_in_at_most_one_block ... ok
 test selftest::report::tests::a_line_stays_one_line ... ok
 test selftest::report::tests::musts_decide_the_exit_code ... ok
-test skills::tests::built_ins_load_in_picker_order ... ok
+test paths::tests::an_old_profile_is_adopted_once ... ok
 test skills::tests::folder_path_is_exe_relative ... ok
-test skills::tests::large_skill_is_truncated ... ok
+test skills::tests::built_ins_load_in_picker_order ... ok
 test skills::tests::parse_handles_bom_crlf_and_missing_front_matter ... ok
-test skills::tests::routing_matches_the_self_test ... ok
+test skills::tests::large_skill_is_truncated ... ok
 test skills::tests::unknown_skills_sort_after_the_known_ones_by_name ... ok
 test state::tests::base36_matches_javascript ... ok
 test state::tests::chat_ids_look_like_electrons ... ok
@@ -722,22 +722,22 @@ test state::tests::queries_are_per_window_and_busy_is_any ... ok
 test state::tests::rect_overlap ... ok
 test store::crypto::tests::bom_local_state_keeps_its_key ... ok
 test store::crypto::tests::dpapi_round_trip ... ok
-test store::crypto::tests::local_state_is_created_then_reused ... ok
+test skills::tests::routing_matches_the_self_test ... ok
 test store::crypto::tests::opens_a_blob_sealed_by_node ... ok
 test store::crypto::tests::round_trip_through_the_ring ... ok
 test store::crypto::tests::seals_byte_for_byte_like_chromium ... ok
-test store::crypto::tests::unreadable_local_state_is_left_alone ... ok
+test store::crypto::tests::local_state_is_created_then_reused ... ok
 test store::crypto::tests::wrong_key_or_garbage_is_none_not_a_panic ... ok
+test store::crypto::tests::unreadable_local_state_is_left_alone ... ok
 test store::durable::tests::replaces_a_target_another_handle_has_open ... ok
-test store::durable::tests::replaces_and_leaves_no_temp ... ok
 test store::durable::tests::sweep_removes_only_our_temps ... ok
+test store::durable::tests::replaces_and_leaves_no_temp ... ok
 test store::tests::automatic_becomes_the_default_once ... ok
 test store::tests::chosen_flag_rules ... ok
+test history::tests::steady_saves_still_write_within_400ms ... ok
 test llm::client::tests::idle_stream_times_out_as_408 ... ok
-test history::tests::flush_now_and_timer_never_overlap ... ok
 test store::tests::corrupt_file_is_kept_aside ... ok
 test store::tests::electron_key_is_migrated ... ok
-test history::tests::steady_saves_still_write_within_400ms ... ok
 test store::tests::fresh_file_gets_every_default_in_order ... ok
 test store::tests::fresh_store_set_lands_on_disk_while_file_is_open ... ok
 test store::tests::invalid_utf8_is_read_lossy_not_reset ... ok
@@ -876,7 +876,7 @@ test voice::capture::tests::a_fixture_records_like_a_microphone ... ok
 test store::tests::input_history ... ok
 test store::tests::concurrent_sets_never_lose_or_corrupt ... ok
 
-test result: ok. 596 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 17.25s
+test result: ok. 596 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 14.72s
 
      Running unittests src\main.rs (target\debug\build\aevaleron/6e80ab28206be87c\out\aevaleron-6e80ab28206be87c.exe)
 
