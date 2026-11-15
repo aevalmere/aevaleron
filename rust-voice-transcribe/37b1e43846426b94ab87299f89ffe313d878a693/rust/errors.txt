@@ -1,0 +1,5 @@
+== smoke.log ==
+[SMOKE] voiceSpeed=FAIL:592ms of 400ms
+[SMOKE] failed: voiceSpeed
+[GATE] fail voiceSpeed=FAIL:592ms of 400ms
+[GATE] verdict=FAIL:1 FAIL line(s); no "done" line; failed: voiceSpeed; 1 listed label(s) never printed

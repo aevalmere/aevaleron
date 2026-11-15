@@ -19,8 +19,8 @@
       Adding windows-sys v0.59.0 (available: v0.61.2)
       Adding winreg v0.55.0 (available: v0.56.0)
  Downloading crates ...
-  Downloaded jiff-tzdb v0.1.10
   Downloaded jiff-core v0.1.6
+  Downloaded jiff-tzdb v0.1.10
   Downloaded jiff v0.2.44
    Compiling aevaleron v1.1.1 (D:\a\aevaleron\aevaleron\src-tauri)
-    Finished `dev` profile [unoptimized + debuginfo] target(s) in 19.80s
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 18.19s
