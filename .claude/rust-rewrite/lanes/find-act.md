@@ -63,6 +63,24 @@ Logged, not gated: `findActNotepad`, `findActRow`, `findActEnter` (key or page, 
 
 `find-act-rows` (the action words; also at 200% text), `find-act-menu` (menu-command rows), `find-act-gone` (the notice in the bar). Checks: `findRowsSayTheAction`, `findActionWordIsQuiet`, `findRowEnterActs`, `findRowClickOnlyGoesThere`, `findMenuRowsComeLast`, `findBarCountsMenus`, `findArrowsStep`, `findEnterActs`, `findGoneIsSaid`, `enterOutsideFindAsks`.
 
+## What CI showed
+
+On `eff8d619` (the last commit that changed code or pages): `rust.yml` run 43723652766 green, `ui-shots.yml` run 43723652723 green with the axe audit clean. The commit after it adds these notes only.
+
+The runner's Notepad is the classic one. From the smoke log:
+
+- The word "settle" was selected 276 ms after Enter, and read back as the selection.
+- View on the menu bar was pressed and its menu opened, then closed.
+- The menu was read from the menu handle in 5 ms: 30 commands, no bound reached. "select all" listed Edit, Select All as a menu row and Enter selected the whole text.
+
+## Not verified
+
+- **A physical Enter key on the runner.** The bar's window was not the foreground window when the probe got there, so the probe made the key press inside the page (the bar's own keydown handler, then `find:act` over the real bridge). A real key press sending `find:act` is proven in ui-shots (Edge), not in the installed app.
+- **Windows 11 Notepad, and any menu that exists only in UI Automation.** The runner has neither, so the expand-and-invoke path (`UiaMenuInvoke`) has only been compiled.
+- **Toggle, Focus, the real click and the click on recognised words, on a real app.** Chosen and sent correctly in unit tests; only Select (document words), Press (a menu bar item) and a menu command ran against a real window.
+- **The one re-read when a match moved or went**, and the refusals for an administrator's window, a covered spot and Aevaleron's own windows: unit tests only.
+- Nothing was run on the owner's PC.
+
 ## For ARCHITECTURE.md at the merge
 
 `find:act {gen, index, match}` (bar and output windows) answers `{status: "done", act, via}` or `{status, message}` with status `no-hit`, `changed`, `gone`, `disabled`, `no-place`, `own-window`, `elevated`, `secure`, `covered` or `failed`. `find:hits` rows carry `act` ("Press", "Focus", "Select", "Click" or ""), and a row of kind `menu` is a menu command. `find:state.counts` carries `menu`. Helper ops added: `selectText`, `selection`, `menuItems`, `menuInvoke`; helper spans carry `role`, `pat`, `enabled`, `line`, `via`.
