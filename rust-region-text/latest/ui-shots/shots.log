@@ -218,13 +218,13 @@
 [UI] noDockUi=ok
 [UI] resizeZones=ok
 [UI] globFrameCost=ok
-[UI] globShapeMs=0.019
+[UI] globShapeMs=0.015
 [UI] shot 04a-glob-08.png
 [UI] shot 04b-glob-30.png
 [UI] shot 04c-glob-52.png
 [UI] shot 04d-glob-70.png
 [UI] shot 04e-glob-90.png
-[UI] globOpen ms=504 frames=24 longestFrameMs=33.4
+[UI] globOpen ms=514 frames=29 longestFrameMs=33.3
 [UI] globOpens=ok
 [UI] globSmooth=ok
 [UI] globReducedMotion=ok
@@ -707,6 +707,47 @@
 [UI] watchSettingsSaves-ts200=ok
 [UI] shot watch-settings-awake-ts200.png
 [UI] watchLidNoteSaysItSleeps-ts200=ok
+[UI] scene regionText/region-text-picker
+[UI] regionTextHint=ok
+[UI] regionTextRole=ok
+[UI] shot region-text-picker.png
+[UI] regionTextAnnounces=ok
+[UI] regionTextEnterAnswers=ok
+[UI] scene regionText/region-text-note-copied
+[UI] region-text-note-copied.ready=ok
+[UI] region-text-note-copied.hiddenFirst=ok
+[UI] region-text-note-copied.says=ok
+[UI] region-text-note-copied.statusOnly=ok
+[UI] shot region-text-note-copied.png
+[UI] scene regionText/region-text-note-none
+[UI] region-text-note-none.ready=ok
+[UI] region-text-note-none.hiddenFirst=ok
+[UI] region-text-note-none.says=ok
+[UI] region-text-note-none.statusOnly=ok
+[UI] shot region-text-note-none.png
+[UI] scene regionText/region-text-note-reading
+[UI] region-text-note-reading.ready=ok
+[UI] region-text-note-reading.hiddenFirst=ok
+[UI] region-text-note-reading.says=ok
+[UI] region-text-note-reading.statusOnly=ok
+[UI] shot region-text-note-reading.png
+[UI] scene regionText/region-text-note-error
+[UI] region-text-note-error.ready=ok
+[UI] region-text-note-error.hiddenFirst=ok
+[UI] region-text-note-error.says=ok
+[UI] region-text-note-error.statusOnly=ok
+[UI] shot region-text-note-error.png
+[UI] scene regionText/region-text-note-long
+[UI] regionNoteLongStaysInside=ok
+[UI] shot region-text-note-long.png
+[UI] regionNoteLeaves=ok
+[UI] regionNoteNewestWins=ok
+[UI] scene regionText/region-text-shortcut
+[UI] regionTextShortcutRow=ok
+[UI] shot region-text-shortcut-unset.png
+[UI] regionTextShortcutCapturing=ok
+[UI] regionTextShortcutSaves=ok
+[UI] shot region-text-shortcut-set.png
 [UI] scene harness/backdrop-dark-editor-150
 [UI] shot 11-dark-editor-bar-output-150.png
 [UI] scene harness/backdrop-photo-busy-150
@@ -921,7 +962,7 @@
 [UI] shot 04c-glob-52-150.png
 [UI] shot 04d-glob-70-150.png
 [UI] shot 04e-glob-90-150.png
-[UI] globOpen-150 ms=518 frames=25 longestFrameMs=33.4
+[UI] globOpen-150 ms=510 frames=28 longestFrameMs=33.3
 [UI] globOpens-150=ok
 [UI] globReducedMotion-150=ok
 [UI] scene sheet/multi-150
@@ -1387,6 +1428,47 @@
 [UI] watchSettingsSaves-150-ts200=ok
 [UI] shot watch-settings-awake-150-ts200.png
 [UI] watchLidNoteSaysItSleeps-150-ts200=ok
+[UI] scene regionText/region-text-picker-150
+[UI] regionTextHint-150=ok
+[UI] regionTextRole-150=ok
+[UI] shot region-text-picker-150.png
+[UI] regionTextAnnounces-150=ok
+[UI] regionTextEnterAnswers-150=ok
+[UI] scene regionText/region-text-note-copied-150
+[UI] region-text-note-copied.ready-150=ok
+[UI] region-text-note-copied.hiddenFirst-150=ok
+[UI] region-text-note-copied.says-150=ok
+[UI] region-text-note-copied.statusOnly-150=ok
+[UI] shot region-text-note-copied-150.png
+[UI] scene regionText/region-text-note-none-150
+[UI] region-text-note-none.ready-150=ok
+[UI] region-text-note-none.hiddenFirst-150=ok
+[UI] region-text-note-none.says-150=ok
+[UI] region-text-note-none.statusOnly-150=ok
+[UI] shot region-text-note-none-150.png
+[UI] scene regionText/region-text-note-reading-150
+[UI] region-text-note-reading.ready-150=ok
+[UI] region-text-note-reading.hiddenFirst-150=ok
+[UI] region-text-note-reading.says-150=ok
+[UI] region-text-note-reading.statusOnly-150=ok
+[UI] shot region-text-note-reading-150.png
+[UI] scene regionText/region-text-note-error-150
+[UI] region-text-note-error.ready-150=ok
+[UI] region-text-note-error.hiddenFirst-150=ok
+[UI] region-text-note-error.says-150=ok
+[UI] region-text-note-error.statusOnly-150=ok
+[UI] shot region-text-note-error-150.png
+[UI] scene regionText/region-text-note-long-150
+[UI] regionNoteLongStaysInside-150=ok
+[UI] shot region-text-note-long-150.png
+[UI] regionNoteLeaves-150=ok
+[UI] regionNoteNewestWins-150=ok
+[UI] scene regionText/region-text-shortcut-150
+[UI] regionTextShortcutRow-150=ok
+[UI] shot region-text-shortcut-unset-150.png
+[UI] regionTextShortcutCapturing-150=ok
+[UI] regionTextShortcutSaves-150=ok
+[UI] shot region-text-shortcut-set-150.png
 [UI] lane harness sceneRuns=8
 [UI] lane platform sceneRuns=0
 [UI] lane windows sceneRuns=0
@@ -1399,6 +1481,7 @@
 [UI] lane voice sceneRuns=8
 [UI] lane polish sceneRuns=28
 [UI] lane watch sceneRuns=10
+[UI] lane regionText sceneRuns=14
 [UI] sheetCssLint=ok
 [UI] markdownNeverInjects=ok
 [UI] cssOnSystem.settings=ok
@@ -1407,8 +1490,10 @@
 [UI] iconsFromSprite=ok
 [UI] voicePillOnlyListens=ok
 [UI] watchCardNeedsNoFocus=ok
-[UI] axe audits=146 ms=19749
+[UI] regionNoteOnlyReports=ok
+[UI] regionNoteKeepsNothing=ok
+[UI] axe audits=153 ms=15933
 [UI] axeClean=ok
 [UI] axeAllowListFresh=ok
 [UI] noPageErrors=ok
-[UI] done failed=0 shots=442
+[UI] done failed=0 shots=458
