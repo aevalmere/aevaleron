@@ -784,6 +784,7 @@ everything else follows the tray.
 | --- | --- | --- |
 | captureQuery | Ask about my screen | |
 | captureRegion | Ask about an area | `…` (opens a selector) |
+| copyRegionText | Copy text from screen | `…` (opens a selector) |
 | findOnScreen | Find on screen | `…` |
 | agentTask | Do a task | `…` |
 | toggleVisibility | Hide or show the overlay | the current verb only: `Hide the overlay` / `Show the overlay` |

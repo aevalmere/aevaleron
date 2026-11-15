@@ -27,6 +27,8 @@ mod llm;
 pub mod notify;
 pub mod paths;
 mod region;
+// region-text lane: copy the text inside a rectangle of the screen.
+mod region_text;
 mod selftest;
 mod skills;
 pub mod state;

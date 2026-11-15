@@ -215,7 +215,7 @@ fn open_window(app: &AppHandle, phys: screen::PxRect, gen: u64) -> tauri::Result
         .content_protected(true)
         .visible(false)
         .data_directory(crate::paths::webview_data_dir())
-        .initialization_script(crate::ipc::bridge_script())
+        .initialization_script(page_script())
         .on_page_load(move |w, p| {
             if matches!(p.event(), tauri::webview::PageLoadEvent::Finished) {
                 LOADED.fetch_max(gen, Ordering::Relaxed);
@@ -242,6 +242,31 @@ fn open_window(app: &AppHandle, phys: screen::PxRect, gen: u64) -> tauri::Result
         _ => {}
     });
     Ok(())
+}
+
+// ---------------------------------------------- region-text lane: the purpose
+
+/// Whether the pick being opened is for "Copy text from screen".
+static FOR_TEXT: AtomicBool = AtomicBool::new(false);
+
+/// `select` for "Copy text from screen" (region_text): the same picker, with
+/// its line saying that the text will be copied. The area is not kept for
+/// the conversation and nothing is captured.
+pub async fn select_text(app: &AppHandle, display: Option<screen::Display>) -> Option<Rect> {
+    FOR_TEXT.store(true, Ordering::Relaxed);
+    let got = select(app, display).await;
+    FOR_TEXT.store(false, Ordering::Relaxed);
+    got
+}
+
+/// The bridge, and for a text pick the word the page reads to say so
+/// (`window.aevalRegionFor`, region.js).
+fn page_script() -> String {
+    let mut script = crate::ipc::bridge_script();
+    if FOR_TEXT.load(Ordering::Relaxed) {
+        script.push_str("window.aevalRegionFor = 'text';\n");
+    }
+    script
 }
 
 // ------------------------------------------------- the conversation's area

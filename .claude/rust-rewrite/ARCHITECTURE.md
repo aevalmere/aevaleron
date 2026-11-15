@@ -850,6 +850,12 @@ Installer size: 4.99 MiB before and after; no new files or DLLs. The exe changes
 - **Vulkan for whisper.cpp.** Would need the Vulkan SDK on the runner and links `vulkan-1.dll` at load time, which a PC without a Vulkan driver does not have, so the exe would not start there. Doing it right means building ggml's Vulkan backend as a separately loaded DLL (GGML_BACKEND_DL) and shipping it beside the exe; whisper-rs 0.14 does not expose that.
 - whisper.cpp's Silero VAD, with a whisper-rs 0.15 bump.
 
+### Copy text from screen (region-text lane)
+
+`region_text/` is a module of its own: `mod.rs` (start, pick, read, copy, say), `assemble.rs` (pieces with rectangles to text; pure), `note.rs` (the note's window). It calls `region::select_text` for the rectangle, the desktop helper's `get_text` and `ocr` for the reading, and the clipboard plugin for the result. It calls no model, question, Find, task, history or settings code and writes no file, and a unit test in `mod.rs` reads its sources and holds it to that. The action is `copyRegionText` (the sixth in `store::ACTIONS`, no default chord); the tray and `windows::on_hotkey` both call `region_text::start`.
+
+IPC: invoke `region:note-ready` (the note's page has its listener; routed in `desktop/channels.rs`), listen `region:note {kind, title, lead, ms}` with kinds `copied`, `none`, `reading`, `error`. The window `region-note` is caller `Note` and may call that one channel. The picker learns its purpose from `window.aevalRegionFor = 'text'`, which `region::page_script` adds to the bridge script before the page's own scripts run. Details and limits: `lanes/region-text.md`.
+
 ## The rename to Aevaleron (2.0)
 
 The app was AevalBuddy through 1.x and in the 2.0 test builds. The documents in this folder were written under that name and keep it; the code, the pages, the installer and the release files say Aevaleron. What changed, and what an upgrade from an AevalBuddy install does:

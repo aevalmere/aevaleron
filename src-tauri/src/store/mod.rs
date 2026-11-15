@@ -74,9 +74,11 @@ const API_KEYS_VERSION: i64 = 1;
 const INPUT_HISTORY_MAX: usize = 50;
 
 /// Action ids in the order Settings lists them.
-pub const ACTIONS: [&str; 5] = [
+pub const ACTIONS: [&str; 6] = [
     "captureQuery",
     "captureRegion",
+    // region-text lane: unset by default, like every chord but the first.
+    "copyRegionText",
     "findOnScreen",
     "agentTask",
     "toggleVisibility",
@@ -97,6 +99,8 @@ fn old_default(action: &str) -> &'static str {
         "captureRegion" => "Ctrl+Shift+A",
         "findOnScreen" => "Ctrl+Shift+G",
         "agentTask" => "Ctrl+Shift+U",
+        // region-text lane: newer than v1, so it never had an old default.
+        "copyRegionText" => "",
         _ => "Ctrl+Shift+H",
     }
 }

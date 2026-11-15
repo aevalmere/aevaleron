@@ -194,6 +194,12 @@ pub fn template(i: &Input) -> Vec<Item> {
         "Ask about an area…",
         key("captureRegion"),
     ));
+    // region-text lane
+    out.push(Item::new(
+        "region-text",
+        "Copy text from screen…",
+        key("copyRegionText"),
+    ));
     out.push(Item::new("find", "Find on screen…", key("findOnScreen")));
     out.push(Item::new("agent", "Do a task…", key("agentTask")));
     out.push(Item::sep());
@@ -687,6 +693,8 @@ fn on_menu(app: &AppHandle, id: &str) {
             "region" => {
                 shared(&app).call(&app, |h| h.start_region.as_ref());
             }
+            // region-text lane
+            "region-text" => crate::region_text::start(&app),
             "find" => w::open_bar(&app, Some("find"), None),
             "agent" => w::open_bar(&app, Some("agent"), None),
             "toggle" => w::toggle_visibility(&app),
@@ -748,6 +756,7 @@ mod tests {
             vec![
                 "Ask, find, or do…",
                 "Ask about an area…",
+                "Copy text from screen…",
                 "Find on screen…",
                 "Do a task…",
                 "-",

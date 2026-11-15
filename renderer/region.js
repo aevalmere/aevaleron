@@ -18,6 +18,16 @@ const live = document.getElementById('live');
 const MIN_EDGE = 12;
 const CHIP_GAP = 10;
 
+// The same picker serves "Copy text from screen". Rust sets
+// window.aevalRegionFor before this script runs (region.rs page_script), and
+// the page says in its one line what the drag will do, so it is not taken
+// for the Ask capture.
+const FOR_TEXT = window.aevalRegionFor === 'text';
+if (FOR_TEXT) {
+  document.body.setAttribute('aria-label', 'Choose an area of the screen to copy its text');
+  document.getElementById('hint-text').textContent = 'Drag over the text to copy it';
+}
+
 let start = null;
 let rect = { x: 0, y: 0, width: 0, height: 0 };
 
@@ -53,7 +63,8 @@ function announceSize() {
 function announceKeys() {
   if (told) return;
   told = true;
-  say(`${sizeText()} Arrows move it, Alt+arrows resize, Enter asks, Esc cancels.`);
+  const enter = FOR_TEXT ? 'Enter copies the text' : 'Enter asks';
+  say(`${sizeText()} Arrows move it, Alt+arrows resize, ${enter}, Esc cancels.`);
   // What it said includes the size, so the size is not said again until it changes.
   said = sizeText();
 }
@@ -133,7 +144,7 @@ document.addEventListener('mouseup', (e) => {
 
 // Without a mouse: the first arrow or Enter puts a box in the middle of the
 // screen. Arrows move it (Shift for larger steps), Alt+arrows change its
-// size, Enter asks about it.
+// size, Enter asks about it (or copies its text, for a text pick).
 let keyed = false;
 function keyBox() {
   if (keyed) return;

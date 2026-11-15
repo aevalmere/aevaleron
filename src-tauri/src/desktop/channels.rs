@@ -59,6 +59,11 @@ pub fn route(
             region::cancel(&app);
             ok
         }
+        // region-text lane: the copy-text confirmation has its listener.
+        "region:note-ready" => {
+            crate::region_text::note::page_ready(window.app_handle());
+            ok
+        }
         "buddy:resolve-result" => {
             let p = payload.clone();
             off_thread(move || buddy::handle_resolve_result(&p));
@@ -116,6 +121,7 @@ mod tests {
             "region:clear",
             "region:done",
             "region:cancel",
+            "region:note-ready",
             "buddy:resolve-result",
             "buddy:dismiss",
             "buddy:advance",
