@@ -1,16 +1,16 @@
 {
   "workflow": "rust",
   "workflow_name": "rust",
-  "run_id": 43592975100,
+  "run_id": 43659945364,
   "run_attempt": 1,
-  "run_url": "https://github.com/aevalmere/aevaleron/actions/runs/43592975100",
+  "run_url": "https://github.com/aevalmere/aevaleron/actions/runs/43659945364",
   "event": "push",
-  "sha": "809038c7bc92bc50648f462cf0bbd609520f0a19",
+  "sha": "ff1765bdb6934bcb0eda795240de92ff4688e6ee",
   "ref": "rust-rewrite",
   "ref_dir": "rust-rewrite",
   "conclusion": "success",
   "failed": [],
-  "finished": "2026-11-14T12:28:16Z",
+  "finished": "2026-11-15T01:12:51Z",
   "error_lines": 0,
   "steps": [
     {
@@ -25,6 +25,11 @@
     },
     {
       "name": "Rust toolchain",
+      "outcome": "success",
+      "log": ""
+    },
+    {
+      "name": "Voice build flags",
       "outcome": "success",
       "log": ""
     },
