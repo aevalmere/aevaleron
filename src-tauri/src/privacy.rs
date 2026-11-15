@@ -275,6 +275,8 @@ pub fn op_reads(op: &str, args: &Value) -> Vec<Read> {
                 vec![window.unwrap_or(Read::Screen)]
             }
         }
+        // Find's menu commands: a window's menu, read or run.
+        "menuItems" | "menuInvoke" => vec![window.unwrap_or(Read::Screen)],
         // Pixels come from the screen as composed, whatever window was
         // asked for.
         "capture" | "ocr" => {
@@ -878,6 +880,8 @@ mod tests {
         let named = json!({ "windowHandle": 4660 });
         assert_eq!(op_reads("getText", &named), [Read::Window(4660)]);
         assert_eq!(op_reads("readTree", &json!({})), [Read::Screen]);
+        assert_eq!(op_reads("menuItems", &named), [Read::Window(4660)]);
+        assert_eq!(op_reads("menuInvoke", &json!({})), [Read::Screen]);
         let null = json!({ "windowHandle": null });
         assert_eq!(op_reads("docText", &null), [Read::Screen]);
         assert_eq!(

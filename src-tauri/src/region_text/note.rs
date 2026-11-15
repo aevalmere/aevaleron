@@ -85,6 +85,11 @@ impl Note {
             let lead = "Add a language with text recognition in Windows Settings, then try again.";
             return Note::new("error", title, lead, ERROR_MS);
         }
+        if e.code == crate::privacy::CODE {
+            let title = "This app is on your private apps list";
+            let lead = "Nothing was copied. Settings, Privacy has the list.";
+            return Note::new("error", title, lead, ERROR_MS);
+        }
         let lead = "Nothing was copied. Try again.";
         Note::new("error", "The text could not be read", lead, ERROR_MS)
     }

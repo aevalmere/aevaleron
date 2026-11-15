@@ -105,8 +105,13 @@ async fn run(app: &AppHandle) {
     let Some(_busy) = Busy::take() else {
         return;
     };
-    // The private-apps gate, when that lane lands, is called here, before
-    // the picker opens: this path never passes through `region::pick`.
+    // Private apps: with a listed app in front no area is picked, and the
+    // bar says why, as for the Ask pick (`privacy.rs`). This path never
+    // passes through `region::pick`, so it asks the gate itself.
+    if crate::privacy::check(crate::privacy::Read::Screen).is_err() {
+        crate::privacy::tell(app, true);
+        return;
+    }
     let display = screen::active_display(&screen::all_displays());
     let front = foreground();
     // Built now, hidden, so the note shows the moment the text is copied.
@@ -182,6 +187,11 @@ async fn read(px: PxRect) -> Result<(String, Source), DesktopError> {
     let rect = json!({ "x": px.x, "y": px.y, "width": px.width, "height": px.height });
     let (x, y) = (f64::from(px.x), f64::from(px.y));
     let clip = Piece::new("", x, y, f64::from(px.width), f64::from(px.height));
+    // Private apps: a rectangle that touches a listed app is not read,
+    // neither its text nor its pixels, whichever window is in front.
+    for (at_x, at_y) in sample_points(px) {
+        crate::privacy::check(crate::privacy::Read::Point(at_x, at_y))?;
+    }
     if let Some(window) = window_under(px).await? {
         // A refusal here (one of our own windows, an elevated app, a tree
         // too slow to walk) leaves the rectangle to OCR.
