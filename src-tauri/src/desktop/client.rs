@@ -1052,6 +1052,11 @@ impl Desktop {
         args["modifiers"] = json!(t["modifiers"].as_str().unwrap_or(""));
         args["physical"] = json!(t["physical"].as_bool().unwrap_or(false));
         args["force"] = json!(t["force"].as_bool().unwrap_or(false));
+        // Find's click on recognised words names the window they are in:
+        // the click lands there or not at all.
+        if let Some(w) = t.get("inWindow").filter(|w| !w.is_null()) {
+            args["inWindow"] = arg_window(Some(w));
+        }
         Ok(p::point_out(self.op("click", args).await?))
     }
 
@@ -1210,6 +1215,64 @@ impl Desktop {
             .await
     }
 
+    /// Selects match `n` of a document (as `find_text` numbered it), or with
+    /// `near` the match closest to that point, brings it into view and gives
+    /// the document the keyboard: `{ok, focus, selected}`.
+    pub async fn select_text(
+        self: &Arc<Self>,
+        r#ref: &str,
+        query: &str,
+        n: u64,
+        near: Option<(i64, i64)>,
+    ) -> DResult<Value> {
+        let mut args = json!({ "ref": r#ref, "query": query, "n": n });
+        if let Some((x, y)) = near {
+            args["x"] = json!(x);
+            args["y"] = json!(y);
+        }
+        self.op("selectText", args).await
+    }
+
+    /// What is selected in a document or editor: `{text, ranges}`.
+    pub async fn selection(self: &Arc<Self>, r#ref: &str) -> DResult<Value> {
+        self.op("selection", json!({ "ref": r#ref })).await
+    }
+
+    /// The names in a window's menu, read without opening anything:
+    /// `{source, items: [{path, pos, sub, enabled}], truncated, limit,
+    /// readMs}`. The helper stops at `depth` levels, `max` items or
+    /// `budget_ms`, and `limit` names the bound that cut it short.
+    pub async fn menu_items(
+        self: &Arc<Self>,
+        window_handle: Option<&Value>,
+        budget_ms: u64,
+        max: u64,
+        depth: u64,
+    ) -> DResult<Value> {
+        let args = json!({
+            "windowHandle": arg_window(window_handle),
+            "budgetMs": budget_ms,
+            "max": max,
+            "depth": depth,
+        });
+        self.op("menuItems", args).await
+    }
+
+    /// Runs one menu command `menu_items` listed: `{source, path, pos}`.
+    pub async fn menu_invoke(
+        self: &Arc<Self>,
+        window_handle: Option<&Value>,
+        item: &Value,
+    ) -> DResult<Value> {
+        let args = json!({
+            "windowHandle": arg_window(window_handle),
+            "source": item["source"],
+            "path": item["path"],
+            "pos": item["pos"],
+        });
+        self.op("menuInvoke", args).await
+    }
+
     pub async fn restore_cursor(self: &Arc<Self>) -> DResult<Value> {
         Ok(p::point_out(self.op("restoreCursor", json!({})).await?))
     }
@@ -1291,12 +1354,20 @@ fn px_rect(v: &Value) -> Option<screen::PxRect> {
 }
 
 fn span_shape(s: &Value) -> Value {
-    json!({
+    let mut out = json!({
         "text": s["text"],
         "rect": p::rect_obj(&s["rect"]),
         "ref": if s["ref"].is_null() { Value::Null } else { s["ref"].clone() },
         "source": s["source"],
-    })
+    });
+    // What the span is, for Find's "act on a hit": its role and patterns,
+    // and the button, link or item it sits in.
+    for key in ["role", "pat", "enabled", "line", "via"] {
+        if let Some(v) = s.get(key).filter(|v| !v.is_null()) {
+            out[key] = v.clone();
+        }
+    }
+    out
 }
 
 fn overlaps(a: &Value, b: &Value) -> bool {

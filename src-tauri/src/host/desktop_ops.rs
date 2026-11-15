@@ -182,6 +182,22 @@ impl DesktopAdapter {
                 let action = str_of(&a, "action").unwrap_or("invoke");
                 d.invoke(str_of(&a, "ref").unwrap_or(""), action).await
             }
+            "selectText" => {
+                let r = str_of(&a, "ref").unwrap_or("");
+                let query = str_of(&a, "query").unwrap_or("");
+                let point = |k: &str| num(&a[k]).map(|f| f.round() as i64);
+                let near = point("x").zip(point("y"));
+                d.select_text(r, query, uint(&a["n"], 0), near).await
+            }
+            "selection" => d.selection(str_of(&a, "ref").unwrap_or("")).await,
+            "menuItems" => {
+                let budget = uint(&a["budgetMs"], 300);
+                let max = uint(&a["max"], 400);
+                let depth = uint(&a["depth"], 4);
+                d.menu_items(opt(&a, "windowHandle"), budget, max, depth)
+                    .await
+            }
+            "menuInvoke" => d.menu_invoke(opt(&a, "windowHandle"), &whole(&a)).await,
             "restoreCursor" => d.restore_cursor().await,
             "cancel" => d.cancel().await,
             "start" => d.start().await.map(|_| json!({ "ok": true })),

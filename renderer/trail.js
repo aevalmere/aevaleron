@@ -4,9 +4,11 @@
 // globals (chatEl, opanel, listen, send, say, showSheet, requestResize,
 // scrollToBottom, syncOrbit).
 //
-//   Find view   the results list: each hit's snippet, and for related hits,
-//               why. A listbox: the arrows move through it and the ring
-//               follows. Nothing found offers the next step.
+//   Find view   the results list: each hit's snippet, for related hits
+//               why, and at the end of the row the one word for what Enter
+//               will do (Press, Focus, Select, Click). A listbox: the arrows
+//               move through it and the ring follows, Enter acts on the row.
+//               Nothing found offers the next step.
 //   Agent trail inside the transcript, one block per run: the plan as the
 //               checklist with each act under the item it serves, a confirm
 //               card when a step needs a yes, and the outcome. One
@@ -21,6 +23,9 @@ let findHits = [];
 let findCurrent = -1;
 let findStatus = null;
 let findQuery = '';
+// The list's generation, sent back with Enter so Rust knows which list
+// the row was in.
+let findGen = 0;
 
 function setView(next) {
   view = next === 'find' ? 'find' : 'chat';
@@ -159,6 +164,9 @@ function findRow(h) {
   body.appendChild(snip);
   if (h.why) body.appendChild(el('span', 'find-why', h.why));
   row.appendChild(body);
+  // What Enter will do, in one word. A row Enter can do nothing with has
+  // none.
+  if (h.act) row.appendChild(el('span', 'find-act', h.act));
   row.addEventListener('click', () => goTo(h.i, false));
   row.addEventListener('contextmenu', (e) => {
     e.preventDefault();
@@ -207,11 +215,30 @@ function goTo(i, focus) {
       r.scrollIntoView({ block: 'nearest' });
     }
   }
-  send('find:step', { by: { index: i } });
+  findStepped = send('find:step', { by: { index: i } });
+}
+
+// The last step asked of Rust, so Enter can wait for it to land.
+let findStepped = Promise.resolve();
+
+// Enter on a row acts on that match, as Enter in the bar does. The row is
+// the current one first, and the step that made it so has landed, so what
+// is sent is what Rust has marked.
+function actOn(i) {
+  const h = findHits.find((x) => x.i === i);
+  if (!h) return;
+  if (i !== findCurrent) goTo(i, false);
+  findStepped.then(() => send('find:act', { gen: findGen, index: i, match: h.match }));
 }
 
 findView.addEventListener('keydown', (e) => {
   if (!e.target.classList || !e.target.classList.contains('find-row') || e.ctrlKey || e.altKey || e.metaKey) return;
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    e.stopPropagation();
+    actOn(Number(e.target.dataset.i));
+    return;
+  }
   const rows = [...findView.querySelectorAll('.find-row')];
   const at = rows.indexOf(e.target);
   let to = -1;
@@ -227,7 +254,8 @@ findView.addEventListener('keydown', (e) => {
 
 let findDrawn = '';
 
-listen('find:hits', ({ hits, current, query }) => {
+listen('find:hits', ({ hits, current, query, gen }) => {
+  findGen = gen;
   // The same list again (a re-read that changed nothing) is not redrawn.
   const same = JSON.stringify([hits, current, query]);
   if (same === findDrawn && view === 'find') return;

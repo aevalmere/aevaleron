@@ -6,6 +6,8 @@
 pub mod agent;
 pub mod bar;
 pub mod capture;
+// find-act lane
+pub mod find_act;
 pub mod harness;
 pub mod llm;
 pub mod platform;
@@ -44,6 +46,9 @@ pub const LANES: [(&str, Probe); 12] = [
     ("llm", llm::run),
     // region-text lane: copies from the smoke's Notepad and leaves it as it was.
     ("region-text", region_text::run),
+    // find-act lane: Enter on a Find hit, in the smoke's Notepad. Before
+    // voice, which types into the file.
+    ("find-act", find_act::run),
     // voice lane: works in the smoke's Notepad, so it runs last.
     ("voice", voice::run),
 ];
@@ -62,7 +67,7 @@ pub const BLOCKS: [(&str, &[&str]); 4] = [
 ];
 
 /// The `v2desktop` block: the lanes that work in the smoke's Notepad.
-const NOTEPAD_LANES: &[&str] = &["llm", "region-text", "voice"]; // voice lane, region-text lane
+const NOTEPAD_LANES: &[&str] = &["llm", "region-text", "find-act", "voice"]; // voice lane, region-text lane, find-act lane
 
 /// The Notepad half of the smoke runs on CI, or when asked (main.js:3837).
 pub fn notepad_enabled() -> bool {
@@ -111,7 +116,7 @@ mod tests {
         let mut sorted = lanes.clone();
         sorted.sort_unstable();
         sorted.dedup();
-        assert_eq!(sorted.len(), 12); // voice lane, polish lane, region-text lane
+        assert_eq!(sorted.len(), 13); // voice lane, polish lane, region-text lane, find-act lane
         assert_eq!(lanes[0], "harness");
         let grouped: Vec<&str> = BLOCKS.iter().flat_map(|b| b.1.iter().copied()).collect();
         for lane in &lanes[1..] {

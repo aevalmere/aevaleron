@@ -51,7 +51,9 @@ Do), and you can settle it yourself.
 | `>` at the start | Do it as a task on your computer |
 | `Ctrl+1/2/3`, `Alt+Down` | Choose Ask, Find or Do without typing a prefix |
 | `Backspace` on an empty bar | Go back to guessing |
-| `Enter` / `Shift+Enter` | Send; in Find, next or previous match |
+| `Enter` / `Shift+Enter` | Send, or a new line |
+| `Enter` in Find | Act on the selected match: press it, focus it, select it or click it (each row says which) |
+| `Down` / `Up` in Find | Next or previous match (`F3` and `Shift+F3` too) |
 | `Alt+Enter` | Run a task the bar only guessed was one |
 | `Up` | Earlier entries |
 | `F6` | Move between the bar and the answer |

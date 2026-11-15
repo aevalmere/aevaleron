@@ -35,7 +35,11 @@ const modelMenu = document.getElementById('model-menu');
 const modelList = document.getElementById('model-list');
 
 const PREFIX = { find: '/', ask: '?', do: '>' };
-const ENTER_SAYS = { ask: 'Enter asks', find: 'Enter goes to the next match', do: 'Enter starts the task' };
+const ENTER_SAYS = {
+  ask: 'Enter asks',
+  find: 'Enter acts on the selected match, and the up and down arrows move between matches',
+  do: 'Enter starts the task',
+};
 // Short enough to sit beside the sigil legend in a 420px capsule at 18px;
 // the field's accessible name keeps the full sentence.
 const PLACEHOLDER = 'Ask, find, or do';
@@ -69,6 +73,9 @@ const bar = {
   modelDismissed: false,
 };
 let findState = null;
+// The list of matches on show ({ gen, hits, current }), so Enter can say
+// which row it meant.
+let findHits = null;
 let barHint = '';
 
 // ------------------------------------------------------------------- rows
@@ -260,18 +267,20 @@ listenSoft('bar:clear', () => {
   input.focus();
 });
 
-// A short note from Rust in the status row (the window cap), for 4 s.
+// A short note in the status row, for a few seconds: from Rust (the window
+// cap), or why Enter on a match did nothing. The longer ones stay longer.
 let barNote = '';
 let noteTimer = null;
-listenSoft('bar:note', (p) => {
-  barNote = String((p && p.text) || '');
+function showNote(text) {
+  barNote = String(text || '');
   clearTimeout(noteTimer);
   noteTimer = setTimeout(() => {
     barNote = '';
     renderStatus();
-  }, 4000);
+  }, barNote.length > 60 ? 7000 : 4000);
   renderStatus();
-});
+}
+listenSoft('bar:note', (p) => showNote(p && p.text));
 
 // ------------------------------------------------------------- the target
 
@@ -706,6 +715,7 @@ function renderStatus() {
       const st = findState.stage || {};
       head = `${findState.current + 1} of ${findState.total}${findState.more ? '+' : ''}`;
       if (c.related) head += ` · ${c.related} related`;
+      if (c.menu) head += ` · ${c.menu} in menus`;
       if (st.related === 'running' || st.concept === 'running') head += ' · looking…';
     }
     text = [head, ...(findState.lines || [])].filter(Boolean).join('\n');
@@ -740,10 +750,50 @@ window.aeval.on('find:state', (s) => {
   // has settled; -1 while that is still unknown.
   const c = (s && s.counts) || { exact: 0, related: 0 };
   const busy = !s || s.reading || (s.stage && (s.stage.related === 'running' || s.stage.concept === 'running'));
-  findState = s && s.open ? { ...s, hits: c.exact + c.related || (busy ? -1 : 0) } : s;
-  if (s && s.open === false) bar.findOn = false;
+  findState = s && s.open ? { ...s, hits: c.exact + c.related + (c.menu || 0) || (busy ? -1 : 0) } : s;
+  if (s && s.open === false) {
+    bar.findOn = false;
+    findHits = null;
+  }
   renderStatus();
 });
+
+listenSoft('find:hits', (h) => {
+  findHits = h && Array.isArray(h.hits) ? h : null;
+});
+
+// The last step asked of Rust, so Enter can wait for it to land.
+let findStepped = Promise.resolve();
+function stepFind(by) {
+  findStepped = Promise.resolve(window.aeval.invoke('find:step', { by })).catch(() => null);
+}
+
+// Find has matches to walk: the arrows and F3 move between them. A recall
+// of earlier entries that is under way keeps the arrows.
+function findStepping() {
+  return barIntent() === 'find' && bar.findOn && bar.recall < 0 && !!findState && findState.open && findState.total > 0;
+}
+
+// Enter in Find acts on the selected match: Rust presses, focuses, selects
+// or clicks it once the bar has folded away. What is sent names the list
+// and the row on show, so a list that changed under the key is left alone.
+// When nothing was done, the status row says why.
+function actOnHit() {
+  // After a step that is still on its way: Down then Enter means the row
+  // the arrow went to.
+  findStepped.then(() => {
+    const h = findHits && findHits.current >= 0 ? findHits.hits[findHits.current] : null;
+    if (!h) {
+      // Nothing is selected yet: the first match, if there is one.
+      if (findState && findState.total > 0) stepFind(1);
+      return;
+    }
+    const failed = () => showNote("Couldn't do that. Press Enter to try again.");
+    window.aeval.invoke('find:act', { gen: findHits.gen, index: findHits.current, match: h.match }).then((r) => {
+      if (r && r.message) showNote(r.message);
+    }, failed);
+  });
+}
 
 // --------------------------------------------------------------- examples
 
@@ -843,7 +893,7 @@ function send(what) {
   if (body) markSent();
   const recallAs = bar.lock && PREFIX[bar.lock] ? `${bar.literal ? '//' : PREFIX[bar.lock]}${body}` : body;
   if (what === 'find') {
-    window.aeval.invoke('find:step', { by: 1 });
+    actOnHit();
     pushHistory(recallAs);
     return;
   }
@@ -1051,7 +1101,19 @@ input.addEventListener('keydown', (e) => {
   }
   if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && !e.altKey && !e.shiftKey && !e.ctrlKey) {
     const dir = e.key === 'ArrowUp' ? -1 : 1;
+    // A Find is one line, so the arrows have no line to move to: they walk
+    // the matches, which Enter did before it acted on one.
+    if (findStepping()) {
+      e.preventDefault();
+      stepFind(dir);
+      return;
+    }
     if (caretAtEdge(dir) && recallKey(dir)) e.preventDefault();
+    return;
+  }
+  if (e.key === 'F3' && !e.altKey && !e.ctrlKey && findStepping()) {
+    e.preventDefault();
+    stepFind(e.shiftKey ? -1 : 1);
     return;
   }
   if (e.key === 'Escape') {
@@ -1068,7 +1130,8 @@ input.addEventListener('keydown', (e) => {
   }
   if (e.key !== 'Enter') return;
   // Shift+Enter starts a new line, except while Find is running, where it
-  // has always gone to the previous match (a Find is one line).
+  // has always gone to the previous match (a Find is one line). Plain Enter
+  // in Find acts on the selected match.
   if (e.shiftKey && !e.ctrlKey && !e.altKey && !(barIntent() === 'find' && bar.findOn)) return;
   e.preventDefault();
   onEnter(e);
