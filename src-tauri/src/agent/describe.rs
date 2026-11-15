@@ -288,6 +288,8 @@ pub fn friendly(code: &str, message: &str) -> String {
         "ELEVATED_TARGET" => {
             "Refused: that window runs as administrator, and Aevaleron does not.".into()
         }
+        // Private apps (`privacy.rs`): the message names the app.
+        "PRIVATE_APP" => format!("Refused: {message}"),
         "STALE_REF" => message.to_string(),
         "" => message.to_string(),
         c => format!("{c}: {message}"),
@@ -363,6 +365,10 @@ mod tests {
         assert_eq!(own, "Refused: that is Aevaleron's own window.");
         let named = friendly("NOT_FOUND", "no such ref");
         assert_eq!(named, "NOT_FOUND: no such ref");
+        // A private app's refusal is the gate's own line, with no code.
+        let line = "KeePass is on your private apps list, so the screen was not read.";
+        let private = friendly(crate::privacy::CODE, line);
+        assert_eq!(private, format!("Refused: {line}"));
         assert_eq!(seconds(&json!("x")), 1.0);
         assert_eq!(seconds(&json!(-2)), 0.0);
     }

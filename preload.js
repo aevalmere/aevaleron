@@ -155,6 +155,11 @@ const INVOKE_CHANNELS = new Set([
   // region-text lane
   'region:note-ready',
   // end region-text lane
+  // private apps lane
+  'privacy:get',
+  'privacy:add',
+  'privacy:remove',
+  // end private apps lane
 ]);
 
 const LISTEN_CHANNELS = new Set([

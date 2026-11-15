@@ -15,8 +15,9 @@ import * as polish from './lanes/polish.mjs'; // polish lane
 import * as watch from './lanes/watch.mjs'; // agents lane
 import * as regionText from './lanes/region-text.mjs'; // region-text lane
 import * as findAct from './lanes/find-act.mjs'; // find-act lane
+import * as privateApps from './lanes/private-apps.mjs'; // private apps lane
 
-export const LANES = { harness, platform, windows, capture, llm, agent, bar, sheet, settings, voice, polish, watch, regionText, 'find-act': findAct };
+export const LANES = { harness, platform, windows, capture, llm, agent, bar, sheet, settings, voice, polish, watch, regionText, 'find-act': findAct, 'private-apps': privateApps };
 
 // One problem string per way a lane file breaks the shape; empty when fine.
 export function shapeProblems(lanes = LANES) {

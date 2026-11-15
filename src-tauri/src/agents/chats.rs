@@ -210,7 +210,10 @@ fn watch() {
 
 /// Reads one window and passes on what changed.
 fn sample(uia: &Uia, tracker: &mut Tracker, hwnd: i64, retry_if_empty: bool) {
-    let exists = native::is_window(hwnd);
+    // Private apps: a listed chat app's window is not read; to the tracker
+    // it is a window that has gone (`privacy.rs`).
+    let read = crate::privacy::Read::Window(hwnd as isize);
+    let exists = native::is_window(hwnd) && crate::privacy::check(read).is_ok();
     let (pid, exe) = native::window_exe(hwnd);
     let app = if exists { app_of(&exe) } else { None };
     if exists && app.is_none() {

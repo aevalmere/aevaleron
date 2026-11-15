@@ -343,6 +343,14 @@ function renderNotice() {
     noticeSettings.dataset.section = 'pg-shortcuts';
     noticeSettings.hidden = false;
     notice.hidden = false;
+  } else if (state.privateNotice) {
+    // private apps lane: the app in front is on the private apps list, so
+    // nothing on screen was read. The sentence is written in Rust.
+    noticeText.textContent = state.privateNotice;
+    noticeSettings.textContent = 'Private apps';
+    noticeSettings.dataset.section = 'sec-private';
+    noticeSettings.hidden = false;
+    notice.hidden = false;
   } else if (!state.hasKey && now !== 'find') {
     noticeText.textContent =
       now === 'do' ? 'Tasks need an AI provider.' : 'Answers need an AI provider. Finding words on screen works without one.';

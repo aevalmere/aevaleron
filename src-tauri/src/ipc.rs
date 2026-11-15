@@ -168,6 +168,11 @@ pub const INVOKE_CHANNELS: &[&str] = &[
     // region-text lane
     "region:note-ready",
     // end region-text lane
+    // private apps lane
+    "privacy:get",
+    "privacy:add",
+    "privacy:remove",
+    // end private apps lane
 ];
 
 /// Channels a page may listen on. Must equal `LISTEN_CHANNELS` in preload.js.
@@ -329,6 +334,8 @@ const REGION: &[Caller] = &[Caller::Bar, Caller::Region];
 const AGENTS: &[Caller] = &[Caller::Settings, Caller::Agents];
 // region-text lane: the confirmation says its listener is in place, no more.
 const NOTE: &[Caller] = &[Caller::Note];
+// private apps lane: Settings' Private apps section, and no other window.
+const PRIVACY: &[Caller] = &[Caller::Settings];
 
 /// Channels whose callers differ from their prefix's row. A table, not
 /// match arms, so `every_invoke_channel_has_a_route` never takes a rule
@@ -391,6 +398,8 @@ fn family(channel: &str) -> Option<&'static [Caller]> {
         "voice" => APP,
         // agents lane.
         "agents" => AGENTS,
+        // private apps lane.
+        "privacy" => PRIVACY,
         _ => return None,
     })
 }
@@ -544,6 +553,10 @@ async fn dispatch(window: &WebviewWindow, channel: &str, payload: Value) -> Resu
     }
     // agents lane
     if let Some(r) = crate::agents::ipc::route(&app, channel, &payload).await {
+        return r;
+    }
+    // private apps lane
+    if let Some(r) = crate::privacy::route(&app, channel, &payload) {
         return r;
     }
     if channel == "ui:context-menu" {
@@ -1021,6 +1034,7 @@ mod tests {
             include_str!("host/settings.rs"),
             include_str!("voice/ipc.rs"),  // voice lane
             include_str!("agents/ipc.rs"), // agents lane
+            include_str!("privacy.rs"),    // private apps lane
         ]
         .concat();
         // Arms are `"x" =>`, `"x" | "y" =>`, or `channel == "x"`.
@@ -1323,6 +1337,8 @@ mod tests {
                     include_str!("../../settings/settings.js"),
                     include_str!("../../renderer/voice-settings.js"), // voice lane
                     include_str!("../../renderer/agents-settings.js"), // agents lane
+                    // private apps lane
+                    include_str!("../../renderer/private-apps-settings.js"),
                 ],
             ),
             (

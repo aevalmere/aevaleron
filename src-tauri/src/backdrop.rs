@@ -86,6 +86,8 @@ struct Inner {
     paused: u32,
     fails: u32,
     high_contrast: bool,
+    /// A private app is in front, so there is no screen to make glass of.
+    private: bool,
     /// The tier the pages were last told.
     last_tier: Option<&'static str>,
     fixture: Option<Fixture>,
@@ -147,6 +149,9 @@ pub struct TierInputs {
     pub high_contrast: bool,
     pub fails: u32,
     pub fixture: bool,
+    /// The app in front is on the private apps list (`privacy.rs`): the
+    /// screen is not captured, so the glass is solid until it leaves.
+    pub private: bool,
 }
 
 pub fn reasons_for(i: TierInputs) -> Vec<&'static str> {
@@ -159,6 +164,9 @@ pub fn reasons_for(i: TierInputs) -> Vec<&'static str> {
     }
     if i.fails >= 3 && !i.fixture {
         r.push("capture-failed");
+    }
+    if i.private {
+        r.push("private-app");
     }
     r
 }
@@ -175,6 +183,7 @@ fn inputs(g: &Inner) -> TierInputs {
         high_contrast: g.high_contrast,
         fails: g.fails,
         fixture: g.fixture.is_some(),
+        private: g.private,
     }
 }
 
@@ -556,12 +565,15 @@ fn push(v: &mut Vec<f64>, x: f64) {
 }
 
 fn tick() {
-    // Theme changes (high contrast on or off) are noticed here.
+    // Theme changes (high contrast on or off) are noticed here, and so is a
+    // private app coming to the front or leaving it.
     let hc = high_contrast_on();
+    let private = crate::privacy::check(crate::privacy::Read::Screen).is_err();
     let changed = {
         let mut g = lock();
-        let c = g.high_contrast != hc;
+        let c = g.high_contrast != hc || g.private != private;
         g.high_contrast = hc;
+        g.private = private;
         c
     };
     if changed {
@@ -971,16 +983,24 @@ mod tests {
     #[test]
     fn transparency_setting_is_not_a_reason() {
         // REQUESTS.md 5: only these three can force solid (B-035 dropped
-        // the stored surface setting).
+        // the stored surface setting), and a private app in front, which
+        // leaves no screen to make glass of.
         let all = reasons_for(TierInputs {
             surface_solid: true,
             can_hide: false,
             high_contrast: true,
             fails: 3,
             fixture: false,
+            private: false,
         });
         let want = ["capture-visible", "high-contrast", "capture-failed"];
         assert_eq!(all, want);
+        let private = reasons_for(TierInputs {
+            can_hide: true,
+            private: true,
+            ..Default::default()
+        });
+        assert_eq!(private, ["private-app"]);
         let none = reasons_for(TierInputs {
             can_hide: true,
             ..Default::default()

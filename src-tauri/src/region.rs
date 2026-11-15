@@ -368,6 +368,12 @@ pub async fn pick(app: &AppHandle) -> Option<bool> {
     if is_active(app) || shared(app).lock().mode == Mode::Hud {
         return None;
     }
+    // Private apps: no area is picked over a listed app, and the bar says
+    // why (`privacy.rs`).
+    if crate::privacy::check(crate::privacy::Read::Screen).is_err() {
+        crate::privacy::tell(app, true);
+        return None;
+    }
     let display = screen::active_display(&screen::all_displays());
     let device = display.device.clone();
     // A cancel was announced by `select`.

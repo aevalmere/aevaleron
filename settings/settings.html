@@ -542,6 +542,33 @@
                 </div>
               </div>
             </section>
+            <!-- private apps lane: programs Aevaleron never reads (renderer/private-apps-settings.js). -->
+            <section class="row" id="sec-private">
+              <div class="row-head">
+                <h2 id="private-heading">Private apps</h2>
+                <span id="private-summary" class="summary"></span>
+                <button class="edit" type="button" aria-expanded="false" aria-controls="sec-private-body" aria-labelledby="private-heading private-summary"><span class="ico i-chevron" aria-hidden="true"></span></button>
+              </div>
+              <div class="body" id="sec-private-body">
+                <div class="body-in">
+                  <p class="note">While one of these apps is in front, Aevaleron takes no screenshot, reads no text from the screen and runs no task step on it. A question you type is still answered, without the screen.</p>
+                  <ul id="private-list" class="private-list" aria-labelledby="private-heading"></ul>
+                  <p id="private-empty" class="note" hidden>No apps are on the list, so Aevaleron reads whichever app is in front.</p>
+                  <div class="private-add">
+                    <label class="field-label" for="private-name">Add an app by the name of its program</label>
+                    <div class="field-row">
+                      <input id="private-name" class="field" type="text" placeholder="notepad.exe" autocomplete="off" spellcheck="false" />
+                      <button id="private-add" type="button" class="g-btn">Add</button>
+                    </div>
+                  </div>
+                  <div class="actions">
+                    <button id="private-add-front" type="button" class="g-btn">Add the app that was in front</button>
+                    <span id="private-front-note" class="note"></span>
+                  </div>
+                  <p id="private-status" class="status" role="status" hidden></p>
+                </div>
+              </div>
+            </section>
             <section class="row static" id="sec-share">
               <div class="row-head">
                 <h2 id="share-heading">Screen share</h2>
@@ -773,5 +800,6 @@
   <script src="settings.js"></script>
   <script src="../renderer/voice-settings.js"></script> <!-- voice lane -->
   <script src="../renderer/agents-settings.js"></script> <!-- agents lane -->
+  <script src="../renderer/private-apps-settings.js"></script> <!-- private apps lane -->
 </body>
 </html>

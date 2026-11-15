@@ -1822,6 +1822,9 @@ impl Inner {
     }
 
     async fn take_snapshot(&self) -> Result<Snapshot, DeskError> {
+        // Private apps: with a listed app in front nothing is read, the
+        // other windows of a whole-screen search included.
+        crate::privacy::check(crate::privacy::Read::Screen)?;
         let settings = self.host.settings();
         let (scope, region) = {
             let s = self.st.lock();
@@ -1959,11 +1962,17 @@ impl Inner {
                 Err(_) if !current => return,
                 Err(e) => {
                     let down = e.code == "HELPER_DOWN";
+                    // Private apps: the gate's own line, and no "try Ask",
+                    // which would not read this app either.
+                    let private = e.code == crate::privacy::CODE;
                     s.fails += 1;
                     // A window that was readable a moment ago and misses one
                     // read is busy, not blank: what was found stays up.
                     let ride = quiet && !down && s.snapshot.is_some() && s.fails < READ_RETRIES;
-                    if !ride {
+                    if private {
+                        s.read_error = e.message.clone();
+                        s.read_action = None;
+                    } else if !ride {
                         let msg = if down { HELPER_DOWN } else { NO_TEXT };
                         s.read_error = msg.to_string();
                         s.read_action = Some("ask");

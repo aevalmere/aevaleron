@@ -26,6 +26,8 @@ mod lens;
 mod llm;
 pub mod notify;
 pub mod paths;
+// private apps lane: programs Aevaleron never reads.
+mod privacy;
 mod region;
 // region-text lane: copy the text inside a rectangle of the screen.
 mod region_text;

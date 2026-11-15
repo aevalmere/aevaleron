@@ -416,6 +416,12 @@ pub fn get() -> &'static Store {
         .expect("store::init runs before anything reads settings")
 }
 
+/// The shared store, or None before `init`: for code that may run in a unit
+/// test, where no settings file is open (private apps lane).
+pub fn try_get() -> Option<&'static Store> {
+    GLOBAL.get()
+}
+
 impl Store {
     /// Reads `aevaleron.json`, merges defaults over it, runs the migrations
     /// and writes the result back.

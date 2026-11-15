@@ -692,13 +692,21 @@ impl Desktop {
 
     /// One op at a time, in order: input has to land in the order it was
     /// asked for. `op = None` only syncs the own-window list and the watch.
+    ///
+    /// Private apps: an op that would read or act on a listed app is not
+    /// sent, and a read's answer from one goes no further.
     pub async fn call(
         self: &Arc<Self>,
         op: Option<&str>,
-        args: Value,
+        mut args: Value,
         timeout_ms: u64,
     ) -> DResult<Value> {
         let _q = self.queue.lock().await;
+        // Asked first, so a refused op does not even start the helper, and
+        // again just before the op is sent.
+        if let Some(op) = op {
+            crate::privacy::check_op(op, &mut args)?;
+        }
         self.ensure().await?;
         let own = self.own_config();
         let key = own.to_string();
@@ -714,7 +722,12 @@ impl Desktop {
         }
         match op {
             None => Ok(Value::Null),
-            Some(op) => self.send(op, &args, timeout_ms).await,
+            Some(op) => {
+                crate::privacy::check_op(op, &mut args)?;
+                let reply = self.send(op, &args, timeout_ms).await?;
+                crate::privacy::check_reply(op, &reply)?;
+                Ok(reply)
+            }
         }
     }
 
@@ -754,6 +767,14 @@ impl Desktop {
                 o.insert("display".into(), json!(screen::matching(displays, &dip).id));
             }
             o.insert("rect".into(), rect);
+            // Private apps: a listed app's window is named by its program
+            // alone. Its title is text of the app's, and is not passed on.
+            let handle = o.get("handle").and_then(p::handle_of).unwrap_or(0);
+            let read = crate::privacy::Read::Window(handle as isize);
+            if handle != 0 && crate::privacy::check(read).is_err() {
+                o.insert("private".into(), json!(true));
+                o.insert("title".into(), json!(""));
+            }
         }
         out
     }

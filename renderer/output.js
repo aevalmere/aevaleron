@@ -595,6 +595,8 @@ function sentPanel(sent, msgId) {
     const doc = { whole: ' and the whole document in it', part: ' and part of the document in it' }[sent.windowText.document] || '';
     item(`The text of ${app}${doc}, ${Number(sent.windowText.chars).toLocaleString('en-US')} characters`);
   }
+  // private apps lane: the app in front was on the private apps list.
+  if (sent.private) item(`Nothing from the screen. ${sent.private}`);
   if (sent.history > 0) item(`${sent.history} earlier message${sent.history === 1 ? '' : 's'} from this conversation`);
   if (sent.reader && sent.reader.modelName) item(`${sent.reader.modelName} read the screen first`);
   panel.appendChild(ul);

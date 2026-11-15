@@ -411,6 +411,12 @@ pub fn remember_foreground() {
     }
 }
 
+/// The window [`remember_foreground`] last noted, or 0 (private apps lane:
+/// Settings offers to add that app). The window may be gone by now.
+pub fn remembered_foreground() -> isize {
+    PREV_FOREGROUND.load(Ordering::Relaxed)
+}
+
 /// The label of our window that has the foreground, if one does.
 pub fn foreground_label() -> Option<String> {
     let fg = foreground();
