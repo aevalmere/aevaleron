@@ -1,7 +1,8 @@
 //! The private apps lane's smoke labels, listed in
 //! `tools/smoke-labels/private-apps.txt`. Notepad goes on the private apps
-//! list for the length of the probe and is brought to the front; every
-//! reader is then asked for it, as the app asks:
+//! list for the length of the probe and is brought to the front, and the
+//! bar is opened over it, as when a person asks. Every reader is then asked
+//! for it, as the app asks:
 //!
 //! - `privateAppsCapture`: no screenshot is taken;
 //! - `privateAppsFind`: Find opens, reads nothing and says why;
@@ -28,6 +29,8 @@ use crate::windows::{self, OVERLAY};
 const LINE: &str = "Notepad is on your private apps list, so the screen was not read.";
 const WAIT: Duration = Duration::from_secs(5);
 
+const MODE_JS: &str = "document.body.dataset.mode || ''";
+
 // The bar's notice as shown, or empty while it is hidden.
 const NOTICE_JS: &str = r#"
 (() => {
@@ -52,14 +55,26 @@ pub fn run(cx: &mut Cx) {
         return;
     };
     let handle = json!(handle);
+    let cx: &Cx = cx;
     let listed_before = privacy::list();
     let restore = Restore(crate::store::get().raw(privacy::KEY));
 
+    cx.on_main(windows::collapse_panel);
+    let _ = cx.wait_for(WAIT, || mode(cx) == "pill");
     let _ = cx.block_on(desktop::client().focus_window(&handle));
     cx.sleep(300);
     let added = privacy::add("Notepad");
+    // The bar opens over Notepad. It may take the keyboard; Notepad is the
+    // app in front either way.
+    cx.on_main(|app| windows::open_bar(app, None, None));
+    let _ = cx.wait_for(WAIT, || mode(cx) == "panel");
+    cx.sleep(400);
     let front = cx.wait_for(WAIT, || privacy::check(Read::Screen).is_err());
-    cx.log("privateAppsAdded", format!("{added:?} front={front}"));
+    let ours = windows::flags::foreground_label();
+    cx.log(
+        "privateAppsAdded",
+        format!("{added:?} front={front} ours={ours:?}"),
+    );
 
     capture_refused(cx);
     find_refused(cx);
@@ -77,11 +92,17 @@ pub fn run(cx: &mut Cx) {
         now == listed_before,
         format!("{now:?}, was {listed_before:?}"),
     );
-    cx.on_main(windows::send_overlay_state);
+    cx.on_main(windows::collapse_panel);
+    let _ = cx.wait_for(WAIT, || mode(cx) == "pill");
     cx.log(
         "privateAppsMs",
         format!("gate={gate}us readAgain={again}ms"),
     );
+}
+
+fn mode(cx: &Cx) -> String {
+    let v = cx.eval(OVERLAY, MODE_JS).unwrap_or(Value::Null);
+    v.as_str().unwrap_or_default().to_string()
 }
 
 /// A screenshot of the whole screen with Notepad in front: none.
@@ -130,7 +151,8 @@ fn ask_refused(cx: &Cx, handle: &Value) {
     );
 }
 
-/// The bar's notice names the app, in the same line as everywhere else.
+/// The open bar's notice names the app, in the same line as everywhere
+/// else (the page draws its notice only while the bar is open).
 fn bar_says(cx: &Cx) {
     cx.on_main(windows::send_overlay_state);
     let notice = || cx.eval(OVERLAY, NOTICE_JS).unwrap_or(Value::Null);

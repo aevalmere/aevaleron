@@ -49,7 +49,7 @@ Shared edits: `lib.rs` (`mod privacy;`), `store/mod.rs` (`try_get`), `windows/fl
 
 `privateAppsCapture`, `privateAppsFind`, `privateAppsAsk`, `privateAppsBar`, `privateAppsAgain`, `privateAppsRestored`. Logged, not gated: `privateAppsAdded`, `privateAppsMs` (what one ask of the gate costs, and how long the text read took to come back).
 
-The probe puts the smoke's Notepad on the list, brings it to the front, shows each reader refusing, takes it off, shows the screenshot and the text read working again, and puts the stored list back, also when the probe panics.
+The probe puts the smoke's Notepad on the list, brings it to the front, opens the bar over it, shows each reader refusing and the bar saying the line, takes it off, shows the screenshot and the text read working again, and puts the stored list back, also when the probe panics.
 
 ## Not verified
 
