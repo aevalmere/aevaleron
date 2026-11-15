@@ -905,6 +905,12 @@ pub fn open_bar(app: &AppHandle, mode: Option<&str>, prefill: Option<String>) {
         return;
     }
     let lock = mode.filter(|m| matches!(*m, "ask" | "find" | "agent"));
+    let opener = match lock {
+        Some("find") => "findOnScreen",
+        Some("agent") => "agentTask",
+        _ => "captureQuery",
+    };
+    *last_opener().lock() = Some(opener.to_string());
     shared(app).lock().pill_error = false;
     set_bar_mode(app, if lock == Some("find") { "find" } else { "ask" });
     bar_mark("mode");
@@ -1035,9 +1041,35 @@ pub fn on_escape(app: &AppHandle) {
     }
 }
 
+/// The bar shortcut that matches how the bar was last opened (the tray and
+/// the pill count as the main one).
+fn last_opener() -> &'static Mutex<Option<String>> {
+    static L: OnceLock<Mutex<Option<String>>> = OnceLock::new();
+    L.get_or_init(Default::default)
+}
+
+/// The shortcut that opened the bar closes it again. A different bar
+/// shortcut still switches the open bar to its mode. With the agent running,
+/// the task shortcut keeps bringing up the trail instead.
+fn closes_bar(app: &AppHandle, action: &str) -> bool {
+    let (open, agent) = {
+        let st = shared(app);
+        let s = st.lock();
+        (s.mode == Mode::Panel && !s.hidden, s.agent.running)
+    };
+    if !open || (action == "agentTask" && agent) {
+        return false;
+    }
+    last_opener().lock().as_deref() == Some(action)
+}
+
 /// A global shortcut fired (hotkeys.rs).
 pub fn on_hotkey(app: &AppHandle, action: &str) {
     crate::state::refresh(app);
+    if closes_bar(app, action) {
+        collapse_panel(app);
+        return;
+    }
     match action {
         "captureQuery" => {
             mark_bar_requested();

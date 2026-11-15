@@ -9,7 +9,7 @@ use std::collections::{BTreeMap, HashMap};
 use std::sync::atomic::{AtomicU32, Ordering::SeqCst};
 use std::sync::mpsc;
 use std::sync::OnceLock;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use parking_lot::Mutex;
 use serde_json::{json, Value};
@@ -553,7 +553,8 @@ pub fn main_chord_failed(app: &AppHandle) -> bool {
 
 /// The plugin's handler, wired in lib.rs.
 pub fn on_shortcut(app: &AppHandle, shortcut: &Shortcut, event: ShortcutEvent) {
-    if event.state() != ShortcutState::Pressed {
+    let now = Instant::now();
+    if !held_gate(&mut held().lock(), shortcut.id(), event.state(), now) {
         return;
     }
     let action = bound().lock().get(&shortcut.id()).cloned();
@@ -567,6 +568,39 @@ pub fn on_shortcut(app: &AppHandle, shortcut: &Shortcut, event: ShortcutEvent) {
     tauri::async_runtime::spawn(async move {
         crate::windows::on_hotkey(&app, &action);
     });
+}
+
+/// Holding a chord makes Windows repeat it. Only the first press of a hold
+/// fires; the rest are swallowed until the key comes up. A repeat still
+/// arriving refreshes the hold, so a release that never reaches us costs at
+/// most `HOLD_LAPSE` of quiet before the chord works again.
+const HOLD_LAPSE: Duration = Duration::from_millis(500);
+
+fn held() -> &'static Mutex<HashMap<u32, Instant>> {
+    static H: OnceLock<Mutex<HashMap<u32, Instant>>> = OnceLock::new();
+    H.get_or_init(Default::default)
+}
+
+/// Whether this event should fire the action.
+fn held_gate(
+    held: &mut HashMap<u32, Instant>,
+    id: u32,
+    state: ShortcutState,
+    now: Instant,
+) -> bool {
+    match state {
+        ShortcutState::Released => {
+            held.remove(&id);
+            false
+        }
+        ShortcutState::Pressed => {
+            let repeat = held
+                .get(&id)
+                .is_some_and(|t| now.duration_since(*t) < HOLD_LAPSE);
+            held.insert(id, now);
+            !repeat
+        }
+    }
 }
 
 /// How many times the global Escape has fired (smoke `escapeSuspend`).
@@ -705,6 +739,23 @@ pub fn reset(app: &AppHandle) -> Value {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_held_chord_fires_once() {
+        let mut h = HashMap::new();
+        let t = Instant::now();
+        let ms = |n| t + Duration::from_millis(n);
+        assert!(held_gate(&mut h, 1, ShortcutState::Pressed, t));
+        assert!(!held_gate(&mut h, 1, ShortcutState::Pressed, ms(30)));
+        assert!(!held_gate(&mut h, 1, ShortcutState::Pressed, ms(400)));
+        assert!(!held_gate(&mut h, 1, ShortcutState::Pressed, ms(800)));
+        assert!(!held_gate(&mut h, 1, ShortcutState::Released, ms(850)));
+        assert!(held_gate(&mut h, 1, ShortcutState::Pressed, ms(900)));
+        // Another chord is its own hold.
+        assert!(held_gate(&mut h, 2, ShortcutState::Pressed, ms(910)));
+        // A lost release: after a quiet lapse the chord works again.
+        assert!(held_gate(&mut h, 1, ShortcutState::Pressed, ms(2000)));
+    }
 
     fn p(s: &str) -> (Modifiers, Code) {
         parse(s).unwrap_or_else(|e| panic!("{s}: {e}"))

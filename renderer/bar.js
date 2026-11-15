@@ -534,6 +534,15 @@ function setLock(next, opts) {
 // in it stays text, and a lock taken too early is handed back.
 function takePrefix() {
   const v = input.value;
+  // A second / straight after the first: exact matches only.
+  if (bar.lock === 'find' && bar.prefixed === '/' && !bar.literal && v.startsWith('/') && !/^\/\S*\//.test(v)) {
+    const at = Math.max(0, input.selectionStart - 1);
+    input.value = v.slice(1);
+    input.setSelectionRange(at, at);
+    bar.prefixed = '//';
+    setLock('find', { literal: true, say: true });
+    return;
+  }
   if (bar.lock === 'find' && bar.prefixed === '/' && /^\S*\//.test(v)) {
     const at = input.selectionStart;
     input.value = `/${v}`;
@@ -545,7 +554,8 @@ function takePrefix() {
   if (bar.lock) return;
   let p = null;
   if (v.startsWith('//')) p = { lock: 'find', literal: true, n: 2 };
-  else if (/^\/[^/]/.test(v) && Intent.parse(v).lock === 'find') p = { lock: 'find', n: 1 };
+  // A bare / locks at once, like ? and >; a path pasted whole stays text.
+  else if (v.startsWith('/') && Intent.parse(v).lock === 'find') p = { lock: 'find', n: 1 };
   else if (v.startsWith('?')) p = { lock: 'ask', n: 1 };
   else if (v.startsWith('>')) p = { lock: 'do', n: 1 };
   if (!p) return;
