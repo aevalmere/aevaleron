@@ -1,8 +1,9 @@
 //! Turning what was said into what was meant: punctuation, capitals,
 //! grammar, filler words and self-corrections, the way Wispr Flow does it.
 //! It is off unless the person turns it on (Settings, Voice, Cleanup): the
-//! words then go in as heard, after a light local tidy ([`tidy`]), with no
-//! wait. On, a free model on OpenRouter does the work, through the llm
+//! words then go in as heard, after a light local tidy ([`tidy`]: no
+//! hesitation sounds, a capital at the start, a full stop at the end), with
+//! no wait. On, a free model on OpenRouter does the work, through the llm
 //! module; when no free model is ready, when the call fails, or when it
 //! takes longer than [`BUDGET`], the tidied words go in instead. Only the
 //! text is sent, never the audio. A reply that adds words, or starts talking
@@ -83,17 +84,91 @@ fn squash(s: &str) -> String {
     s.trim().to_string()
 }
 
-/// The fallback: hesitation sounds out, spacing fixed, a capital at the
-/// start. Words are never changed.
-pub fn tidy(raw: &str) -> String {
+/// A hesitation sound standing alone as a word: um, umm, uh, uhh, uhm, erm,
+/// hmm, mhm.
+fn filler(word: &str) -> bool {
     static FILLER: OnceLock<Regex> = OnceLock::new();
-    static COMMAS: OnceLock<Regex> = OnceLock::new();
-    let filler = re(&FILLER, r"(?i)[\s,]*\b(?:um+|uh+|uhm|erm|hmm+|mhm)\b[\s,]*");
-    let s = filler.replace_all(raw, " ");
-    let s = re(&COMMAS, r",\s*,").replace_all(&s, ",");
-    let s = squash(&s);
-    let s = s.trim_start_matches([',', ' ']).to_string();
-    capitalize(&s)
+    re(&FILLER, r"(?i)^(?:um+|uh+|uhm+|erm+|hmm+|mhm)$").is_match(word)
+}
+
+/// Whether `text` ends a sentence.
+fn stops(text: &str) -> bool {
+    text.ends_with(|c: char| ['.', '?', '!', '\u{2026}'].contains(&c))
+}
+
+/// A mark that closes a quotation or a bracket.
+fn closes(c: char) -> bool {
+    ['"', '\'', ')', ']', '\u{201d}', '\u{2019}'].contains(&c)
+}
+
+/// A comma, a semicolon or a space: what an utterance does not end on.
+fn loose(c: char) -> bool {
+    [',', ';', ' '].contains(&c)
+}
+
+/// Scripts that end a sentence with a mark of their own, which a full stop
+/// is not added to: Hindi, Thai, Chinese and Japanese with their marks, and
+/// the full-width forms.
+const OWN_STOP: [std::ops::RangeInclusive<char>; 5] = [
+    '\u{0900}'..='\u{097F}',
+    '\u{0E00}'..='\u{0E7F}',
+    '\u{3000}'..='\u{30FF}',
+    '\u{3400}'..='\u{9FFF}',
+    '\u{FF00}'..='\u{FFEF}',
+];
+
+/// Whether an utterance whose last character is `c` still wants its full
+/// stop.
+fn unfinished(c: char) -> bool {
+    let marked = ['.', '?', '!', ':', '\u{2026}'].contains(&c);
+    !marked && !OWN_STOP.iter().any(|r| r.contains(&c))
+}
+
+/// What every utterance gets when AI cleanup is off or cannot help, with no
+/// setting and no wait:
+/// - hesitation sounds out, each with the comma after it;
+/// - a capital at the start, and on a sentence a hesitation opened;
+/// - a full stop at the end of an utterance that ends without `.`, `?` or
+///   `!`.
+///
+/// Words are never changed, and what lies between is as the engine wrote it.
+pub fn tidy(raw: &str) -> String {
+    let mut out: Vec<String> = Vec::new();
+    // The next word opens a sentence: the first, and one whose hesitation
+    // went.
+    let mut opens = true;
+    for token in raw.split_whitespace() {
+        let word = token.trim_end_matches(|c: char| !c.is_alphanumeric());
+        if !filler(word) {
+            let kept = if opens {
+                capitalize(token)
+            } else {
+                token.to_string()
+            };
+            out.push(kept);
+            opens = false;
+            continue;
+        }
+        let tail = &token[word.len()..];
+        if let Some(last) = out.last_mut() {
+            if stops(last) {
+                opens = true;
+            } else if [".", "?", "!"].contains(&tail) {
+                // "I think, um. Yes": the full stop moves to the word before.
+                let kept = last.trim_end_matches(loose).len();
+                last.truncate(kept);
+                last.push_str(tail);
+            }
+        }
+    }
+    let mut text = squash(&out.join(" "));
+    let kept = text.trim_end_matches(loose).len();
+    text.truncate(kept);
+    let last = text.trim_end_matches(closes).chars().next_back();
+    if last.is_some_and(unfinished) {
+        text.push('.');
+    }
+    text
 }
 
 fn capitalize(s: &str) -> String {
@@ -256,7 +331,7 @@ mod tests {
 
     #[tokio::test]
     async fn the_raw_words_go_in_when_cleanup_cannot_help() {
-        let tidied = "So I think we should meet at 3 no 4pm tomorrow";
+        let tidied = "So I think we should meet at 3 no 4pm tomorrow.";
         // No key at all, and a paid model: nothing is sent.
         let (l, fake) = llm(Vec::new());
         let none = clean_with(&l, &MemorySettings::default(), RAW, BUDGET).await;
@@ -321,17 +396,63 @@ mod tests {
     }
 
     #[test]
-    fn the_local_tidy_only_takes_out_hesitations() {
-        assert_eq!(
-            tidy("um, so I think we should, uh, meet"),
-            "So I think we should meet"
-        );
-        assert_eq!(tidy("I think, um. Yes"), "I think. Yes");
-        assert_eq!(tidy("Umbrella, hmm, number"), "Umbrella number");
+    fn the_local_tidy_takes_out_hesitations() {
+        let heard = "um, so I think we should, uh, meet";
+        assert_eq!(tidy(heard), "So I think we should, meet.");
+        assert_eq!(tidy("I think, um. Yes"), "I think. Yes.");
+        assert_eq!(tidy("Umbrella, hmm, number"), "Umbrella, number.");
+        assert_eq!(tidy("at three, umm, four pm"), "At three, four pm.");
+        assert_eq!(tidy("So, um... I think so"), "So, I think so.");
+        assert_eq!(tidy("so yeah, uh"), "So yeah.");
+        for only in ["um", "Um.", "uh, uhh, erm", "  "] {
+            assert_eq!(tidy(only), "", "{only:?}");
+        }
+        // A word that only starts like one is a word.
+        let words = "umbrellas, uhlans and ermine";
+        assert_eq!(tidy(words), "Umbrellas, uhlans and ermine.");
         assert_eq!(
             strip_noise("[BLANK_AUDIO] hello (music) there [ Silence ]"),
             "hello there"
         );
         assert_eq!(strip_noise("  "), "");
+    }
+
+    #[test]
+    fn an_utterance_starts_with_a_capital_and_ends_with_a_stop() {
+        let plain = "meet at four pm tomorrow";
+        assert_eq!(tidy(plain), "Meet at four pm tomorrow.");
+        assert_eq!(tidy("what time is it?"), "What time is it?");
+        assert_eq!(tidy("Stop!"), "Stop!");
+        assert_eq!(tidy("the list is:"), "The list is:");
+        assert_eq!(tidy("and then\u{2026}"), "And then\u{2026}");
+        assert_eq!(tidy("to go over the budget,"), "To go over the budget.");
+        assert_eq!(tidy("she said \"go.\""), "She said \"go.\"");
+        assert_eq!(tidy("she said \"go\""), "She said \"go\".");
+        assert_eq!(tidy("4 pm"), "4 pm.");
+        // Scripts with a full stop of their own are left to the engine.
+        let japanese = "\u{4eca}\u{65e5}\u{306f}";
+        assert_eq!(tidy(japanese), japanese);
+        let hindi = "\u{0928}\u{092e}\u{0938}\u{094d}\u{0924}\u{0947}";
+        assert_eq!(tidy(hindi), hindi);
+        let korean = "\u{c548}\u{b155}";
+        assert_eq!(tidy(korean), format!("{korean}."));
+    }
+
+    #[test]
+    fn pieces_joined_after_a_pause_keep_their_middle() {
+        // Whisper, two pieces: the second sentence lost its "Um," and takes
+        // the capital it had.
+        let whisper = "Um, so I think we should meet at 3, no, 4pm tomorrow. \
+                       Um, so we can go over the budget.";
+        assert_eq!(
+            tidy(whisper),
+            "So I think we should meet at 3, no, 4pm tomorrow. So we can go over the budget."
+        );
+        // Parakeet, two pieces: no stop between them, so no capital either.
+        let parakeet = "Um so I think we should meet at three Um so we can go over the budget";
+        assert_eq!(
+            tidy(parakeet),
+            "So I think we should meet at three so we can go over the budget."
+        );
     }
 }

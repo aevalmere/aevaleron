@@ -5,13 +5,15 @@
 import { BAR, openBar } from '../kit.mjs';
 
 const SNAPSHOT = {
-  settings: { dictation: true, hotkey: 'Ctrl+Super', cleanup: false, language: 'en', engine: 'whisper-base', device: '' },
+  settings: { dictation: true, hotkey: 'Ctrl+Super', cleanup: false, language: 'en', engine: 'parakeet-110m', device: '' },
   hotkeyLabel: 'Ctrl+Win',
   devices: ['Microphone (Realtek Audio)', 'Headset (USB Audio)'],
   engines: [
-    { id: 'whisper-base', local: true, bytes: 59721011, ready: false, available: true },
-    { id: 'whisper-tiny', local: true, bytes: 32166155, ready: true, available: true },
-    { id: 'whisper-small', local: true, bytes: 190098681, ready: false, available: true },
+    { id: 'parakeet-110m', local: true, bytes: 101335520, ready: false, standIn: false, available: true },
+    { id: 'whisper-base', local: true, bytes: 63709472, ready: false, standIn: false, available: true },
+    { id: 'whisper-tiny', local: true, bytes: 44135072, ready: true, standIn: false, available: true },
+    { id: 'whisper-small', local: true, bytes: 193672256, ready: false, standIn: false, available: true },
+    { id: 'parakeet-0.6b', local: true, bytes: 548946272, ready: false, standIn: false, available: true },
     { id: 'gemini', local: false, bytes: null, ready: false, available: false },
   ],
   languages: [
@@ -145,10 +147,21 @@ export const scenes = [
         summary: document.getElementById('voice-dictation-summary').textContent,
         privacy: document.getElementById('sec-voice-privacy').textContent,
         download: !document.getElementById('voice-download').hidden,
+        engine: document.getElementById('voice-engine-summary').textContent,
+        credits: document.getElementById('sec-voice-credits').textContent,
+        notes: [...document.querySelectorAll('[data-voice-engine] .choice-note')].map((n) => n.textContent),
       }));
       t.check(
         'voiceSettingsPage',
-        page.checked === 'whisper-base' && page.gemini && page.summary === 'Ctrl+Win' && page.download && /Nothing is recorded or kept/.test(page.privacy),
+        page.checked === 'parakeet-110m' && page.gemini && page.summary === 'Ctrl+Win' && page.download && /Nothing is recorded or kept/.test(page.privacy),
+        JSON.stringify(page),
+      );
+      // Six engines, one line each; only Parakeet 110M says it is the fastest,
+      // and the Parakeet models' licence is named.
+      const fastest = page.notes.filter((n) => /fastest/i.test(n));
+      t.check(
+        'voiceSettingsEngines',
+        page.engine === 'Parakeet 110M' && page.notes.length === 6 && fastest.length === 1 && /^On this PC\. Fastest\./.test(fastest[0]) && /NVIDIA.*CC BY 4\.0/.test(page.credits),
         JSON.stringify(page),
       );
       await st.click('[data-voice-engine="whisper-tiny"]');

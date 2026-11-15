@@ -70,6 +70,7 @@ async fn snapshot() -> Value {
                 "local": spec.is_some(),
                 "bytes": spec.map(|m| m.bytes),
                 "ready": engine::ready(&probe),
+                "standIn": engine::stand_in(&probe),
                 "available": spec.is_some() || gemini::available(),
             })
         })
