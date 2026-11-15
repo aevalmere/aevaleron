@@ -1,16 +1,16 @@
 {
   "workflow": "ui-shots",
   "workflow_name": "ui-shots",
-  "run_id": 43722579683,
+  "run_id": 43723652723,
   "run_attempt": 1,
-  "run_url": "https://github.com/aevalmere/aevaleron/actions/runs/43722579683",
+  "run_url": "https://github.com/aevalmere/aevaleron/actions/runs/43723652723",
   "event": "push",
-  "sha": "52f9fd30e25875cfae8aa3aac92017c959d0b15b",
+  "sha": "eff8d61998ce1545774d884a4b06e34cef8e752a",
   "ref": "rust/find-act",
   "ref_dir": "rust-find-act",
-  "conclusion": "cancelled",
+  "conclusion": "success",
   "failed": [],
-  "finished": "2026-11-15T14:19:13Z",
+  "finished": "2026-11-15T14:33:43Z",
   "error_lines": 0,
   "steps": [
     {
