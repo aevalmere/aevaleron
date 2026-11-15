@@ -1955,6 +1955,28 @@ body[data-fixed-height="1"] #chat {
   display: grid;
   gap: 2px; /* optical */
   min-width: 0;
+  flex: 1 1 auto;
+}
+
+/* What Enter will do on the row, in one word at its end: caption text in
+   the second label colour, on the snippet's first line. No fill, no edge. */
+.find-act {
+  flex: none;
+  margin-inline-start: var(--sp-3);
+  font-size: var(--t-caption, 13px);
+  line-height: var(--lh-row, 20px);
+  color: var(--label-2);
+  white-space: nowrap;
+}
+
+/* A menu command is not on screen: its mark is a short bar, the shape of a
+   menu row, in place of the square that stands for words in the window. */
+.kind-mark.menu {
+  top: 17px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--label-2);
+  box-shadow: none;
 }
 
 .find-snippet {
@@ -2624,5 +2646,8 @@ html[data-motion="reduced"] .trow.running .trow-mark::before {
   .kind-mark.concept {
     background: Canvas;
     box-shadow: inset 0 0 0 1.5px Highlight;
+  }
+  .kind-mark.menu {
+    background: CanvasText;
   }
 }

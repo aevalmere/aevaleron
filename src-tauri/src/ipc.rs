@@ -78,6 +78,7 @@ pub const INVOKE_CHANNELS: &[&str] = &[
     "find:open",
     "find:query",
     "find:step",
+    "find:act",
     "find:scope",
     "find:to-ask",
     "find:close",
@@ -421,7 +422,8 @@ pub fn first_request(channel: &str, p: &Value) -> bool {
     match channel {
         "query:submit" => !p_str(p, "question").trim().is_empty(),
         "agent:start" => !p_str(p, "task").trim().is_empty(),
-        "find:step" => true,
+        // Enter in Find acts on the hit; it was the step before.
+        "find:step" | "find:act" => true,
         _ => false,
     }
 }

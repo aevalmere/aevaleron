@@ -61,6 +61,7 @@ const INVOKE_CHANNELS = new Set([
   'find:open',
   'find:query',
   'find:step',
+  'find:act',
   'find:scope',
   'find:to-ask',
   'find:close',

@@ -13,6 +13,12 @@
 //! The snapshot is the desktop engine's getText. Rects are physical pixels
 //! throughout. Offsets are UTF-16 code units, as in JavaScript, so a hit's
 //! start and end mean the same thing to the renderer as they did.
+//!
+//! Enter on the selected hit acts on it (`act`): a press, the keyboard
+//! focus, a selection or a click, chosen from what the hit is. A window's
+//! menu commands are listed after what is on screen.
+
+pub mod act;
 
 use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -315,6 +321,8 @@ pub struct Span {
     pub window: Value,
     pub hay: Vec<u16>,
     pub tokens: Vec<Token>,
+    /// What the span is, for acting on a hit in it.
+    pub act: act::SpanAct,
 }
 
 pub fn index_spans(spans: &[Value]) -> Vec<Span> {
@@ -343,6 +351,7 @@ pub fn index_spans(spans: &[Value]) -> Vec<Span> {
                 window: or_null(sp.get("window")),
                 hay,
                 tokens: tokenize(text),
+                act: act::SpanAct::from_span(sp),
             }
         })
         .collect()
@@ -421,6 +430,8 @@ pub struct Hit {
     /// A whole-document match: the document's ref and the match's number
     /// in it, as the helper's findText counted.
     pub doc: Option<(String, usize)>,
+    /// The link or button a whole-document match sits in.
+    pub via: Option<act::Target>,
 }
 
 impl Hit {
@@ -499,6 +510,7 @@ pub fn match_literal(
             span_text: None,
             raw_why: None,
             doc: None,
+            via: None,
         });
     };
     let single = !q.chars().any(js_space);
@@ -832,6 +844,15 @@ struct State {
     doc_seq: u64,
     /// Re-reads that failed since the last good one.
     fails: u32,
+    /// The front window's menu commands, their names indexed for matching,
+    /// and the ones the query matches. Listed after what is on screen.
+    menu: Vec<act::MenuCommand>,
+    menu_spans: Vec<Span>,
+    menu_hits: Vec<Hit>,
+    /// The bound that cut the menu read short, if one did.
+    menu_limit: Option<&'static str>,
+    /// The window whose menu was asked for.
+    menu_for: Option<String>,
 }
 
 impl Default for State {
@@ -870,6 +891,11 @@ impl Default for State {
             moving: false,
             doc_seq: 0,
             fails: 0,
+            menu: Vec::new(),
+            menu_spans: Vec::new(),
+            menu_hits: Vec::new(),
+            menu_limit: None,
+            menu_for: None,
         }
     }
 }
@@ -879,6 +905,28 @@ fn hit_key(h: &Hit) -> String {
         return format!("doc:{r}:{n}");
     }
     format!("{}:{}:{}:{}", h.kind, h.span_id, h.start, h.matched)
+}
+
+/// Where a hit is in the list read again. As many hits must say the same
+/// words as before: with fewer or more, which of them it was cannot be
+/// told, and it counts as gone. Then it is the same hit by its key, else
+/// the one in the same position among them (the third "Save" is still the
+/// third).
+fn refind(before: &[Hit], hit: &Hit, after: &[Hit]) -> Option<usize> {
+    let key = hit_key(hit);
+    let words = fold(&hit.matched);
+    let same = |h: &Hit| {
+        h.kind == hit.kind && h.doc.is_some() == hit.doc.is_some() && fold(&h.matched) == words
+    };
+    let was: Vec<&Hit> = before.iter().filter(|h| same(h)).collect();
+    let all = after.iter().enumerate();
+    let now: Vec<usize> = all.filter(|(_, h)| same(h)).map(|(i, _)| i).collect();
+    if now.len() != was.len() {
+        return None;
+    }
+    let by_key = now.iter().copied().find(|i| hit_key(&after[*i]) == key);
+    let nth = was.iter().position(|h| hit_key(h) == key);
+    by_key.or_else(|| nth.and_then(|n| now.get(n).copied()))
 }
 
 impl State {
@@ -915,7 +963,105 @@ impl State {
         out.extend(self.doc.iter().cloned());
         out.extend(related);
         out.extend(self.concept.iter().cloned());
+        // Menu commands are not on screen yet: after everything that is.
+        out.extend(self.menu_hits.iter().cloned());
         out
+    }
+
+    /// The window whose menu has not been asked for yet, marked as asked
+    /// for. An area chosen on the screen has no menu of its own.
+    fn menu_target(&mut self) -> Option<(String, Value)> {
+        if self.region.is_some() {
+            return None;
+        }
+        let handle = self.snapshot.as_ref()?.windows.first()?["handle"].clone();
+        let key = handle.to_string();
+        if self.menu_for.as_deref() == Some(key.as_str()) {
+            return None;
+        }
+        self.menu.clear();
+        self.menu_spans.clear();
+        self.menu_hits.clear();
+        self.menu_limit = None;
+        self.menu_for = Some(key.clone());
+        Some((key, handle))
+    }
+
+    fn set_menu(&mut self, commands: Vec<act::MenuCommand>, limit: Option<&'static str>) {
+        // Each name is a span of its own "window", so a phrase is never
+        // matched across two commands that happen to be neighbours.
+        let name = |(i, c): (usize, &act::MenuCommand)| {
+            json!({ "text": c.path.last(), "source": "menu", "window": i + 1 })
+        };
+        let names: Vec<Value> = commands.iter().enumerate().map(name).collect();
+        self.menu_spans = index_spans(&names);
+        self.menu = commands;
+        self.menu_limit = limit;
+        self.rematch_menu();
+    }
+
+    /// The menu commands whose names match the query: stage A's matcher
+    /// over the names, one row per command, from two letters up.
+    fn rematch_menu(&mut self) {
+        self.menu_hits.clear();
+        if self.menu.is_empty() || len16(js_trim(&self.query)) < 2 {
+            return;
+        }
+        let mut taken = HashSet::new();
+        let mut seen = HashSet::new();
+        for mut h in match_literal(&self.menu_spans, &self.query, "menu", &mut taken) {
+            let Some(cmd) = self.menu.get(h.span_id) else {
+                continue;
+            };
+            if !seen.insert(h.span_id) {
+                continue;
+            }
+            h.text = cmd.path.join(" \u{203a} ");
+            h.window = cmd.window.clone();
+            h.why = Some(act::MENU_WHY.to_string());
+            self.menu_hits.push(h);
+        }
+    }
+
+    /// What Enter does on a hit.
+    fn plan(&self, h: &Hit) -> act::Act {
+        if h.kind == "menu" {
+            return act::Act::Menu { index: h.span_id };
+        }
+        if let Some((r, n)) = &h.doc {
+            return act::plan_doc(r, *n, js_trim(&self.query), h.via.as_ref());
+        }
+        let snap = self.snapshot.as_ref();
+        match snap.and_then(|s| s.spans.get(h.span_id)) {
+            Some(sp) => {
+                let ocr = sp.source.as_deref() == Some("ocr");
+                act::plan_span(&sp.act, ocr, h.rect, &h.matched)
+            }
+            None => act::Act::Nothing {
+                why: act::Why::NoPlace,
+            },
+        }
+    }
+
+    /// The action on a hit, ready to carry out, or why there is none.
+    fn plan_for(&self, h: &Hit) -> Result<act::Plan, act::Refusal> {
+        let action = self.plan(h);
+        let menu = match &action {
+            act::Act::Nothing { why } => {
+                return Err(match why {
+                    act::Why::Disabled => act::Refusal::Disabled,
+                    act::Why::NoPlace => act::Refusal::NoPlace,
+                });
+            }
+            act::Act::Menu { index } => self.menu.get(*index).map(|c| c.item.clone()),
+            _ => None,
+        };
+        Ok(act::Plan {
+            act: action,
+            window: h.window.clone(),
+            menu,
+            query: self.query.clone(),
+        })
     }
 
     /// Exact matches: the snapshot's and the documents'.
@@ -971,6 +1117,7 @@ impl State {
                         span_text: None,
                         raw_why: None,
                         doc: Some((r.to_string(), n)),
+                        via: act::Target::from_value(&m["via"]),
                     });
                 }
                 self.doc_refs.insert(r.to_string());
@@ -1040,6 +1187,7 @@ impl State {
         }
         let exact = self.exact();
         let related = self.related.len() + self.concept.len();
+        let menus = self.menu_hits.len();
         let running = self.stage_b == Stage::Running || self.stage_c == Stage::Running;
         let text = if exact == 0 && related == 0 {
             if running {
@@ -1047,7 +1195,10 @@ impl State {
             } else if self.stage_b == Stage::Done || self.stage_c == Stage::Done {
                 lines.push("No related matches either.".to_string());
             }
-            format!("Nothing on screen matches \"{q}\".")
+            match menus {
+                0 => format!("Nothing on screen matches \"{q}\"."),
+                n => format!("Nothing on screen \u{b7} {}", act::menu_count(n)),
+            }
         } else {
             // Exact-only (`//`) never looks for related words, so it does
             // not count them either.
@@ -1056,6 +1207,9 @@ impl State {
             let mut text = format!("{exact}{more} exact");
             if related > 0 || !quiet {
                 text.push_str(&format!(" \u{b7} {related} related"));
+            }
+            if menus > 0 {
+                text.push_str(&format!(" \u{b7} {}", act::menu_count(menus)));
             }
             if running {
                 text.push_str(" \u{b7} looking\u{2026}");
@@ -1075,6 +1229,10 @@ impl State {
         }
         if let Some(n) = &self.notice {
             lines.insert(0, n.clone());
+        }
+        // A menu that was not read in full may hold what was typed.
+        if len16(q) >= 2 {
+            lines.extend(act::menu_note(self.menu_limit).map(str::to_string));
         }
         let extra = match self.stage_b {
             Stage::Offline => Some(NEEDS_CONNECTION),
@@ -1136,6 +1294,7 @@ impl State {
             span_text: Some(span.text.clone()),
             raw_why: None,
             doc: None,
+            via: None,
         });
     }
 
@@ -1164,6 +1323,7 @@ impl State {
                 }
             }
         }
+        self.rematch_menu();
         let n = self.hits().len() as i64;
         if self.current >= n {
             self.current = if n > 0 { 0 } else { -1 };
@@ -1471,6 +1631,81 @@ impl Find {
         scope
     }
 
+    /// Enter on the selected hit: the action to carry out, or why there is
+    /// none. `gen`, `index` and `matched` say which list and which row the
+    /// person was looking at; with any other, nothing is done. What the
+    /// action needs is checked to be there still. If it is not, the window
+    /// is read again, once, and the same hit looked for in what came back.
+    pub async fn plan_act(
+        &self,
+        gen: Option<i64>,
+        index: Option<i64>,
+        matched: Option<&str>,
+    ) -> Result<act::Plan, act::Refusal> {
+        let inner = &self.inner;
+        let (hit, before, plan) = {
+            let s = inner.st.lock();
+            let hits = s.hits();
+            let at = usize::try_from(s.current).ok().filter(|i| *i < hits.len());
+            let Some(at) = at.filter(|_| s.open) else {
+                return Err(act::Refusal::NoHit);
+            };
+            let hit = hits[at].clone();
+            let row = index == Some(s.current) && matched == Some(hit.matched.as_str());
+            if gen != Some(s.gen) || !row {
+                return Err(act::Refusal::Changed);
+            }
+            let plan = s.plan_for(&hit)?;
+            (hit, hits, plan)
+        };
+        if inner.still_there(&plan).await {
+            return Ok(plan);
+        }
+        inner.refresh("act").await;
+        if hit.doc.is_some() {
+            let seq = inner.next_doc_seq();
+            inner.run_doc(seq).await;
+        }
+        let again = {
+            let mut s = inner.st.lock();
+            let after = s.hits();
+            let found = refind(&before, &hit, &after);
+            if let Some(i) = found {
+                s.pin(i as i64);
+            }
+            found.map(|i| s.plan_for(&after[i]))
+        };
+        // The list the person sees is the one that was just read.
+        inner.emit_all();
+        let plan = again.ok_or(act::Refusal::Gone)??;
+        // Words read a moment ago are where they were read; an element is
+        // asked once more.
+        let read_now = matches!(plan.act, act::Act::ClickPoint { .. });
+        if read_now || inner.still_there(&plan).await {
+            Ok(plan)
+        } else {
+            Err(act::Refusal::Gone)
+        }
+    }
+
+    /// The list as it stands: `{gen, query, current, rows: [{i, kind,
+    /// match, text, act}]}`. The smoke run reads it to act on a row it
+    /// knows.
+    pub fn rows(&self) -> Value {
+        let s = self.inner.st.lock();
+        let mut rows = Vec::new();
+        for (i, h) in s.hits().iter().enumerate() {
+            rows.push(json!({
+                "i": i,
+                "kind": h.kind,
+                "match": h.matched,
+                "text": h.text,
+                "act": s.plan(h).word(),
+            }));
+        }
+        json!({ "gen": s.gen, "query": s.query, "current": s.current, "rows": rows })
+    }
+
     pub fn current_hit(&self) -> Option<Hit> {
         let s = self.inner.st.lock();
         let i = usize::try_from(s.current).ok()?;
@@ -1546,6 +1781,8 @@ impl Inner {
                     "match": h.matched,
                     "why": h.why_or_empty(),
                     "offscreen": offscreen,
+                    // What Enter will do, in one word; empty for nothing.
+                    "act": s.plan(h).word(),
                 }));
                 lens.push(json!({
                     "i": i,
@@ -1569,7 +1806,11 @@ impl Inner {
                 "status": text,
                 "lines": lines,
                 "action": action,
-                "counts": { "exact": s.exact(), "related": s.related.len() + s.concept.len() },
+                "counts": {
+                    "exact": s.exact(),
+                    "related": s.related.len() + s.concept.len(),
+                    "menu": s.menu_hits.len(),
+                },
                 "stage": { "related": s.stage_b.as_str(), "concept": s.stage_c.as_str() },
                 "current": s.current,
                 "total": all.len(),
@@ -1675,7 +1916,7 @@ impl Inner {
         }
         let result = self.take_snapshot().await;
         let quiet = reason == "poll" || reason == "scroll";
-        let (requery, say, redo_doc) = {
+        let (requery, say, redo_doc, menu) = {
             let mut s = self.st.lock();
             let current = gen == s.snap_gen;
             let mut requery = None;
@@ -1742,7 +1983,7 @@ impl Inner {
             let rested = reason == "scroll" && !redo_doc && s.nudge_seq == nudge;
             let settled = rested && std::mem::replace(&mut s.moving, false);
             let say = !quiet || first || changed_now || settled || s.read_error != before;
-            (requery, say, redo_doc)
+            (requery, say, redo_doc, s.menu_target())
         };
         match requery {
             Some((q, literal)) => {
@@ -1756,6 +1997,75 @@ impl Inner {
                     self.spawn_doc(0);
                 }
             }
+        }
+        // After what is on screen has been said: the menu is read off to
+        // the side, once per window, and never holds a match back.
+        if let Some((key, window)) = menu {
+            let inner = self.clone();
+            self.rt.spawn(async move { inner.read_menu(key, window).await });
+        }
+    }
+
+    /// Reads the front window's menu commands, within the bounds in `act`.
+    async fn read_menu(&self, key: String, window: Value) {
+        let args = json!({
+            "windowHandle": window,
+            "budgetMs": act::MENU_BUDGET_MS,
+            "max": act::MENU_MAX,
+            "depth": act::MENU_DEPTH,
+        });
+        // On a task of its own: a read Find stops waiting for still runs to
+        // its end, so the helper is never left half way through a call.
+        let desktop = self.desktop.clone();
+        let task = self.rt.spawn(async move { desktop.op("menuItems", args).await });
+        let wait = Duration::from_millis(act::MENU_WAIT_MS);
+        let (commands, limit) = match tokio::time::timeout(wait, task).await {
+            Ok(Ok(Ok(read))) => {
+                act::menu_commands(&read, &window, act::MENU_DEPTH, act::MENU_MAX)
+            }
+            // No menu, or one that cannot be read: nothing to list or say.
+            Ok(_) => (Vec::new(), None),
+            Err(_) => (Vec::new(), Some("skipped")),
+        };
+        {
+            let mut s = self.st.lock();
+            let mine = s.open && s.menu_for.as_deref() == Some(key.as_str());
+            if !mine || (commands.is_empty() && limit.is_none()) {
+                return;
+            }
+            s.set_menu(commands, limit);
+            if js_trim(&s.query).is_empty() {
+                return;
+            }
+        }
+        self.emit_all();
+    }
+
+    /// Whether what an action needs is there still. Words that text
+    /// recognition found have no element to ask, so they never are: the
+    /// window is read again first. A numbered document match is brought
+    /// into view, which fails once it has left the document. A menu command
+    /// is checked by the helper as it runs it.
+    async fn still_there(&self, plan: &act::Plan) -> bool {
+        match &plan.act {
+            act::Act::ClickPoint { .. } => false,
+            act::Act::Menu { .. } => true,
+            act::Act::SelectText {
+                r#ref,
+                query,
+                n: Some(n),
+                ..
+            } => {
+                let args = json!({ "ref": r#ref, "query": query, "n": n });
+                self.desktop.op("scrollToText", args).await.is_ok()
+            }
+            other => match other.element() {
+                Some(r) => {
+                    let args = json!({ "ref": r });
+                    self.desktop.op("resolve", args).await.is_ok()
+                }
+                None => true,
+            },
         }
     }
 
@@ -2116,7 +2426,7 @@ impl Inner {
             } else {
                 s.stage_c = Stage::Running;
                 let hits = s.hits();
-                let near = hits.iter().filter(|h| h.doc.is_none());
+                let near = hits.iter().filter(|h| h.doc.is_none() && h.kind != "menu");
                 let anchors: Vec<usize> = near.map(|h| h.span_id).collect();
                 let rows: Vec<String> = budget_spans(untouched, &anchors)
                     .iter()
@@ -2667,6 +2977,329 @@ mod tests {
             let st = find.state();
             let want = "Desktop reading stopped responding. Restarting it\u{2026}";
             assert_eq!(st["status"]["text"], json!(want));
+            find.close();
+        });
+    }
+
+    // ------------------------------------------------------- act on a hit
+
+    /// A window with a button's label, a link, a line of a document and a
+    /// plain piece of text, each saying "save".
+    fn acting_spans() -> Vec<Value> {
+        let button = json!({ "ref": "b1", "role": "button", "pat": ["invoke"] });
+        let mut label = span_at("Save file", 0);
+        label["ref"] = json!("t1");
+        label["role"] = json!("text");
+        label["via"] = button;
+        let mut link = span_at("Save as a copy", 1);
+        link["ref"] = json!("l1");
+        link["role"] = json!("hyperlink");
+        link["pat"] = json!(["invoke"]);
+        let mut line = span_at("please save this line", 2);
+        line["ref"] = json!("d1");
+        line["role"] = json!("document");
+        line["pat"] = json!(["text"]);
+        line["line"] = json!(true);
+        let mut plain = span_at("Autosave is on", 3);
+        plain["ref"] = json!("p1");
+        plain["role"] = json!("text");
+        let mut word = span_at("save", 4);
+        word["ref"] = Value::Null;
+        word["source"] = json!("ocr");
+        vec![label, link, line, plain, word]
+    }
+
+    fn acting_engine() -> (Find, Arc<Host>, Arc<FakeDesktop>) {
+        let (find, host, desktop) = engine(Related::Off, &[]);
+        let text = json!({ "source": "mixed", "spans": acting_spans() });
+        desktop.reply("getText", text);
+        (find, host, desktop)
+    }
+
+    /// What the bar sends with Enter: the list and the row it is showing.
+    async fn enter(find: &Find, host: &Host) -> Result<act::Plan, act::Refusal> {
+        let hits = host.events.last("find:hits").unwrap();
+        let at = hits["current"].as_i64().unwrap();
+        let row = &hits["hits"][at as usize];
+        find.plan_act(hits["gen"].as_i64(), Some(at), row["match"].as_str())
+            .await
+    }
+
+    #[test]
+    fn each_row_says_what_enter_will_do() {
+        run(async {
+            let (find, host, _) = acting_engine();
+            find.open(None, None).await;
+            find.query("save", true);
+            let hits = host.events.last("find:hits").unwrap();
+            let rows = hits["hits"].as_array().unwrap();
+            let words: Vec<&str> = rows.iter().map(|h| h["act"].as_str().unwrap()).collect();
+            assert_eq!(words, ["Press", "Press", "Select", "Click", "Click"]);
+            find.close();
+        });
+    }
+
+    #[test]
+    fn enter_acts_on_the_row_the_person_was_looking_at() {
+        run(async {
+            let (find, host, desktop) = acting_engine();
+            find.open(None, None).await;
+            find.query("save", true);
+            // The label presses the button it sits in.
+            let plan = enter(&find, &host).await.unwrap();
+            let want = act::Act::Pattern {
+                r#ref: "b1".into(),
+                action: "invoke",
+            };
+            assert_eq!(plan.act, want);
+            assert_eq!(plan.window, json!(7));
+            assert_eq!(plan.query, "save");
+            // The element was asked for once; nothing was read again.
+            let asked = |m: &str| desktop.methods().iter().filter(|x| *x == m).count();
+            assert_eq!((asked("resolve"), asked("getText")), (1, 1));
+
+            // A list that has moved on is not acted on.
+            let hits = host.events.last("find:hits").unwrap();
+            let gen = hits["gen"].as_i64();
+            let stale = find.plan_act(gen.map(|g| g - 1), Some(0), Some("Save"));
+            assert_eq!(stale.await, Err(act::Refusal::Changed));
+            let other_row = find.plan_act(gen, Some(1), Some("Save"));
+            assert_eq!(other_row.await, Err(act::Refusal::Changed));
+            let other_words = find.plan_act(gen, Some(0), Some("Open"));
+            assert_eq!(other_words.await, Err(act::Refusal::Changed));
+            assert_eq!(asked("resolve"), 1);
+
+            // The line of the document: selected near where it sits.
+            find.step(&json!({ "index": 2 })).await;
+            let plan = enter(&find, &host).await.unwrap();
+            assert_eq!(plan.act.word(), "Select");
+            assert_eq!(plan.act.element(), Some("d1"));
+            // Recognised words: the window is read again before the click.
+            find.step(&json!({ "index": 4 })).await;
+            let plan = enter(&find, &host).await.unwrap();
+            assert!(matches!(plan.act, act::Act::ClickPoint { .. }));
+            assert_eq!(asked("getText"), 2);
+
+            find.close();
+            assert_eq!(enter(&find, &host).await, Err(act::Refusal::NoHit));
+        });
+    }
+
+    #[test]
+    fn a_target_that_is_gone_is_looked_for_once_then_left_alone() {
+        run(async {
+            let (find, host, desktop) = acting_engine();
+            find.open(None, None).await;
+            find.query("save", true);
+            // The button no longer answers, and the window still reads the
+            // same: it is gone, and nothing is pressed.
+            desktop.fail("resolve", "STALE_REF");
+            assert_eq!(enter(&find, &host).await, Err(act::Refusal::Gone));
+            let m = desktop.methods();
+            let asked = |name: &str| m.iter().filter(|x| *x == name).count();
+            assert_eq!((asked("getText"), asked("resolve")), (2, 2));
+            assert_eq!(asked("invoke") + asked("click"), 0);
+
+            // The words left the window: gone as well, and the list shows it.
+            desktop.reply("resolve", json!({ "node": {} }));
+            let rest: Vec<Value> = acting_spans().into_iter().skip(1).collect();
+            desktop.reply("getText", json!({ "source": "mixed", "spans": rest }));
+            desktop.fail("resolve", "STALE_REF");
+            assert_eq!(enter(&find, &host).await, Err(act::Refusal::Gone));
+            let hits = host.events.last("find:hits").unwrap();
+            assert_eq!(hits["hits"].as_array().unwrap().len(), 4);
+            find.close();
+        });
+    }
+
+    #[test]
+    fn a_target_that_moved_is_found_again() {
+        run(async {
+            let (find, host, desktop) = acting_engine();
+            find.open(None, None).await;
+            find.query("save", true);
+            find.step(&json!({ "index": 4 })).await;
+            // A new line above pushes everything down one place.
+            let mut moved = vec![span_at("Welcome", 9)];
+            moved.extend(acting_spans());
+            desktop.reply("getText", json!({ "source": "mixed", "spans": moved }));
+            let plan = enter(&find, &host).await.unwrap();
+            assert!(matches!(plan.act, act::Act::ClickPoint { .. }));
+            // The ring is on the same words, in their new place.
+            let hits = host.events.last("find:hits").unwrap();
+            assert_eq!(hits["current"], json!(4));
+            find.close();
+        });
+    }
+
+    fn hit(kind: &'static str, span_id: usize, matched: &str) -> Hit {
+        Hit {
+            kind,
+            span_id,
+            start: 0,
+            end: len16(matched),
+            text: matched.to_string(),
+            matched: matched.to_string(),
+            rect: None,
+            r#ref: Value::Null,
+            window: Value::Null,
+            term: None,
+            score: None,
+            why: None,
+            span_text: None,
+            raw_why: None,
+            doc: None,
+            via: None,
+        }
+    }
+
+    #[test]
+    fn refinding_never_guesses_between_lookalikes() {
+        let before = [
+            hit("literal", 1, "Delete"),
+            hit("literal", 4, "Delete"),
+            hit("literal", 6, "Other"),
+        ];
+        // Unchanged: the same key.
+        assert_eq!(refind(&before, &before[1], &before), Some(1));
+        // Everything one place down: still the second "Delete".
+        let down = [
+            hit("literal", 0, "Other"),
+            hit("literal", 2, "delete"),
+            hit("literal", 5, "Delete"),
+        ];
+        assert_eq!(refind(&before, &before[1], &down), Some(2));
+        // One "Delete" left: which of the two it was cannot be told.
+        let one = [hit("literal", 4, "Delete"), hit("literal", 6, "Other")];
+        assert_eq!(refind(&before, &before[1], &one), None);
+        // A third appeared: the same.
+        let mut three = before.to_vec();
+        three.push(hit("literal", 9, "Delete"));
+        assert_eq!(refind(&before, &before[1], &three), None);
+        // Another kind of hit on the same words does not stand in.
+        let related = [hit("related", 1, "Delete"), hit("related", 4, "Delete")];
+        assert_eq!(refind(&before, &before[1], &related), None);
+    }
+
+    fn menu_read() -> Value {
+        json!({ "source": "win32", "limit": null, "items": [
+            { "path": ["&File"], "pos": [0], "sub": true },
+            { "path": ["&File", "&Save\tCtrl+S"], "pos": [0, 2], "sub": false },
+            { "path": ["F&ormat"], "pos": [2], "sub": true },
+            { "path": ["F&ormat", "&Word Wrap"], "pos": [2, 0], "sub": false },
+            { "path": ["F&ormat", "&Font..."], "pos": [2, 1], "sub": false },
+        ] })
+    }
+
+    #[test]
+    fn menu_commands_are_listed_after_what_is_on_screen() {
+        run(async {
+            let (find, host, desktop) = acting_engine();
+            desktop.reply("menuItems", menu_read());
+            find.open(None, None).await;
+            settle(30).await;
+            find.query("save", true);
+            let hits = host.events.last("find:hits").unwrap();
+            let rows = hits["hits"].as_array().unwrap();
+            assert_eq!(rows.len(), 6);
+            let last = &rows[5];
+            assert_eq!(last["kind"], json!("menu"));
+            assert_eq!(last["text"], json!("File \u{203a} Save"));
+            assert_eq!(last["match"], json!("Save"));
+            assert_eq!(last["why"], json!("Menu command"));
+            assert_eq!(last["act"], json!("Press"));
+            let st = host.events.last("find:state").unwrap();
+            assert_eq!(st["counts"]["menu"], json!(1));
+            assert_eq!(st["status"], json!("5 exact \u{b7} 1 menu command"));
+
+            // Nothing on screen says it, and the menu does.
+            find.query("word wrap", true);
+            let st = host.events.last("find:state").unwrap();
+            assert_eq!(st["status"], json!("Nothing on screen \u{b7} 1 menu command"));
+            assert_eq!(st["total"], json!(1));
+            // Enter runs it: the helper gets the names as the app wrote them.
+            let plan = enter(&find, &host).await.unwrap();
+            assert_eq!(plan.act, act::Act::Menu { index: 1 });
+            let item = plan.menu.clone().unwrap();
+            assert_eq!(item["path"], json!(["F&ormat", "&Word Wrap"]));
+            assert_eq!(item["pos"], json!([2, 0]));
+            act::perform(&*desktop, &plan).await.unwrap();
+            assert_eq!(desktop.methods().last().unwrap(), "menuInvoke");
+
+            // One letter is in every name: menus stay out until two.
+            find.query("f", true);
+            let st = host.events.last("find:state").unwrap();
+            assert_eq!(st["counts"]["menu"], json!(0));
+            // The bar itself is on screen already, never a menu command.
+            find.query("format", true);
+            let st = host.events.last("find:state").unwrap();
+            assert_eq!(st["counts"]["menu"], json!(0));
+            // The menu was read once for the window, not once per query.
+            let m = desktop.methods();
+            assert_eq!(m.iter().filter(|x| *x == "menuItems").count(), 1);
+            find.close();
+        });
+    }
+
+    #[test]
+    fn a_menu_too_slow_to_read_is_skipped_and_said() {
+        run(async {
+            let (find, host, desktop) = acting_engine();
+            desktop.reply("menuItems", menu_read());
+            desktop.slow("menuItems", act::MENU_WAIT_MS + 400);
+            find.open(None, None).await;
+            find.query("word wrap", true);
+            // What is on screen never waits for the menu.
+            let st = host.events.last("find:state").unwrap();
+            assert_eq!(st["status"], json!("Nothing on screen matches \"word wrap\"."));
+            settle(act::MENU_WAIT_MS + 100).await;
+            let st = host.events.last("find:state").unwrap();
+            assert_eq!(st["counts"]["menu"], json!(0));
+            let lines = st["lines"].as_array().unwrap();
+            let want = act::menu_note(Some("skipped")).unwrap();
+            assert!(lines.contains(&json!(want)), "{lines:?}");
+            find.close();
+        });
+    }
+
+    #[test]
+    fn a_document_match_in_a_link_presses_the_link() {
+        run(async {
+            let (find, host, desktop) = engine(Related::Off, &["see the total here"]);
+            let via = json!({ "ref": "ref_9", "role": "hyperlink", "pat": ["invoke"] });
+            let rect = json!({ "x": 0, "y": 0, "width": 40, "height": 20 });
+            let matches = json!([
+                { "n": 0, "match": "total", "text": "see the total here", "rect": rect,
+                    "via": via },
+                { "n": 1, "match": "total", "text": "the total below", "rect": null },
+            ]);
+            let doc = json!({ "ref": "r1", "matches": matches, "truncated": false,
+                "box": { "x": 0, "y": 0, "width": 800, "height": 600 } });
+            desktop.reply("findText", json!({ "docs": [doc] }));
+            find.open(None, None).await;
+            find.query("total", true);
+            settle(DOC_WAIT_MS + 80).await;
+            let hits = host.events.last("find:hits").unwrap();
+            let words: Vec<&str> = hits["hits"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|h| h["act"].as_str().unwrap())
+                .collect();
+            assert_eq!(words, ["Press", "Select"]);
+            let plan = enter(&find, &host).await.unwrap();
+            assert_eq!(plan.act.element(), Some("ref_9"));
+            // The second is scrolled away: brought into view, then selected
+            // by its number.
+            find.step(&json!({ "index": 1 })).await;
+            let plan = enter(&find, &host).await.unwrap();
+            let want = act::Act::SelectText {
+                r#ref: "r1".into(),
+                query: "total".into(),
+                n: Some(1),
+                near: None,
+            };
+            assert_eq!(plan.act, want);
             find.close();
         });
     }

@@ -1,6 +1,7 @@
 //! Find's side of main.js: setBarMode, setOutputView, openFind, closeFind,
 //! findEmit, findToLens, findToAsk, the `find.init({...})` deps and the
-//! bar:mode / find:* IPC rows.
+//! bar:mode / find:* IPC rows. `find:act` is new in v2: Enter on the
+//! selected hit acts on it.
 
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
@@ -8,6 +9,7 @@ use std::sync::{Arc, Mutex};
 use serde_json::{json, Value};
 use tauri::AppHandle;
 
+use crate::agent::seams::DesktopOps;
 use crate::capture;
 use crate::find::{self as engine, FindHost, FindSettings, Related};
 use crate::lens;
@@ -430,7 +432,11 @@ pub async fn find_to_ask(app: &AppHandle, index: Option<i64>) -> Value {
     let Some(h) = hit else {
         return json!({ "status": "no-hit" });
     };
-    let why = why_suffix(h.get("why"));
+    // A menu command's line says what it is, not why it matched.
+    let why = match h["kind"].as_str() {
+        Some("menu") => String::new(),
+        _ => why_suffix(h.get("why")),
+    };
     let rect = h
         .get("rect")
         .filter(|r| r["width"].as_f64().is_some_and(|w| w != 0.0))
@@ -450,8 +456,60 @@ pub async fn find_to_ask(app: &AppHandle, index: Option<i64>) -> Value {
     ask::submit(app, &question, opts).await
 }
 
+/// The pause after the target window is asked to the front, before the
+/// action: a window that has just come forward takes a moment to listen.
+const ACT_SETTLE_MS: u64 = 60;
+
+/// `find:act`: Enter on the selected hit. `{gen, index, match}` name the
+/// list and the row the page was showing, so a list that moved on under
+/// the key press is never acted on.
+///
+/// This runs only from that key press, and it does not go through the
+/// agent or its permissions: it is one desktop call on the hit the person
+/// chose. The helper refuses Aevaleron's own windows.
+///
+/// Nothing is touched until the target is known to be there (the engine
+/// re-reads the window once if it is not). Then the bar and the results
+/// fold away, the target's window gets the foreground back, and the action
+/// lands in it. If it fails after that, the bar comes back with the words
+/// and says what happened.
+pub async fn find_act(app: &AppHandle, p: &Value) -> Value {
+    // Said in the bar, whether Enter was pressed there or in the list.
+    let refused = |r: engine::act::Refusal| {
+        let note = json!({ "text": r.message() });
+        windows::emit(app, windows::OVERLAY, "bar:note", note);
+        json!({ "status": r.status(), "message": r.message() })
+    };
+    let Some(sv) = try_services() else {
+        return refused(engine::act::Refusal::NoHit);
+    };
+    let index = hit_index(p.get("index"));
+    let planned = sv.find.plan_act(p["gen"].as_i64(), index, p["match"].as_str());
+    let plan = match planned.await {
+        Ok(plan) => plan,
+        Err(r) => return refused(r),
+    };
+    let word = plan.act.word();
+    windows::collapse_panel(app);
+    // The foreground is back with the app that had it; this makes sure it
+    // is the hit's own window. A failure here shows in the action itself.
+    let front = json!({ "handle": plan.window });
+    let _ = sv.desktop.op("focusWindow", front).await;
+    tokio::time::sleep(std::time::Duration::from_millis(ACT_SETTLE_MS)).await;
+    match engine::act::perform(&*sv.desktop, &plan).await {
+        Ok(done) => json!({ "status": "done", "act": word, "via": done["via"] }),
+        Err(e) => {
+            let (status, message) = engine::act::failure(&e);
+            windows::open_bar(app, Some("find"), Some(plan.query.clone()));
+            windows::emit(app, windows::OVERLAY, "bar:note", json!({ "text": message }));
+            json!({ "status": status, "message": message, "code": e.code })
+        }
+    }
+}
+
 /// IPC rows bar:mode, find:open, find:query, find:related, find:step,
-/// find:scope, find:to-ask, find:close; `None` for any other channel.
+/// find:act, find:scope, find:to-ask, find:close; `None` for any other
+/// channel.
 pub async fn route(app: &AppHandle, channel: &str, p: &Value) -> Option<Result<Value, String>> {
     let v = match channel {
         "bar:mode" => {
@@ -476,6 +534,7 @@ pub async fn route(app: &AppHandle, channel: &str, p: &Value) -> Option<Result<V
         }
         "find:related" => json!({ "ok": services().find.related() }),
         "find:step" => services().find.step(&p["by"]).await,
+        "find:act" => find_act(app, p).await,
         "find:scope" => {
             let find = &services().find;
             let scope = match p["scope"].as_str().filter(|s| !s.is_empty()) {

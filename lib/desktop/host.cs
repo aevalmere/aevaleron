@@ -118,11 +118,22 @@ namespace AevalDesktop
         [DllImport("kernel32.dll", CharSet = CharSet.Unicode)] public static extern IntPtr GetModuleHandle(string name);
         [DllImport("user32.dll")] public static extern IntPtr OpenInputDesktop(uint flags, bool inherit, uint access);
         [DllImport("user32.dll")] public static extern bool CloseDesktop(IntPtr desk);
+        [DllImport("user32.dll")] public static extern IntPtr GetMenu(IntPtr h);
+        [DllImport("user32.dll")] public static extern bool IsMenu(IntPtr menu);
+        [DllImport("user32.dll")] public static extern int GetMenuItemCount(IntPtr menu);
+        [DllImport("user32.dll")] public static extern IntPtr GetSubMenu(IntPtr menu, int pos);
+        [DllImport("user32.dll")] public static extern uint GetMenuItemID(IntPtr menu, int pos);
+        [DllImport("user32.dll")] public static extern uint GetMenuState(IntPtr menu, uint item, uint flags);
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern int GetMenuString(IntPtr menu, uint item, StringBuilder sb, int max, uint flags);
+        [DllImport("user32.dll")] public static extern IntPtr SendMessageTimeout(IntPtr h, uint msg, IntPtr w, IntPtr l, uint flags, uint ms, out IntPtr result);
 
         public const uint GA_ROOT = 2, GA_ROOTOWNER = 3;
         public const int GWL_EXSTYLE = -20;
         public const int WS_EX_TOOLWINDOW = 0x80, WS_EX_TRANSPARENT = 0x20;
         public const uint WM_CLOSE = 0x10, WM_QUIT = 0x12;
+        public const uint WM_COMMAND = 0x111, WM_INITMENU = 0x116, WM_INITMENUPOPUP = 0x117;
+        public const uint MF_BYPOSITION = 0x400, MF_GRAYED = 0x1, MF_DISABLED = 0x2, MF_CHECKED = 0x8, MF_SEPARATOR = 0x800;
+        public const uint SMTO_ABORTIFHUNG = 0x2;
         public const uint INPUT_MOUSE = 0, INPUT_KEYBOARD = 1;
         public const uint KEYEVENTF_EXTENDEDKEY = 1, KEYEVENTF_KEYUP = 2, KEYEVENTF_UNICODE = 4;
         public const uint MOUSEEVENTF_MOVE = 1, MOUSEEVENTF_WHEEL = 0x0800, MOUSEEVENTF_HWHEEL = 0x1000;
@@ -234,6 +245,13 @@ namespace AevalDesktop
             ControlType.Text.Id, ControlType.Edit.Id, ControlType.Document.Id, ControlType.ListItem.Id,
             ControlType.DataItem.Id, ControlType.Hyperlink.Id, ControlType.Header.Id, ControlType.HeaderItem.Id,
             ControlType.TreeItem.Id, ControlType.MenuItem.Id,
+        };
+        // What a piece of text inside it acts through: Find presses the
+        // button a label sits in, not the label.
+        static readonly HashSet<int> ActTypes = new HashSet<int> {
+            ControlType.Button.Id, ControlType.Hyperlink.Id, ControlType.MenuItem.Id, ControlType.TabItem.Id,
+            ControlType.ListItem.Id, ControlType.CheckBox.Id, ControlType.RadioButton.Id, ControlType.TreeItem.Id,
+            ControlType.SplitButton.Id, ControlType.DataItem.Id,
         };
         static readonly Dictionary<int, string> roleNames = new Dictionary<int, string>();
 
@@ -472,6 +490,10 @@ namespace AevalDesktop
                 case "scrollTo": return ScrollTo(a);
                 case "findText": return FindTextCmd(a);
                 case "scrollToText": return ScrollToText(a);
+                case "selectText": return SelectText(a);
+                case "selection": return SelectionCmd(a);
+                case "menuItems": return MenuItems(a);
+                case "menuInvoke": return MenuInvoke(a);
                 case "docText": return DocTextCmd(a);
                 case "invoke": return InvokeCmd(a);
                 case "setValue": return SetValueCmd(a);
@@ -1286,6 +1308,18 @@ namespace AevalDesktop
             // For getText: called per kept node instead of building a tree;
             // returns false to skip the node's children.
             public Func<AutomationElement, Info, int, string, bool> OnNode;
+            // The nearest button, link or item above the node being visited,
+            // for getText: the element a piece of text acts through.
+            public int ActRef;
+            public Info ActInfo;
+        }
+
+        // The walk running on this thread, so a per-node callback can reach it.
+        [ThreadStatic] static Walk walking;
+
+        static bool IsActTarget(Info i)
+        {
+            return ActTypes.Contains(i.ControlTypeId) && (i.Invoke || i.Toggle || i.Select || i.Expand);
         }
 
         static void Visit(Walk w, AutomationElement el, int parentRef, int depth, bool isRoot, string parentName)
@@ -1338,11 +1372,18 @@ namespace AevalDesktop
             catch (ElementNotAvailableException) { return; }
             catch (InvalidOperationException) { return; }
             if (kids == null) return;
-            foreach (AutomationElement k in kids)
+            int heldRef = w.ActRef;
+            Info heldInfo = w.ActInfo;
+            if (emit && !isRoot && IsActTarget(i)) { w.ActRef = myRef; w.ActInfo = i; }
+            try
             {
-                Visit(w, k, myRef, childDepth, false, myName);
-                if (w.Truncated) return;
+                foreach (AutomationElement k in kids)
+                {
+                    Visit(w, k, myRef, childDepth, false, myName);
+                    if (w.Truncated) return;
+                }
             }
+            finally { w.ActRef = heldRef; w.ActInfo = heldInfo; }
         }
 
         static readonly object genLock = new object();
@@ -1428,6 +1469,7 @@ namespace AevalDesktop
             w.Top = hwnd;
             w.WinRect = WindowRect(hwnd);
             w.OnNode = onNode;
+            walking = w;
             string strategy = Str(a, "strategy", "subtree");
 
             AutomationElement winEl = AutomationElement.FromHandle(hwnd);
@@ -1466,6 +1508,8 @@ namespace AevalDesktop
                 w.Nodes.Clear();
                 w.Visited = 0;
                 w.Truncated = false;
+                w.ActRef = 0;
+                w.ActInfo = null;
             }
             return w;
         }
@@ -1510,6 +1554,40 @@ namespace AevalDesktop
             d["ref"] = r > 0 ? RefStr(r) : null;
             d["source"] = source;
             return d;
+        }
+
+        // The patterns Find chooses an action from.
+        static List<string> ActPatterns(Info i)
+        {
+            var p = new List<string>();
+            if (i.Invoke) p.Add("invoke");
+            if (i.Toggle) p.Add("toggle");
+            if (i.Select) p.Add("selectionitem");
+            if (i.Expand) p.Add("expandcollapse");
+            if (i.Text) p.Add("text");
+            if (i.ValueP && !i.ValueRO) p.Add("value");
+            return p;
+        }
+
+        static Dictionary<string, object> ActTarget(int r, Info i)
+        {
+            var v = new Dictionary<string, object>();
+            v["ref"] = RefStr(r);
+            v["role"] = i.Role;
+            v["pat"] = ActPatterns(i);
+            if (!i.Enabled) v["enabled"] = false;
+            return v;
+        }
+
+        // What a span is, for Find's "act on a hit": its own role and
+        // patterns, and the button, link or item it sits in, if any.
+        static void Tag(Dictionary<string, object> d, Info i, Walk w, bool line)
+        {
+            d["role"] = i.Role;
+            d["pat"] = ActPatterns(i);
+            if (!i.Enabled) d["enabled"] = false;
+            if (line) d["line"] = true;
+            if (w != null && w.ActRef > 0 && w.ActInfo != null) d["via"] = ActTarget(w.ActRef, w.ActInfo);
         }
 
         // One span per visible line, with that line's rectangle, so Find can
@@ -1605,19 +1683,26 @@ namespace AevalDesktop
             int gen;
             w = RunWalk(a, "visible", delegate (AutomationElement el, Info i, int r, string parentName)
             {
-                if (chars >= maxChars) { w.Truncated = true; return false; }
+                // The walk is still running, so RunWalk has not returned it.
+                if (chars >= maxChars) { if (walking != null) walking.Truncated = true; return false; }
                 if (!TextRoles.Contains(i.ControlTypeId) || i.Password) return true;
                 if (i.Text && (i.ControlTypeId == ControlType.Document.Id || i.ControlTypeId == ControlType.Edit.Id))
                 {
                     // The document's own text covers its children.
-                    try { if (LineSpans(el, r, clip, spans, ref chars, maxChars)) return false; }
+                    int before = spans.Count;
+                    bool lines = false;
+                    try { lines = LineSpans(el, r, clip, spans, ref chars, maxChars); }
                     catch (Exception) { }
+                    for (int n = before; n < spans.Count; n++) Tag(spans[n], i, null, true);
+                    if (lines) return false;
                 }
                 string text = !string.IsNullOrEmpty(i.Value) ? i.Value : (i.Name != parentName ? i.Name : "");
                 if (text.Trim().Length == 0) return true;
                 if (clip != null && !Intersects(i.Rect, clip)) return true;
                 text = Clip(text, Math.Max(1, maxChars - chars));
-                spans.Add(Span(text, i.Rect, r, "uia"));
+                var span = Span(text, i.Rect, r, "uia");
+                Tag(span, i, walking, false);
+                spans.Add(span);
                 chars += text.Length + 1;
                 return true;
             }, out gen);
@@ -1656,11 +1741,43 @@ namespace AevalDesktop
         // reports for a match that is showing. Matches come in document
         // order and are numbered, so scrollToText can go to one again.
         const int FindLineContext = 120;
+        // Matches in view asked what they sit in, and the time that may take.
+        const int FindTargetMax = 24;
+        const int FindTargetBudget = 150;
 
-        static Dictionary<string, object> FindInText(AutomationElement el, int r, int[] box, string query, int max, Stopwatch sw, int budget, out int found, out bool cut)
+        // The link or button a match in a document sits in, if any: Find
+        // presses that instead of selecting its words. A few steps up, never
+        // past the document.
+        static Dictionary<string, object> RangeTarget(TextPatternRange m, AutomationElement doc, IntPtr top)
+        {
+            try
+            {
+                AutomationElement el = m.GetEnclosingElement();
+                var cr = MakeCache(TreeScope.Element);
+                var walker = TreeWalker.ControlViewWalker;
+                for (int n = 0; el != null && n < 4; n++)
+                {
+                    if (Automation.Compare(el, doc)) return null;
+                    AutomationElement c = el.GetUpdatedCache(cr);
+                    Info i = Read(c, true);
+                    int ct = i.ControlTypeId;
+                    if (ct == ControlType.Document.Id || ct == ControlType.Window.Id) return null;
+                    bool pressable = ct == ControlType.Hyperlink.Id || ct == ControlType.Button.Id || ct == ControlType.SplitButton.Id
+                        || ct == ControlType.CheckBox.Id || ct == ControlType.RadioButton.Id || ct == ControlType.TabItem.Id || ct == ControlType.MenuItem.Id;
+                    if (pressable && IsActTarget(i) && !IsExcludedPid(i.Pid)) return ActTarget(RefFor(c, i, top), i);
+                    el = walker.GetParent(el);
+                }
+            }
+            catch (Exception) { }
+            return null;
+        }
+
+        static Dictionary<string, object> FindInText(AutomationElement el, int r, int[] box, IntPtr top, string query, int max, Stopwatch sw, int budget, out int found, out bool cut)
         {
             found = 0;
             cut = false;
+            int asked = 0;
+            var asking = new Stopwatch();
             TextPattern tp;
             try { tp = el.GetCurrentPattern(TextPattern.Pattern) as TextPattern; }
             catch (InvalidOperationException) { return null; }
@@ -1711,6 +1828,14 @@ namespace AevalDesktop
                 d["match"] = hit;
                 d["text"] = text;
                 d["rect"] = rect;
+                if (rect != null && asked < FindTargetMax && asking.ElapsedMilliseconds < FindTargetBudget)
+                {
+                    asked++;
+                    asking.Start();
+                    var via = RangeTarget(m, el, top);
+                    asking.Stop();
+                    if (via != null) d["via"] = via;
+                }
                 matches.Add(d);
                 found++;
                 rest.MoveEndpointByRange(TextPatternRangeEndpoint.Start, m, TextPatternRangeEndpoint.End);
@@ -1745,7 +1870,8 @@ namespace AevalDesktop
                 Dictionary<string, object> d = null;
                 int found = 0;
                 bool cut = false;
-                try { d = FindInText(el, r, i.Rect, query, max - total, sw, budget, out found, out cut); }
+                IntPtr top = walking != null ? walking.Top : IntPtr.Zero;
+                try { d = FindInText(el, r, i.Rect, top, query, max - total, sw, budget, out found, out cut); }
                 catch (Exception) { d = null; }
                 if (d == null) return true;
                 docs.Add(d);
@@ -1850,6 +1976,465 @@ namespace AevalDesktop
             var res = new Dictionary<string, object>();
             res["ok"] = true;
             return res;
+        }
+
+        static long PointToRect(int x, int y, System.Windows.Rect r)
+        {
+            double dx = x < r.Left ? r.Left - x : x > r.Right ? x - r.Right : 0;
+            double dy = y < r.Top ? r.Top - y : y > r.Bottom ? y - r.Bottom : 0;
+            return (long)(dx * dx + dy * dy);
+        }
+
+        // Find's "act" on words in a document: selects match n (as findText
+        // numbered it), or with a point the match nearest to it, brings it
+        // into view and gives the document the keyboard. Nothing is clicked.
+        static object SelectText(Dictionary<string, object> a)
+        {
+            var e = GetRef(Arg(a, "ref"));
+            RefuseElevated(e.Top);
+            string query = Str(a, "query", "");
+            if (query.Trim().Length == 0) throw new DesktopError("BAD_ARGS", "selectText needs a query");
+            int n = Math.Max(0, Int(a, "n", 0));
+            bool near = Arg(a, "x") != null && Arg(a, "y") != null;
+            if (B(e.El, AutomationElement.IsPasswordProperty, false)) throw new DesktopError("NO_PATTERN", "a password field is never read or selected");
+            TextPattern tp;
+            try { tp = e.El.GetCurrentPattern(TextPattern.Pattern) as TextPattern; }
+            catch (InvalidOperationException) { tp = null; }
+            if (tp == null) throw new DesktopError("NO_PATTERN", "that element has no text to select (no TextPattern)");
+            TextPatternRange rest = tp.DocumentRange.Clone();
+            TextPatternRange m = null;
+            if (!near)
+            {
+                for (int k = 0; k <= n; k++)
+                {
+                    m = rest.FindText(query, false, true);
+                    if (m == null) throw new DesktopError("NOT_FOUND", "that match is no longer in the document");
+                    rest.MoveEndpointByRange(TextPatternRangeEndpoint.Start, m, TextPatternRangeEndpoint.End);
+                }
+            }
+            else
+            {
+                int px = RequireInt(a, "x"), py = RequireInt(a, "y");
+                long best = long.MaxValue;
+                TextPatternRange first = null, last = null;
+                var sw = Stopwatch.StartNew();
+                for (int k = 0; k < 2000 && sw.ElapsedMilliseconds < 400; k++)
+                {
+                    TextPatternRange c = rest.FindText(query, false, true);
+                    if (c == null) break;
+                    if (last != null && c.CompareEndpoints(TextPatternRangeEndpoint.Start, last, TextPatternRangeEndpoint.Start) <= 0) break;
+                    last = c;
+                    if (first == null) first = c;
+                    System.Windows.Rect[] rs = null;
+                    try { rs = c.GetBoundingRectangles(); } catch (Exception) { rs = null; }
+                    if (rs != null)
+                    {
+                        foreach (var x in rs)
+                        {
+                            if (x.IsEmpty || x.Width <= 0 || x.Height <= 0) continue;
+                            long dist = PointToRect(px, py, x);
+                            if (dist < best) { best = dist; m = c; }
+                        }
+                    }
+                    if (best == 0) break;
+                    rest.MoveEndpointByRange(TextPatternRangeEndpoint.Start, c, TextPatternRangeEndpoint.End);
+                    if (rest.CompareEndpoints(TextPatternRangeEndpoint.Start, rest, TextPatternRangeEndpoint.End) >= 0) break;
+                }
+                if (m == null) m = first;
+                if (m == null) throw new DesktopError("NOT_FOUND", "that text is no longer in the document");
+            }
+            CheckCancel();
+            string focus = "window";
+            try { focus = FocusElement(e.El); } catch (Exception) { focus = "window"; }
+            try { m.ScrollIntoView(true); } catch (Exception) { }
+            try { m.Select(); }
+            catch (InvalidOperationException ex) { throw new DesktopError("NO_PATTERN", "that text cannot be selected (" + ex.Message + ")"); }
+            Thread.Sleep(60);
+            var res = new Dictionary<string, object>();
+            res["ok"] = true;
+            res["focus"] = focus;
+            string got = null;
+            try { got = m.GetText(400); } catch (Exception) { got = null; }
+            res["selected"] = got;
+            return res;
+        }
+
+        // What is selected in a document or editor, for the self-check that
+        // proves selectText. A password field answers with nothing.
+        static object SelectionCmd(Dictionary<string, object> a)
+        {
+            var e = GetRef(Arg(a, "ref"));
+            var res = new Dictionary<string, object>();
+            var ranges = new List<object>();
+            res["ranges"] = ranges;
+            res["text"] = "";
+            if (B(e.El, AutomationElement.IsPasswordProperty, false)) return res;
+            TextPattern tp;
+            try { tp = e.El.GetCurrentPattern(TextPattern.Pattern) as TextPattern; }
+            catch (InvalidOperationException) { tp = null; }
+            if (tp == null) throw new DesktopError("NO_PATTERN", "that element has no text (no TextPattern)");
+            TextPatternRange[] sel = tp.GetSelection();
+            if (sel != null)
+                foreach (var r in sel)
+                {
+                    string t = r.GetText(2000);
+                    if (t != null) ranges.Add(t);
+                }
+            if (ranges.Count > 0) res["text"] = ranges[0];
+            return res;
+        }
+
+        // ------------------------------------------------------------ menus
+
+        static string MenuText(IntPtr menu, int pos)
+        {
+            var sb = new StringBuilder(260);
+            int n = Native.GetMenuString(menu, (uint)pos, sb, sb.Capacity, Native.MF_BYPOSITION);
+            return n > 0 ? sb.ToString() : "";
+        }
+
+        // One level of a classic menu and, within the bounds, the levels
+        // under it. A separator or a picture-only item has no name and is
+        // left out.
+        static void WalkMenu(IntPtr menu, List<string> path, List<int> pos, int depth, int max, Stopwatch sw, int budget, List<object> items, ref string limit)
+        {
+            int count = Math.Min(Native.GetMenuItemCount(menu), 200);
+            for (int k = 0; k < count; k++)
+            {
+                if (limit == "time" || limit == "count") return;
+                if (sw.ElapsedMilliseconds > budget) { limit = "time"; return; }
+                if (items.Count >= max) { limit = "count"; return; }
+                IntPtr sub = Native.GetSubMenu(menu, k);
+                uint state = Native.GetMenuState(menu, (uint)k, Native.MF_BYPOSITION);
+                if (state == 0xFFFFFFFF) continue;
+                // With a submenu the high byte counts its items; the flags
+                // are the low byte alone.
+                if (sub != IntPtr.Zero) state &= 0xFF;
+                if ((state & Native.MF_SEPARATOR) != 0) continue;
+                string name = MenuText(menu, k);
+                if (name.Trim().Length == 0) continue;
+                var p = new List<string>(path);
+                p.Add(name);
+                var at = new List<int>(pos);
+                at.Add(k);
+                var d = new Dictionary<string, object>();
+                d["path"] = p;
+                d["pos"] = at;
+                d["sub"] = sub != IntPtr.Zero;
+                d["enabled"] = (state & (Native.MF_GRAYED | Native.MF_DISABLED)) == 0;
+                if ((state & Native.MF_CHECKED) != 0) d["checked"] = true;
+                items.Add(d);
+                if (sub == IntPtr.Zero) continue;
+                if (p.Count >= depth) { if (limit == null) limit = "depth"; continue; }
+                WalkMenu(sub, p, at, depth, max, sw, budget, items, ref limit);
+            }
+        }
+
+        static CacheRequest MenuCache()
+        {
+            var cr = new CacheRequest();
+            cr.Add(AutomationElement.ControlTypeProperty);
+            cr.Add(AutomationElement.NameProperty);
+            cr.Add(AutomationElement.IsEnabledProperty);
+            cr.Add(AutomationElement.ProcessIdProperty);
+            cr.Add(AutomationElement.IsExpandCollapsePatternAvailableProperty);
+            cr.TreeScope = TreeScope.Element;
+            cr.TreeFilter = Automation.ControlViewCondition;
+            cr.AutomationElementMode = AutomationElementMode.Full;
+            return cr;
+        }
+
+        static AutomationElementCollection MenuKids(AutomationElement el, CacheRequest cr)
+        {
+            using (cr.Activate()) { return el.FindAll(TreeScope.Children, Condition.TrueCondition); }
+        }
+
+        // The window's menu bars, looked for a few levels down and never
+        // inside the title bar (whose only menu is the system menu).
+        static List<AutomationElement> MenuBars(IntPtr hwnd, CacheRequest cr, Stopwatch sw, int budget)
+        {
+            var bars = new List<AutomationElement>();
+            var level = new List<AutomationElement>();
+            level.Add(AutomationElement.FromHandle(hwnd));
+            int opened = 0;
+            for (int d = 0; d < 4 && level.Count > 0; d++)
+            {
+                var next = new List<AutomationElement>();
+                foreach (var el in level)
+                {
+                    if (opened >= 60 || sw.ElapsedMilliseconds > budget) return bars;
+                    opened++;
+                    AutomationElementCollection kids;
+                    try { kids = MenuKids(el, cr); }
+                    catch (ElementNotAvailableException) { continue; }
+                    catch (InvalidOperationException) { continue; }
+                    foreach (AutomationElement k in kids)
+                    {
+                        ControlType ct = k.Cached.ControlType;
+                        if (ct == ControlType.MenuBar) bars.Add(k);
+                        else if (ct == ControlType.Pane || ct == ControlType.Group || ct == ControlType.Custom || ct == ControlType.ToolBar || ct == ControlType.Window) next.Add(k);
+                    }
+                }
+                if (bars.Count > 0) return bars;
+                level = next;
+            }
+            return bars;
+        }
+
+        static void WalkUiaMenu(AutomationElement el, List<string> path, CacheRequest cr, int depth, int max, Stopwatch sw, int budget, List<object> items, ref string limit)
+        {
+            AutomationElementCollection kids;
+            try { kids = MenuKids(el, cr); }
+            catch (ElementNotAvailableException) { return; }
+            catch (InvalidOperationException) { return; }
+            foreach (AutomationElement k in kids)
+            {
+                if (limit == "time" || limit == "count") return;
+                if (sw.ElapsedMilliseconds > budget) { limit = "time"; return; }
+                if (items.Count >= max) { limit = "count"; return; }
+                ControlType ct = k.Cached.ControlType;
+                // A submenu is often a Menu element between an item and its children.
+                if (ct == ControlType.Menu) { WalkUiaMenu(k, path, cr, depth, max, sw, budget, items, ref limit); continue; }
+                if (ct != ControlType.MenuItem) continue;
+                string name = k.Cached.Name ?? "";
+                if (name.Trim().Length == 0) continue;
+                var p = new List<string>(path);
+                p.Add(name);
+                int before = items.Count;
+                var d = new Dictionary<string, object>();
+                d["path"] = p;
+                d["enabled"] = k.Cached.IsEnabled;
+                items.Add(d);
+                bool sub = (bool)k.GetCachedPropertyValue(AutomationElement.IsExpandCollapsePatternAvailableProperty);
+                if (p.Count < depth) WalkUiaMenu(k, p, cr, depth, max, sw, budget, items, ref limit);
+                else if (sub && limit == null) limit = "depth";
+                d["sub"] = sub || items.Count > before + 1;
+            }
+        }
+
+        static bool UiaMenu(IntPtr hwnd, int depth, int max, Stopwatch sw, int budget, List<object> items, ref string limit)
+        {
+            var cr = MenuCache();
+            var bars = MenuBars(hwnd, cr, sw, budget);
+            foreach (var bar in bars) WalkUiaMenu(bar, new List<string>(), cr, depth, max, sw, budget, items, ref limit);
+            return bars.Count > 0;
+        }
+
+        // Find's menu commands: the names in a window's menu, read without
+        // opening anything. A classic menu is read from the window's own
+        // menu handle, every level of it. Any other menu bar is read through
+        // UI Automation, which holds only what the application has built so
+        // far (most build a submenu when it first opens). Bounded by depth,
+        // count and time; `limit` says which bound cut the read short.
+        static object MenuItems(Dictionary<string, object> a)
+        {
+            IntPtr hwnd = TargetWindow(a);
+            int budget = Math.Max(50, Math.Min(2000, Int(a, "budgetMs", 300)));
+            int max = Math.Max(1, Math.Min(2000, Int(a, "max", 400)));
+            int depth = Math.Max(1, Math.Min(8, Int(a, "depth", 4)));
+            var sw = Stopwatch.StartNew();
+            var items = new List<object>();
+            string limit = null;
+            string source = null;
+            IntPtr menu = Native.GetMenu(hwnd);
+            if (menu != IntPtr.Zero && Native.IsMenu(menu))
+            {
+                WalkMenu(menu, new List<string>(), new List<int>(), depth, max, sw, budget, items, ref limit);
+                if (items.Count > 0) source = "win32";
+            }
+            if (items.Count == 0)
+            {
+                try
+                {
+                    if (UiaMenu(hwnd, depth, max, sw, budget, items, ref limit)) source = "uia";
+                }
+                catch (ElementNotAvailableException) { }
+                catch (InvalidOperationException) { }
+            }
+            var res = new Dictionary<string, object>();
+            res["windowHandle"] = HandleStr(hwnd);
+            res["source"] = source;
+            res["items"] = items;
+            res["truncated"] = limit != null;
+            res["limit"] = limit;
+            res["readMs"] = sw.ElapsedMilliseconds;
+            return res;
+        }
+
+        static string[] StrList(object v)
+        {
+            var arr = v as object[];
+            if (arr == null) return new string[0];
+            var list = new List<string>();
+            foreach (var x in arr) list.Add(Convert.ToString(x, System.Globalization.CultureInfo.InvariantCulture));
+            return list.ToArray();
+        }
+
+        // A classic menu command, run the way its menu would run it: the
+        // application is asked to bring each menu on the way up to date
+        // (WM_INITMENUPOPUP, as opening it would), the item is checked to be
+        // the one that was listed and to be available, and its command is
+        // posted. No menu is drawn.
+        static object Win32MenuInvoke(IntPtr hwnd, string[] path, object[] posArg)
+        {
+            IntPtr menu = Native.GetMenu(hwnd);
+            if (menu == IntPtr.Zero || !Native.IsMenu(menu)) throw new DesktopError("NOT_FOUND", "that window no longer has a menu");
+            if (posArg == null || posArg.Length == 0 || posArg.Length != path.Length) throw new DesktopError("BAD_ARGS", "menuInvoke needs pos and path of the same length");
+            IntPtr cur = menu;
+            IntPtr ignored;
+            for (int k = 0; k + 1 < posArg.Length; k++)
+            {
+                int at = Convert.ToInt32(posArg[k]);
+                IntPtr sub = Native.GetSubMenu(cur, at);
+                if (sub == IntPtr.Zero || MenuText(cur, at) != path[k]) throw new DesktopError("NOT_FOUND", "that menu command is no longer there");
+                CheckCancel();
+                if (k == 0) Native.SendMessageTimeout(hwnd, Native.WM_INITMENU, menu, IntPtr.Zero, Native.SMTO_ABORTIFHUNG, 500, out ignored);
+                Native.SendMessageTimeout(hwnd, Native.WM_INITMENUPOPUP, sub, new IntPtr(at & 0xFFFF), Native.SMTO_ABORTIFHUNG, 500, out ignored);
+                cur = sub;
+            }
+            int last = Convert.ToInt32(posArg[posArg.Length - 1]);
+            if (last < 0 || last >= Native.GetMenuItemCount(cur) || MenuText(cur, last) != path[path.Length - 1])
+                throw new DesktopError("NOT_FOUND", "that menu command is no longer there");
+            if (Native.GetSubMenu(cur, last) != IntPtr.Zero) throw new DesktopError("NO_PATTERN", "that menu item opens a submenu; it is not a command");
+            uint state = Native.GetMenuState(cur, (uint)last, Native.MF_BYPOSITION);
+            if (state == 0xFFFFFFFF) throw new DesktopError("NOT_FOUND", "that menu command is no longer there");
+            if ((state & (Native.MF_GRAYED | Native.MF_DISABLED)) != 0) throw new DesktopError("DISABLED", "that menu command is not available right now");
+            uint id = Native.GetMenuItemID(cur, last);
+            if (id == 0xFFFFFFFF || id == 0) throw new DesktopError("NO_PATTERN", "that menu item has no command");
+            CheckCancel();
+            bool sent = Native.PostMessage(hwnd, Native.WM_COMMAND, new IntPtr(id & 0xFFFF), IntPtr.Zero);
+            var res = new Dictionary<string, object>();
+            res["ok"] = sent;
+            res["via"] = "command";
+            res["id"] = (int)(id & 0xFFFF);
+            return res;
+        }
+
+        static AutomationElement MenuChild(AutomationElement under, string name, bool deep)
+        {
+            var cond = new AndCondition(
+                new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.MenuItem),
+                new PropertyCondition(AutomationElement.NameProperty, name));
+            try { return under.FindFirst(deep ? TreeScope.Descendants : TreeScope.Children, cond); }
+            catch (ElementNotAvailableException) { return null; }
+            catch (InvalidOperationException) { return null; }
+        }
+
+        // A menu that has just opened: under its item, or in a popup window
+        // of the same application.
+        static AutomationElement OpenedMenuChild(AutomationElement parent, IntPtr hwnd, string name)
+        {
+            AutomationElement c = MenuChild(parent, name, true);
+            if (c != null) return c;
+            uint pid = PidOf(hwnd);
+            var popups = new List<IntPtr>();
+            Native.EnumWindows(delegate (IntPtr h, IntPtr l)
+            {
+                if (h != hwnd && Native.IsWindowVisible(h) && PidOf(h) == pid && popups.Count < 12) popups.Add(h);
+                return true;
+            }, IntPtr.Zero);
+            foreach (var h in popups)
+            {
+                if (IsExcludedWindow(h)) continue;
+                try
+                {
+                    c = MenuChild(AutomationElement.FromHandle(h), name, true);
+                    if (c != null) return c;
+                }
+                catch (Exception) { }
+            }
+            return null;
+        }
+
+        // Any other menu command: each parent is opened in turn through UI
+        // Automation, then the command itself is invoked. A step that fails
+        // closes what was opened.
+        static object UiaMenuInvoke(IntPtr hwnd, string[] path)
+        {
+            if (path.Length == 0) throw new DesktopError("BAD_ARGS", "menuInvoke needs a path");
+            var sw = Stopwatch.StartNew();
+            var cr = MenuCache();
+            AutomationElement cur = null;
+            foreach (var bar in MenuBars(hwnd, cr, sw, 1500))
+            {
+                cur = MenuChild(bar, path[0], false);
+                if (cur != null) break;
+            }
+            if (cur == null) throw new DesktopError("NOT_FOUND", "that menu is no longer there");
+            AutomationElement first = cur;
+            try
+            {
+                for (int k = 0; k + 1 < path.Length; k++)
+                {
+                    var open = cur;
+                    object pat;
+                    Action act;
+                    if (open.TryGetCurrentPattern(ExpandCollapsePattern.Pattern, out pat))
+                    {
+                        var ec = (ExpandCollapsePattern)pat;
+                        act = delegate () { if (ec.Current.ExpandCollapseState != ExpandCollapseState.Expanded) ec.Expand(); };
+                    }
+                    else if (open.TryGetCurrentPattern(InvokePattern.Pattern, out pat))
+                    {
+                        var ip = (InvokePattern)pat;
+                        act = delegate () { ip.Invoke(); };
+                    }
+                    else throw new DesktopError("NO_PATTERN", "\"" + path[k] + "\" cannot be opened");
+                    RunBounded(act, 2000);
+                    AutomationElement next = null;
+                    for (int tries = 0; tries < 16 && next == null; tries++)
+                    {
+                        CheckCancel();
+                        Thread.Sleep(50);
+                        next = OpenedMenuChild(open, hwnd, path[k + 1]);
+                    }
+                    if (next == null) throw new DesktopError("NOT_FOUND", "\"" + path[k + 1] + "\" is not in that menu any more");
+                    cur = next;
+                }
+                var leaf = cur;
+                if (!(bool)leaf.GetCurrentPropertyValue(AutomationElement.IsEnabledProperty)) throw new DesktopError("DISABLED", "that menu command is not available right now");
+                object lp;
+                Action run;
+                string via;
+                if (leaf.TryGetCurrentPattern(InvokePattern.Pattern, out lp)) { var x = (InvokePattern)lp; run = delegate () { x.Invoke(); }; via = "invoke"; }
+                else if (leaf.TryGetCurrentPattern(TogglePattern.Pattern, out lp)) { var x = (TogglePattern)lp; run = delegate () { x.Toggle(); }; via = "toggle"; }
+                else if (leaf.TryGetCurrentPattern(SelectionItemPattern.Pattern, out lp)) { var x = (SelectionItemPattern)lp; run = delegate () { x.Select(); }; via = "select"; }
+                else if (leaf.TryGetCurrentPattern(ExpandCollapsePattern.Pattern, out lp)) { var x = (ExpandCollapsePattern)lp; run = delegate () { x.Expand(); }; via = "expand"; }
+                else throw new DesktopError("NO_PATTERN", "that menu command cannot be run through UI Automation");
+                bool done = RunBounded(run, 2000);
+                var res = new Dictionary<string, object>();
+                res["ok"] = true;
+                res["via"] = via;
+                res["pending"] = !done;
+                return res;
+            }
+            catch (Exception)
+            {
+                if (path.Length > 1)
+                {
+                    try
+                    {
+                        object pat;
+                        if (first.TryGetCurrentPattern(ExpandCollapsePattern.Pattern, out pat))
+                        {
+                            var ec = (ExpandCollapsePattern)pat;
+                            RunBounded(delegate () { ec.Collapse(); }, 1000);
+                        }
+                    }
+                    catch (Exception) { }
+                }
+                throw;
+            }
+        }
+
+        static object MenuInvoke(Dictionary<string, object> a)
+        {
+            IntPtr hwnd = TargetWindow(a);
+            RefuseElevated(hwnd);
+            RefuseSecureDesktop();
+            string[] path = StrList(Arg(a, "path"));
+            if (Str(a, "source", "win32") == "uia") return UiaMenuInvoke(hwnd, path);
+            return Win32MenuInvoke(hwnd, path, Arg(a, "pos") as object[]);
         }
 
         static object At(Dictionary<string, object> a)
@@ -2391,6 +2976,15 @@ namespace AevalDesktop
             else if (button == "middle") { down = 0x20; up = 0x40; }
             else throw new DesktopError("BAD_ARGS", "button must be left, right or middle");
             IntPtr hitTop = CheckPoint(p[0], p[1], e, force);
+            // A click at a point that names its window lands in that window
+            // (or another of the same application) or not at all.
+            long inWindow = ParseHandle(Arg(a, "inWindow"));
+            if (e == null && inWindow != 0 && !force)
+            {
+                IntPtr want = Native.GetAncestor(new IntPtr(inWindow), Native.GA_ROOT);
+                if (hitTop != want && PidOf(hitTop) != PidOf(want))
+                    throw new DesktopError("OCCLUDED", "another window (\"" + Title(hitTop) + "\") covers that spot");
+            }
             MoveTo(p[0], p[1]);
             Thread.Sleep(20);
             HoldModifiers(mods, false);
@@ -2600,6 +3194,7 @@ namespace AevalDesktop
             RefuseElevated(e.Top);
             string action = Str(a, "action", "invoke");
             var el = e.El;
+            string focus = null;
             Action act;
             switch (action)
             {
@@ -2609,6 +3204,9 @@ namespace AevalDesktop
                 case "expand": act = delegate () { ((ExpandCollapsePattern)el.GetCurrentPattern(ExpandCollapsePattern.Pattern)).Expand(); }; break;
                 case "collapse": act = delegate () { ((ExpandCollapsePattern)el.GetCurrentPattern(ExpandCollapsePattern.Pattern)).Collapse(); }; break;
                 case "focus": act = delegate () { el.SetFocus(); }; break;
+                // Find's "act" on a text field: the field if it takes the
+                // keyboard, else the nearest thing in or around it that does.
+                case "focusNear": act = delegate () { focus = FocusElement(el); }; break;
                 default: throw new DesktopError("BAD_ARGS", "unknown action: " + action);
             }
             bool done;
@@ -2618,6 +3216,7 @@ namespace AevalDesktop
             res["ok"] = true;
             res["via"] = action;
             res["pending"] = !done;
+            if (focus != null) res["focus"] = focus;
             return res;
         }
 
