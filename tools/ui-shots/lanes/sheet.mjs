@@ -1660,6 +1660,19 @@ export const scenes = [
       await t.tick(700);
       const after = await f.evaluate(() => [...document.querySelectorAll('.confirm-actions button')].map((b) => `${b.getAttribute('aria-disabled')}:${b.classList.contains('settling')}`));
       t.check('confirmSweepThenEnable', sweep.join(',') === 'true:true,true:true' && tooSoon === 0 && after.join(',') === 'null:false,null:false', JSON.stringify({ sweep, tooSoon, after }));
+      // Allow similar: offered only when the app says so, between Skip and
+      // Allow, and its answer says the same step need not ask again.
+      await emitAll(f, [['agent:confirm-request', { id: 'c3', text: 'Click "Next" in Setup', reason: 'go to the next page', why: 'it is not known what the button "Next" does', similar: true }]]);
+      await t.tick(800);
+      const three = await f.evaluate(() => [...document.querySelectorAll('.confirm-actions button')].map((b) => ({ text: b.textContent, label: b.getAttribute('aria-label') || '', off: b.getAttribute('aria-disabled') })));
+      await f.evaluate(() => document.querySelector('.confirm-actions button[data-similar]').click());
+      await t.tick(100);
+      const alike = (await t.calls('out1', 'agent:confirm')).map((c) => c.payload).filter((p) => p && p.id === 'c3');
+      t.check(
+        'confirmAllowSimilar',
+        three.map((b) => b.text).join('|') === 'Skip|Allow similar|Allow' && three.every((b) => b.off === null) && three[1].label.includes('again in this task') && alike.length === 1 && alike[0].allow === true && alike[0].similar === true,
+        JSON.stringify({ three, alike })
+      );
     }),
   },
 

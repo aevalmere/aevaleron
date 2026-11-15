@@ -252,6 +252,11 @@ struct St {
     end_state: String,
     final_text: String,
     confirming: Option<(String, oneshot::Sender<bool>)>,
+    /// The answer to the card that was up was "Allow similar".
+    similar_yes: bool,
+    /// The steps the person allowed for the rest of this task
+    /// ([`similar_key`]).
+    similar: Vec<String>,
     asking: Option<oneshot::Sender<String>>,
     plan_wait: Option<oneshot::Sender<()>>,
 }
@@ -646,6 +651,33 @@ fn app_label(w: &Value) -> String {
 }
 
 /// What `inspect` learned, as `describe` and the confirm card read it.
+/// What makes two flagged steps the same step, for "Allow similar": the
+/// tool, the app, the control it lands on (or the one with keyboard focus),
+/// what it types or opens, the sentence on its card and the gate's reason
+/// for asking. A button of the same name under another warning is another
+/// step.
+///
+/// `None` for a step the person decides every time: what automatic mode
+/// always asks about (money, a password or a sign-in, a change to this PC
+/// or an account, a command line, anything the gate could not read), a
+/// drag, and closing a window.
+fn similar_key(call: &Call, info: &Info, label: &str, why: &str) -> Option<String> {
+    if matches!(call.name.as_str(), "left_click_drag" | "close_window") {
+        return None;
+    }
+    let value = full_value(&call.name, &call.args, &seen(info)).map(|(v, _)| v);
+    if auto::always_ask(why, label, value.as_deref()).is_some() {
+        return None;
+    }
+    let on = info.t.node.as_ref().or(info.t.focused.as_ref());
+    let role = on.map(|n| js_string(&n["role"])).unwrap_or_default();
+    let name = on.map(|n| js_string(&n["name"])).unwrap_or_default();
+    let target = js_string(&call.args["target"]);
+    let app = &info.t.app;
+    let key = json!([call.name, app, role, name, value, target, label, why]);
+    Some(key.to_string())
+}
+
 fn seen(info: &Info) -> Seen<'_> {
     let end = info.t.end.as_ref();
     Seen {
@@ -880,6 +912,8 @@ impl Agent {
             end_state: String::new(),
             final_text: String::new(),
             confirming: None,
+            similar_yes: false,
+            similar: Vec::new(),
             asking: None,
             plan_wait: None,
         };
@@ -932,11 +966,20 @@ impl Agent {
 
     /// The user's answer to a confirm card.
     pub fn confirm(&self, id: &str, allow: bool) -> bool {
+        self.answer(id, allow, false)
+    }
+
+    /// [`Agent::confirm`]; with `similar`, an allowed step is also allowed
+    /// whenever the same one comes up again in this task.
+    pub fn answer(&self, id: &str, allow: bool, similar: bool) -> bool {
         let Some(ctx) = self.ctx() else { return false };
         let pending = {
             let mut s = ctx.r.st.lock();
             match &s.confirming {
-                Some((want, _)) if want == id => s.confirming.take(),
+                Some((want, _)) if want == id => {
+                    s.similar_yes = allow && similar;
+                    s.confirming.take()
+                }
                 _ => None,
             }
         };
@@ -1367,7 +1410,8 @@ impl Ctx {
         auto::parse_review(&turn.content)
     }
 
-    async fn ask_confirm(&self, call: &Call, info: &Info, why: &str) -> bool {
+    /// `similar`: the card also offers "Allow similar".
+    async fn ask_confirm(&self, call: &Call, info: &Info, why: &str, similar: bool) -> bool {
         let seq = self.a.confirm_seq.fetch_add(1, Ordering::Relaxed) + 1;
         let id = confirm_id(seq);
         let (tx, rx) = oneshot::channel();
@@ -1405,6 +1449,9 @@ impl Ctx {
         if let Some((value, truncated)) = full_value(&call.name, &call.args, &seen(info)) {
             request["value"] = json!(value);
             request["truncated"] = json!(truncated);
+        }
+        if similar {
+            request["similar"] = json!(true);
         }
         self.emit("agent:confirm-request", request);
         self.a.host.show_trail(true);
@@ -2075,11 +2122,23 @@ impl Ctx {
             return Outcome::failed(format!("Refused by the app: {}.", verdict.why));
         }
 
+        // Allow similar: the person already allowed this same step in this
+        // task and said the next ones need no card. It runs as theirs, with
+        // no card and no second check.
+        let kind_key = match verdict.cls {
+            Class::Consequential => similar_key(call, &info, &label, &verdict.why),
+            _ => None,
+        };
+        let same = kind_key
+            .as_ref()
+            .is_some_and(|k| self.st(|s| s.similar.contains(k)));
+
         // Automatic mode: a second check reads the flagged step against what
         // the person asked for. It runs, is blocked, or asks as it would
         // have.
         let mut checked = None;
-        if verdict.cls == Class::Consequential && settings.auto && !self.st(|s| s.auto_off) {
+        let review = settings.auto && !same && !self.st(|s| s.auto_off);
+        if verdict.cls == Class::Consequential && review {
             let review = self.auto_review(call, &info, &label, &verdict.why).await;
             if self.ended() {
                 return Outcome::text("Stopped.");
@@ -2115,16 +2174,21 @@ impl Ctx {
             }
         }
 
-        if verdict.cls == Class::Consequential && checked.is_none() {
+        if verdict.cls == Class::Consequential && checked.is_none() && !same {
             let mut allowed = false;
+            let offer = kind_key.is_some();
             for _ in 0..3 {
                 let before = info.point;
-                allowed = self.ask_confirm(call, &info, &verdict.why).await;
+                allowed = self.ask_confirm(call, &info, &verdict.why, offer).await;
                 if self.ended() {
                     return Outcome::text("Stopped.");
                 }
                 if !allowed {
                     break;
+                }
+                let similar = self.st(|s| std::mem::take(&mut s.similar_yes));
+                if let Some(k) = kind_key.as_ref().filter(|_| similar) {
+                    self.st(|s| s.similar.push(k.clone()));
                 }
                 // Confirming took focus. Hand it back, and make sure the
                 // target did not move or disappear while the card was up;
@@ -2196,6 +2260,9 @@ impl Ctx {
         }
         if let Some(reason) = &checked {
             row["checked"] = json!(reason);
+        }
+        if same {
+            row["similar"] = json!(true);
         }
         let rw = self.row(row);
         let t0 = Instant::now();
@@ -2993,6 +3060,95 @@ mod tests {
         assert!(!d.methods().contains(&"click".to_string()));
         let rows = done["rows"].as_array().cloned().unwrap_or_default();
         assert!(rows.iter().any(|r| r["state"] == "skipped"));
+    }
+
+    /// Two presses of the same Send button, the first answered `similar`.
+    /// How many cards came up, and the finished run.
+    async fn two_sends(similar: bool) -> (usize, Arc<FakeDesktop>, Value) {
+        let d = notepad_desktop();
+        d.reply("click", json!({ "clicked": true }));
+        let args = json!({ "ref": "ref_9", "reason": "send it" });
+        let click = json!({ "name": "left_click", "args": args });
+        let fixture = script("send twice", &[click.clone(), click], "Sent both.");
+        let (agent, host) = agent_with(d.clone(), vec![fixture]);
+        agent.start(opts("send twice"));
+        let mut cards = HashSet::new();
+        for _ in 0..400 {
+            if let Some(done) = host.events.last("agent:done") {
+                return (cards.len(), d, done);
+            }
+            if let Some(req) = host.events.last("agent:confirm-request") {
+                let id = req["id"].as_str().unwrap_or_default().to_string();
+                if cards.insert(id.clone()) {
+                    assert_eq!(req["similar"], true, "the card offers it");
+                    agent.answer(&id, true, similar);
+                }
+            }
+            tokio::time::sleep(Duration::from_millis(25)).await;
+        }
+        panic!("the run did not finish");
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn allow_similar_runs_the_same_step_again_without_a_card() {
+        let (cards, d, done) = two_sends(true).await;
+        assert_eq!(cards, 1);
+        let clicks = d.methods().iter().filter(|m| *m == "click").count();
+        assert_eq!(clicks, 2);
+        let rows = done["rows"].as_array().cloned().unwrap_or_default();
+        let marked = rows.iter().filter(|r| r["similar"] == true).count();
+        assert_eq!(marked, 1, "the second press says why it did not ask");
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn a_plain_allow_asks_again_for_the_same_step() {
+        let (cards, d, _) = two_sends(false).await;
+        assert_eq!(cards, 2);
+        let clicks = d.methods().iter().filter(|m| *m == "click").count();
+        assert_eq!(clicks, 2);
+    }
+
+    #[test]
+    fn what_the_person_always_decides_is_never_allowed_as_similar() {
+        let node = |name: &str| json!({ "role": "button", "name": name, "ref": "ref_2" });
+        let info = |name: &str, app: &str| Info {
+            t: Touches {
+                node: Some(node(name)),
+                app: app.into(),
+                ..Touches::default()
+            },
+            point: None,
+            private: None,
+        };
+        let click = |name: &str| Call {
+            id: String::new(),
+            name: name.into(),
+            args: json!({ "ref": "ref_2" }),
+        };
+        let why = "\"Send\" can send something";
+        let send = info("Send", "Mail");
+        let key = similar_key(&click("left_click"), &send, "Click \"Send\" in Mail", why);
+        assert!(key.is_some());
+        // The same button for another reason, or in another app, is another
+        // step.
+        let other = "a dialog says \"Delete all messages?\"";
+        let again = similar_key(&click("left_click"), &send, "Click \"Send\" in Mail", other);
+        assert_ne!(key, again);
+        let chat = info("Send", "Chat");
+        let there = similar_key(&click("left_click"), &chat, "Click \"Send\" in Chat", why);
+        assert_ne!(key, there);
+        // Money, a sign-in, a command line, what could not be read, a drag
+        // and closing a window are asked about every time.
+        let pay = info("Pay now", "Shop");
+        let label = "Click \"Pay now\" in Shop";
+        assert_eq!(similar_key(&click("left_click"), &pay, label, why), None);
+        let unread = "it could not read what is there";
+        let label = "Click \"Send\" in Mail";
+        assert_eq!(similar_key(&click("left_click"), &send, label, unread), None);
+        let shell = "PowerShell is a command line, and Enter runs what is typed";
+        assert_eq!(similar_key(&click("left_click"), &send, label, shell), None);
+        assert_eq!(similar_key(&click("left_click_drag"), &send, label, why), None);
+        assert_eq!(similar_key(&click("close_window"), &send, label, why), None);
     }
 
     /// `agent`, in automatic mode, whose safety check answers `review`
