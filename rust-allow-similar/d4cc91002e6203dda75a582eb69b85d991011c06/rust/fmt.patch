@@ -1,0 +1,23 @@
+diff --git a/src-tauri/src/agent/run.rs b/src-tauri/src/agent/run.rs
+index 1aa9674..00a46b7 100644
+--- a/src-tauri/src/agent/run.rs
++++ b/src-tauri/src/agent/run.rs
+@@ -3144,10 +3144,16 @@ mod tests {
+         assert_eq!(similar_key(&click("left_click"), &pay, label, why), None);
+         let unread = "it could not read what is there";
+         let label = "Click \"Send\" in Mail";
+-        assert_eq!(similar_key(&click("left_click"), &send, label, unread), None);
++        assert_eq!(
++            similar_key(&click("left_click"), &send, label, unread),
++            None
++        );
+         let shell = "PowerShell is a command line, and Enter runs what is typed";
+         assert_eq!(similar_key(&click("left_click"), &send, label, shell), None);
+-        assert_eq!(similar_key(&click("left_click_drag"), &send, label, why), None);
++        assert_eq!(
++            similar_key(&click("left_click_drag"), &send, label, why),
++            None
++        );
+         assert_eq!(similar_key(&click("close_window"), &send, label, why), None);
+     }
+ 
