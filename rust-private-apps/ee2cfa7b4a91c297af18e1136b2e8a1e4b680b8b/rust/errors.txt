@@ -1,0 +1,5 @@
+== smoke.log ==
+[SMOKE] privateAppsBar=FAIL:notice="Answers need an AI provider. Finding words on screen works without one."
+[SMOKE] failed: privateAppsBar
+[GATE] fail privateAppsBar=FAIL:notice="Answers need an AI provider. Finding words on screen works without one."
+[GATE] verdict=FAIL:1 FAIL line(s); no "done" line; failed: privateAppsBar; 1 listed label(s) never printed
