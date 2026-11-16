@@ -218,13 +218,13 @@
 [UI] noDockUi=ok
 [UI] resizeZones=ok
 [UI] globFrameCost=ok
-[UI] globShapeMs=0.015
+[UI] globShapeMs=0.020
 [UI] shot 04a-glob-08.png
 [UI] shot 04b-glob-30.png
 [UI] shot 04c-glob-52.png
 [UI] shot 04d-glob-70.png
 [UI] shot 04e-glob-90.png
-[UI] globOpen ms=506 frames=28 longestFrameMs=33.4
+[UI] globOpen ms=521 frames=24 longestFrameMs=33.4
 [UI] globOpens=ok
 [UI] globSmooth=ok
 [UI] globReducedMotion=ok
@@ -367,6 +367,7 @@
 [UI] shot sheet-confirm-long-text.png
 [UI] confirmAllowWaitsForFullText=ok
 [UI] confirmSweepThenEnable=ok
+[UI] confirmAllowSimilar=ok
 [UI] scene sheet/sheet-consent
 [UI] shot sheet-consent.png
 [UI] consentNamesProvider=ok
@@ -1020,7 +1021,7 @@
 [UI] shot 04c-glob-52-150.png
 [UI] shot 04d-glob-70-150.png
 [UI] shot 04e-glob-90-150.png
-[UI] globOpen-150 ms=502 frames=27 longestFrameMs=33.4
+[UI] globOpen-150 ms=501 frames=24 longestFrameMs=33.3
 [UI] globOpens-150=ok
 [UI] globReducedMotion-150=ok
 [UI] scene sheet/multi-150
@@ -1155,6 +1156,7 @@
 [UI] shot sheet-confirm-long-text-150.png
 [UI] confirmAllowWaitsForFullText-150=ok
 [UI] confirmSweepThenEnable-150=ok
+[UI] confirmAllowSimilar-150=ok
 [UI] scene sheet/sheet-consent-150
 [UI] shot sheet-consent-150.png
 [UI] consentNamesProvider-150=ok
@@ -1611,7 +1613,7 @@
 [UI] regionNoteOnlyReports=ok
 [UI] regionNoteKeepsNothing=ok
 [UI] privateLineIsWrittenOnce=ok
-[UI] axe audits=162 ms=18299
+[UI] axe audits=162 ms=23025
 [UI] axeClean=ok
 [UI] axeAllowListFresh=ok
 [UI] noPageErrors=ok
