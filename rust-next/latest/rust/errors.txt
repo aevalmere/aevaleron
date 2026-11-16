@@ -1,5 +1,0 @@
-== smoke.log ==
-[SMOKE] crashLogged=FAIL:task panic not in errors.log
-[SMOKE] failed: crashLogged
-[GATE] fail crashLogged=FAIL:task panic not in errors.log
-[GATE] verdict=FAIL:1 FAIL line(s); no "done" line; failed: crashLogged; 1 listed label(s) never printed
