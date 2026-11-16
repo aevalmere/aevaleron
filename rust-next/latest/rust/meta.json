@@ -1,17 +1,20 @@
 {
   "workflow": "rust",
   "workflow_name": "rust",
-  "run_id": 43782575722,
+  "run_id": 43782660910,
   "run_attempt": 1,
-  "run_url": "https://github.com/aevalmere/aevaleron/actions/runs/43782575722",
+  "run_url": "https://github.com/aevalmere/aevaleron/actions/runs/43782660910",
   "event": "push",
-  "sha": "73ecedf10c3c4d007c824a207081e2f024ab5bb9",
+  "sha": "f112229bc6bedf226447ab46ebc63b815ec2c543",
   "ref": "rust/next",
   "ref_dir": "rust-next",
-  "conclusion": "cancelled",
-  "failed": [],
-  "finished": "2026-11-16T00:49:44Z",
-  "error_lines": 0,
+  "conclusion": "failure",
+  "failed": [
+    "Format",
+    "Clippy"
+  ],
+  "finished": "2026-11-16T00:54:19Z",
+  "error_lines": 30,
   "steps": [
     {
       "name": "Checkout",
@@ -35,38 +38,38 @@
     },
     {
       "name": "Cache cargo",
-      "outcome": "cancelled",
+      "outcome": "success",
       "log": ""
     },
     {
       "name": "Gate helper",
-      "outcome": "skipped",
+      "outcome": "success",
       "log": ""
     },
     {
       "name": "Prebuild desktop helper",
-      "outcome": "skipped",
-      "log": ""
+      "outcome": "success",
+      "log": "prebuild.log"
     },
     {
       "name": "Format",
-      "outcome": "skipped",
-      "log": ""
+      "outcome": "failure",
+      "log": "fmt.log"
     },
     {
       "name": "Format patch",
-      "outcome": "skipped",
-      "log": ""
+      "outcome": "success",
+      "log": "fmt.patch"
     },
     {
       "name": "Clippy",
-      "outcome": "skipped",
-      "log": ""
+      "outcome": "failure",
+      "log": "clippy.log"
     },
     {
       "name": "Unit tests",
-      "outcome": "skipped",
-      "log": ""
+      "outcome": "success",
+      "log": "test.log"
     },
     {
       "name": "Restore NSIS toolset",
@@ -95,13 +98,13 @@
     },
     {
       "name": "Capture check",
-      "outcome": "skipped",
-      "log": ""
+      "outcome": "success",
+      "log": "capture.log"
     },
     {
       "name": "Desktop selfcheck",
-      "outcome": "skipped",
-      "log": ""
+      "outcome": "success",
+      "log": "desktop.log"
     },
     {
       "name": "Upload installer",
