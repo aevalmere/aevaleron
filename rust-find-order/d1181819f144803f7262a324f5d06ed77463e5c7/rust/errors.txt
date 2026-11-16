@@ -1,0 +1,32 @@
+== fmt.log ==
+Diff in \\?\D:\a\aevaleron\aevaleron\src-tauri\src\find.rs:330:
+         at(0.02, 0.9),
+         at(0.98, 0.9),
+     ];
+-    points.iter().all(|(x, y)| over.iter().any(|o| o.holds(*x, *y)))
++    points
++        .iter()
++        .all(|(x, y)| over.iter().any(|o| o.holds(*x, *y)))
+ }
+ 
+ /// The windows a whole-screen search reads, front to back, each with the
+Diff in \\?\D:\a\aevaleron\aevaleron\src-tauri\src\find.rs:3078:
+             other,
+         ];
+         let got = screen_targets(&all);
+-        let read: Vec<i64> = got.iter().map(|(w, _)| w["handle"].as_i64().unwrap()).collect();
++        let read: Vec<i64> = got
++            .iter()
++            .map(|(w, _)| w["handle"].as_i64().unwrap())
++            .collect();
+         // The overlay the mouse passes through hides nothing; the two
+         // windows behind the full one cannot be seen at all.
+         assert_eq!(read, [1, 2]);
+Diff in \\?\D:\a\aevaleron\aevaleron\src-tauri\src\find.rs:3125:
+             desktop.reply("listWindows", json!([front, back]));
+             // Both windows answer with the same text: one line under the
+             // front window, one clear of it.
+-            let line = |x: i64| json!({ "text": "Total", "source": "uia", "ref": "e",
+-                "rect": { "x": x, "y": 40, "width": 100, "height": 20 } });
++            let line = |x: i64| {
+
