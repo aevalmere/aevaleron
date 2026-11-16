@@ -1,19 +1,19 @@
 {
   "workflow": "rust",
   "workflow_name": "rust",
-  "run_id": 43782548928,
+  "run_id": 43782649855,
   "run_attempt": 1,
-  "run_url": "https://github.com/aevalmere/aevaleron/actions/runs/43782548928",
+  "run_url": "https://github.com/aevalmere/aevaleron/actions/runs/43782649855",
   "event": "push",
-  "sha": "d1181819f144803f7262a324f5d06ed77463e5c7",
+  "sha": "60de9307501ebbf7eb7d10ac0852edcf7f3e64a5",
   "ref": "rust/find-order",
   "ref_dir": "rust-find-order",
   "conclusion": "cancelled",
   "failed": [
     "Format"
   ],
-  "finished": "2026-11-16T00:49:37Z",
-  "error_lines": 30,
+  "finished": "2026-11-16T00:55:08Z",
+  "error_lines": 13,
   "steps": [
     {
       "name": "Checkout",

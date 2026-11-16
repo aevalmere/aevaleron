@@ -1,12 +1,12 @@
 # rust: cancelled
 
 - Workflow: rust
-- Run: [43782548928](https://github.com/aevalmere/aevaleron/actions/runs/43782548928), attempt 1, on push
-- Commit: d1181819f144803f7262a324f5d06ed77463e5c7
+- Run: [43782649855](https://github.com/aevalmere/aevaleron/actions/runs/43782649855), attempt 1, on push
+- Commit: 60de9307501ebbf7eb7d10ac0852edcf7f3e64a5
 - Ref: rust/find-order
 - Conclusion: **cancelled**
 - Failed: Format
-- Finished: 2026-11-16T00:49:37Z
+- Finished: 2026-11-16T00:55:08Z
 
 | Step | Outcome | Log |
 |---|---|---|
@@ -30,4 +30,4 @@
 | Desktop selfcheck | skipped |  |
 | Upload installer | skipped |  |
 
-errors.txt: 30 error and warning lines from the logs.
+errors.txt: 13 error and warning lines from the logs.
