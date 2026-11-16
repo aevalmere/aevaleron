@@ -431,6 +431,61 @@ fn speed(cx: &Cx) {
     let json = serde_json::to_string(&timings).unwrap_or_default();
     cx.log("voiceSpeedWhisperTimings", &json);
     cx.log("voiceSpeedWhisperHeard", format!("{field:?}"));
+
+    spare(cx, &clip);
+    tuned(cx, &clip);
+}
+
+/// An engine whose model is not on disk (Whisper small, never fetched in
+/// this run) is chosen while Parakeet is: the words come at once from
+/// Parakeet, with no download in the way, and the chosen model arrives
+/// behind them. This is what the first dictation after a change of default
+/// engine meets.
+fn spare(cx: &Cx, clip: &[f32]) {
+    let small = model::spec_for("small", "en");
+    if model::usable(small).is_some() {
+        cx.must("voiceSpare", false, "the small model is already here");
+        cx.must("voiceSpareFetch", false, "the small model is already here");
+        return;
+    }
+    let (started, timings, field) = e2e(cx, clip, "whisper-small");
+    let json = serde_json::to_string(&timings).unwrap_or_default();
+    cx.log("voiceSpareTimings", &json);
+    let by = timings.as_ref().map(|t| t.model.clone());
+    let by = by.unwrap_or_default();
+    let stood_in = by.starts_with("parakeet");
+    let heard = field.to_lowercase().contains("tomorrow");
+    cx.must(
+        "voiceSpare",
+        started && stood_in && heard,
+        format!("started={started} model={by:?} field={field:?}"),
+    );
+    let began = Instant::now();
+    let arrived = cx.wait_for(Duration::from_secs(240), || model::ready(small));
+    let waited = format!("after {}ms", ms(began));
+    cx.must("voiceSpareFetch", arrived, waited);
+}
+
+/// The thread measuring ([`whisper::tune`]) on the default engine: it times
+/// each count the runner has, keeps one, and the engine still hears the
+/// fixture with it. Last in the lane, so no gate before it runs on a count
+/// it chose.
+fn tuned(cx: &Cx, clip: &[f32]) {
+    let Some(path) = model::usable(model::parakeet()) else {
+        cx.must("voiceTuned", false, "Parakeet is not on disk");
+        return;
+    };
+    whisper::preload(&path);
+    let line = whisper::tune(&path, &|| false);
+    let threads = whisper::threads();
+    let whole = engine::piece(&path, clip).unwrap_or(clip);
+    let (took, text) = pass(&path, whole);
+    cx.log("voiceTunedPass", said(took, &text));
+    cx.must(
+        "voiceTuned",
+        line.is_some() && tomorrow(&text),
+        format!("{line:?} threads={threads}"),
+    );
 }
 
 /// The default engine, Parakeet 110M, on the fixture and on its first three

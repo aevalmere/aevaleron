@@ -93,6 +93,9 @@ pub struct Timings {
     pub cleanup_ms: u64,
     pub insert_ms: u64,
     pub total_ms: u64,
+    /// The model file that heard it, and the threads it ran on.
+    pub model: String,
+    pub threads: i32,
 }
 
 static LAST_TIMINGS: Mutex<Option<Timings>> = Mutex::new(None);
@@ -319,6 +322,8 @@ async fn pipeline(
     let began = Instant::now();
     let heard = engine::transcribe(&s, audio.samples, early, &on_progress).await?;
     t.transcribe_ms = began.elapsed().as_millis() as u64;
+    t.model.clone_from(&heard.model);
+    t.threads = whisper::threads();
     if moved(since) {
         // Cancelled meanwhile: nothing to say.
         return Err(String::new());
@@ -347,6 +352,56 @@ fn record(t: &mut Timings, released: Instant) {
         serde_json::to_string(&t).unwrap_or_default()
     );
     *LAST_TIMINGS.lock() = Some(t.clone());
+    if let Ok(v) = serde_json::to_value(&*t) {
+        log_line(&v);
+    }
+}
+
+/// The timing log is kept under this size: the older half goes.
+const LOG_MAX: u64 = 64 * 1024;
+
+fn log_path() -> std::path::PathBuf {
+    model::dir().join("timings.log")
+}
+
+/// What is kept of a log that grew past its size: the newer half, from the
+/// start of a line.
+fn newer_half(log: &str) -> &str {
+    let mut from = log.len() / 2;
+    while !log.is_char_boundary(from) {
+        from += 1;
+    }
+    match log[from..].find('\n') {
+        Some(i) => &log[from + i + 1..],
+        None => "",
+    }
+}
+
+/// Adds a line to `voice/timings.log` in the app's data folder: when, and
+/// the numbers of one dictation or of the thread measuring. Never the words.
+/// It is how a slow dictation on someone's PC can be explained afterwards.
+pub fn log_line(what: &Value) {
+    use std::io::Write;
+    let path = log_path();
+    if std::fs::metadata(&path).is_ok_and(|m| m.len() > LOG_MAX) {
+        if let Ok(old) = std::fs::read_to_string(&path) {
+            let _ = std::fs::write(&path, newer_half(&old));
+        }
+    }
+    let since = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH);
+    let at = since.map_or(0, |d| d.as_secs());
+    let mut line = json!({ "at": at });
+    if let (Some(o), Value::Object(more)) = (line.as_object_mut(), what.clone()) {
+        o.extend(more);
+    }
+    let _ = std::fs::create_dir_all(model::dir());
+    let file = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&path);
+    if let Ok(mut f) = file {
+        let _ = writeln!(f, "{line}");
+    }
 }
 
 async fn deliver(
@@ -467,6 +522,16 @@ pub fn setup(app: &AppHandle) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_long_log_keeps_its_newer_half_from_a_whole_line() {
+        let log = "{\"at\":1}\n{\"at\":2}\n{\"at\":3}\n{\"at\":4}\n";
+        // The half starts inside the third line; the fourth is the first
+        // whole one.
+        assert_eq!(newer_half(log), "{\"at\":4}\n");
+        assert_eq!(newer_half("no line end"), "");
+        assert_eq!(newer_half(""), "");
+    }
 
     #[test]
     fn a_state_carries_its_origin_and_extras() {

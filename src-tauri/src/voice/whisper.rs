@@ -71,6 +71,11 @@ static PINNED: AtomicBool = AtomicBool::new(false);
 static EVICTOR: AtomicBool = AtomicBool::new(false);
 /// Threads for the engine; 0 picks them from the processor.
 static THREADS: AtomicI32 = AtomicI32::new(0);
+/// The thread count measured on this PC ([`tune`]); 0 until then.
+static TUNED: AtomicI32 = AtomicI32::new(0);
+static TUNING: AtomicBool = AtomicBool::new(false);
+/// A pass over the test clip longer than this ends the measuring.
+const TUNE_STOP_MS: u64 = 1500;
 /// Where the last pass spent its time, for the speed probe.
 static STAGES: Mutex<String> = parking_lot::const_mutex(String::new());
 
@@ -186,12 +191,113 @@ pub fn set_threads(n: i32) {
 
 pub fn threads() -> i32 {
     match THREADS.load(Ordering::SeqCst) {
-        0 => {
-            let n = std::thread::available_parallelism().map_or(4, |n| n.get());
-            n.clamp(1, 8) as i32
-        }
+        0 => match TUNED.load(Ordering::SeqCst) {
+            0 => logical().clamp(1, 8) as i32,
+            n => n,
+        },
         n => n,
     }
+}
+
+fn logical() -> usize {
+    std::thread::available_parallelism().map_or(4, |n| n.get())
+}
+
+/// The thread counts worth timing on a processor with `logical` threads.
+fn candidates(logical: usize) -> Vec<i32> {
+    let fits = |n: &i32| *n as usize <= logical;
+    [2, 4, 6, 8].into_iter().filter(fits).collect()
+}
+
+/// The fewest threads that are within a tenth of the quickest. On a
+/// processor with fast and slow cores more threads are often no quicker, and
+/// every pass waits for its slowest thread.
+fn pick(times: &[(i32, u64)]) -> Option<i32> {
+    let best = times.iter().map(|t| t.1).min()?;
+    let limit = best + best / 10;
+    let near = times.iter().filter(|t| t.1 <= limit);
+    near.map(|t| t.0).min()
+}
+
+/// Six seconds of a quiet hiss: the model does its whole work on it and
+/// writes next to nothing.
+fn hiss() -> Vec<f32> {
+    let mut seed: u32 = 0x2545_F491;
+    let mut next = || {
+        seed = seed.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+        ((seed >> 8) as f32 / 16_777_216.0 - 0.5) * 0.002
+    };
+    (0..wav::RATE as usize * 6).map(|_| next()).collect()
+}
+
+/// Times the model at `path` on this PC with each thread count worth trying
+/// and keeps the fewest that is as quick as any, once in a run of the app.
+/// The clamp of [`threads`] was chosen on a runner with four equal cores; a
+/// laptop with two fast cores and eight slow ones is another machine. Gives
+/// up, to be asked again, when `busy` says someone is dictating. A thread
+/// count set by hand ([`set_threads`]) is left alone.
+pub fn tune(path: &Path, busy: &dyn Fn() -> bool) -> Option<String> {
+    if THREADS.load(Ordering::SeqCst) != 0 || TUNING.swap(true, Ordering::SeqCst) {
+        return None;
+    }
+    let Ok(engine) = load(path) else {
+        TUNING.store(false, Ordering::SeqCst);
+        return None;
+    };
+    let counts = candidates(logical());
+    if counts.len() < 2 {
+        return None;
+    }
+    let clip = hiss();
+    let family = engine.whisper.then(|| {
+        RunExtension::Whisper(WhisperRunOptions {
+            temperature_inc: Some(0.0),
+            ..Default::default()
+        })
+    });
+    let options = RunOptions {
+        timestamps: TimestampKind::None,
+        family,
+        ..Default::default()
+    };
+    let mut times: Vec<(i32, u64)> = Vec::new();
+    for n in counts {
+        if busy() {
+            TUNING.store(false, Ordering::SeqCst);
+            return None;
+        }
+        let Ok(mut trial) = session(&engine.model, n) else {
+            continue;
+        };
+        // A second of it first, untimed: a session's first pass also sets
+        // its buffers up. What is written does not matter, only the time.
+        let _ = trial.run(&clip[..wav::RATE as usize], &options);
+        let began = Instant::now();
+        let _ = trial.run(&clip, &options);
+        let took = began.elapsed().as_millis() as u64;
+        // A model this slow is not timed four times over: the count stays
+        // as it was.
+        if took > TUNE_STOP_MS {
+            return None;
+        }
+        times.push((n, took));
+    }
+    let kept = pick(&times)?;
+    TUNED.store(kept, Ordering::SeqCst);
+    // The session kept for dictation is made over now, not inside the next
+    // utterance.
+    let mut slot = engine.slot.lock();
+    if slot.threads != kept {
+        if let Ok(s) = session(&engine.model, kept) {
+            slot.session = s;
+            slot.threads = kept;
+        }
+    }
+    drop(slot);
+    let show = |(n, ms): &(i32, u64)| format!("{n}={ms}ms");
+    let each: Vec<String> = times.iter().map(show).collect();
+    // As the timing log has it: `2=140ms 4=96ms 8=131ms kept=4`.
+    Some(format!("{} kept={kept}", each.join(" ")))
 }
 
 /// The library's version and the devices it runs on.
@@ -335,6 +441,28 @@ fn pass(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_fewest_threads_as_quick_as_any_are_kept() {
+        // Two fast cores and eight slow ones: eight threads are slower.
+        let hybrid = [(2, 210), (4, 150), (6, 158), (8, 240)];
+        assert_eq!(pick(&hybrid), Some(4));
+        // Four equal cores: four is plainly quicker than two.
+        assert_eq!(pick(&[(2, 300), (4, 180)]), Some(4));
+        // Within a tenth is a tie, and the tie goes to fewer threads.
+        assert_eq!(pick(&[(2, 105), (4, 100), (8, 99)]), Some(2));
+        assert_eq!(pick(&[]), None);
+    }
+
+    #[test]
+    fn only_counts_the_processor_has_are_timed() {
+        assert_eq!(candidates(12), vec![2, 4, 6, 8]);
+        assert_eq!(candidates(4), vec![2, 4]);
+        assert_eq!(candidates(1), Vec::<i32>::new());
+        let clip = hiss();
+        assert_eq!(clip.len(), wav::RATE as usize * 6);
+        assert!(clip.iter().all(|s| s.abs() <= 0.001));
+    }
 
     #[test]
     fn the_prompt_is_the_last_words() {
