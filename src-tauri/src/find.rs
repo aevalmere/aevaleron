@@ -293,6 +293,70 @@ impl Rect {
             && self.y < b.y + b.height
             && b.y < self.y + self.height
     }
+
+    fn holds(&self, x: f64, y: f64) -> bool {
+        x >= self.x && x < self.x + self.width && y >= self.y && y < self.y + self.height
+    }
+
+    fn contains(&self, b: &Rect) -> bool {
+        b.x >= self.x
+            && b.y >= self.y
+            && b.x + b.width <= self.x + self.width
+            && b.y + b.height <= self.y + self.height
+    }
+}
+
+/// Whether a window in front lies over the middle of this rectangle. A
+/// match there cannot be seen, and a mark on it would sit on other words.
+fn under_window(rect: Option<Rect>, over: &[Rect]) -> bool {
+    let Some(r) = rect else { return false };
+    let (x, y) = (r.x + r.width / 2.0, r.y + r.height / 2.0);
+    over.iter().any(|o| o.holds(x, y))
+}
+
+/// Whether windows in front hide the whole rectangle: its middle and a
+/// point just inside each corner. One that shows in part is kept, and its
+/// matches are checked one by one.
+fn buried(rect: Option<Rect>, over: &[Rect]) -> bool {
+    let Some(r) = rect else { return false };
+    if over.is_empty() {
+        return false;
+    }
+    let at = |fx: f64, fy: f64| (r.x + r.width * fx, r.y + r.height * fy);
+    let points = [
+        at(0.5, 0.5),
+        at(0.02, 0.1),
+        at(0.98, 0.1),
+        at(0.02, 0.9),
+        at(0.98, 0.9),
+    ];
+    points
+        .iter()
+        .all(|(x, y)| over.iter().any(|o| o.holds(*x, *y)))
+}
+
+/// The windows a whole-screen search reads, front to back, each with the
+/// windows lying over it. One that a single window in front hides whole is
+/// left out, so it is neither read nor counted against the limit.
+fn screen_targets(all: &[Value]) -> Vec<(Value, Vec<Rect>)> {
+    let front = all.iter().find(|w| w["isForeground"] == true);
+    let fg = front.or(all.first());
+    let display = fg.map(|w| w["display"].clone()).unwrap_or(Value::Null);
+    let display = or_null(Some(&display));
+    let mut over: Vec<Rect> = Vec::new();
+    let mut out = Vec::new();
+    for w in all.iter().filter(|w| w["isMinimized"] != true) {
+        let rect = Rect::from_value(&w["rect"]);
+        let here = display.is_null() || w["display"] == display;
+        let hidden = rect.is_some_and(|r| over.iter().any(|o| o.contains(&r)));
+        if here && !hidden && out.len() < SCREEN_WINDOW_CAP {
+            out.push((w.clone(), over.clone()));
+        }
+        if w["through"] != true {
+            over.extend(rect);
+        }
+    }
+    out
 }
 
 fn rect_json(r: Option<Rect>) -> Value {
@@ -518,6 +582,9 @@ pub fn match_literal(
     // screen is the query itself, so a real match never shares the page
     // with a lookalike.
     let mut near: Vec<(usize, usize, usize)> = Vec::new();
+    // The words of a phrase found apart in one piece of text, kept back the
+    // same way: shown only when the phrase itself is nowhere.
+    let mut apart: Vec<(usize, usize, usize)> = Vec::new();
     let mut any = false;
     for (k, span) in spans.iter().enumerate() {
         let mut found = false;
@@ -540,14 +607,16 @@ pub fn match_literal(
                 .collect();
             let all = words.len() > 1 && words.iter().all(|w| index_of(&span.hay, w, 0).is_some());
             if all {
-                any = true;
+                let from = apart.len();
                 for w in words.iter().filter(|w| w.len() >= 2) {
                     let mut at = index_of(&span.hay, w, 0);
                     while let Some(i) = at {
-                        push(span, i, i + w.len());
+                        apart.push((k, i, i + w.len()));
                         at = index_of(&span.hay, w, i + w.len());
                     }
                 }
+                // As they stand in the line, not as they were typed.
+                apart[from..].sort_by_key(|(_, start, _)| *start);
                 continue;
             }
             // The phrase runs on into the next piece of text (a link in the
@@ -580,7 +649,8 @@ pub fn match_literal(
         }
     }
     if !any {
-        for (k, start, end) in near {
+        let loose = if apart.is_empty() { near } else { apart };
+        for (k, start, end) in loose {
             push(&spans[k], start, end);
         }
     }
@@ -799,6 +869,8 @@ struct Snapshot {
     spans: Vec<Span>,
     source: String,
     windows: Vec<Value>,
+    /// For each window read, by handle: the windows in front of it.
+    above: Vec<(Value, Vec<Rect>)>,
     // Kept as lib/find.js returned it; nothing reads it yet.
     #[allow(dead_code)]
     ocr_error: Value,
@@ -929,6 +1001,20 @@ fn refind(before: &[Hit], hit: &Hit, after: &[Hit]) -> Option<usize> {
     by_key.or_else(|| nth.and_then(|n| now.get(n).copied()))
 }
 
+impl Snapshot {
+    /// Whether a window in front lies over a match in `window` at `rect`.
+    fn hides(&self, window: &Value, rect: Option<Rect>) -> bool {
+        let over = self.above.iter().find(|(w, _)| w == window);
+        over.is_some_and(|(_, o)| under_window(rect, o))
+    }
+
+    /// Where a window comes front to back; one not read comes last.
+    fn depth(&self, window: &Value) -> usize {
+        let at = self.windows.iter().position(|w| &w["handle"] == window);
+        at.unwrap_or(usize::MAX)
+    }
+}
+
 impl State {
     fn spans(&self) -> Option<Arc<Snapshot>> {
         self.snapshot.clone()
@@ -959,8 +1045,14 @@ impl State {
             known || inside
         };
         let mine = self.literal.iter().filter(|h| !covered(h));
-        let mut out: Vec<Hit> = mine.cloned().collect();
-        out.extend(self.doc.iter().cloned());
+        // The window in front first, and in each window what its document
+        // holds before the tabs and buttons around it: the page is what a
+        // person searching means, as in a browser's own find.
+        let mut out: Vec<Hit> = self.doc.to_vec();
+        out.extend(mine.cloned());
+        if let Some(s) = &self.snapshot {
+            out.sort_by_key(|h| s.depth(&h.window));
+        }
         out.extend(related);
         out.extend(self.concept.iter().cloned());
         // Menu commands are not on screen yet: after everything that is.
@@ -1095,6 +1187,10 @@ impl State {
                         if !rect.is_some_and(|x| x.overlaps(&area)) {
                             continue;
                         }
+                    }
+                    let snap = self.snapshot.as_ref();
+                    if snap.is_some_and(|s| s.hides(window, rect)) {
+                        continue;
                     }
                     let matched = js_text(m.get("match"));
                     let line = js_text(m.get("text"));
@@ -1257,6 +1353,9 @@ impl State {
         let q = js_trim(&self.query).to_string();
         let mut taken = std::mem::take(&mut self.taken);
         for mut h in match_literal(&snap.spans, term, "related", &mut taken) {
+            if snap.hides(&h.window, h.rect) {
+                continue;
+            }
             h.term = Some(term.to_string());
             h.score = Some(score_or(score, 0.7));
             let because = text_or(why, "a related term");
@@ -1300,7 +1399,11 @@ impl State {
         let snap = self.spans();
         let spans: &[Span] = snap.as_ref().map_or(&[], |s| s.spans.as_slice());
         let mut taken = HashSet::new();
-        self.literal = dedupe(match_literal(spans, &self.query, "literal", &mut taken));
+        let mut literal = match_literal(spans, &self.query, "literal", &mut taken);
+        if let Some(s) = snap.as_ref() {
+            literal.retain(|h| !s.hides(&h.window, h.rect));
+        }
+        self.literal = dedupe(literal);
         // Related and concept hits survive a refresh by their match text, so
         // a scroll does not throw away a model answer that already arrived.
         let keep_related = std::mem::take(&mut self.related);
@@ -1830,24 +1933,15 @@ impl Inner {
             let s = self.st.lock();
             (s.scope, s.region)
         };
-        let targets: Vec<Value> = if scope == "screen" {
+        let targets: Vec<(Value, Vec<Rect>)> = if scope == "screen" {
             let all = self.desktop.op("listWindows", json!({})).await?;
             let all = all.as_array().cloned().unwrap_or_default();
-            let front = all.iter().find(|w| w["isForeground"] == true);
-            let fg = front.or(all.first());
-            let display = fg.map(|w| w["display"].clone()).unwrap_or(Value::Null);
-            let display = or_null(Some(&display));
-            all.iter()
-                .filter(|w| w["isMinimized"] != true)
-                .filter(|w| display.is_null() || w["display"] == display)
-                .take(SCREEN_WINDOW_CAP)
-                .cloned()
-                .collect()
+            screen_targets(&all)
         } else {
             let fg = self.desktop.op("foregroundWindow", json!({})).await?;
             match or_null(Some(&fg)) {
                 Value::Null => Vec::new(),
-                w => vec![w],
+                w => vec![(w, Vec::new())],
             }
         };
         if targets.is_empty() {
@@ -1857,7 +1951,8 @@ impl Inner {
         let mut windows = Vec::new();
         let mut sources: Vec<Option<String>> = Vec::new();
         let mut ocr_error = Value::Null;
-        for w in &targets {
+        let mut above = Vec::new();
+        for (w, over) in &targets {
             let args = json!({ "windowHandle": w["handle"], "ocrFallback": settings.ocr });
             let g = match self.desktop.op("getText", args).await {
                 Ok(g) => g,
@@ -1873,7 +1968,12 @@ impl Inner {
             }
             let window = json!({ "handle": w["handle"], "title": w["title"], "rect": w["rect"] });
             windows.push(window);
+            above.push((w["handle"].clone(), over.clone()));
             for sp in g["spans"].as_array().into_iter().flatten() {
+                // Text under a window in front is not on the screen.
+                if buried(Rect::from_value(&sp["rect"]), over) {
+                    continue;
+                }
                 let mut sp = sp.clone();
                 if let Some(o) = sp.as_object_mut() {
                     o.insert("window".into(), w["handle"].clone());
@@ -1897,6 +1997,7 @@ impl Inner {
             spans: index_spans(&spans),
             source,
             windows,
+            above,
             ocr_error,
             ocr_used: settings.ocr,
             text: texts.join("\n"),
@@ -2944,7 +3045,114 @@ mod tests {
         let mut taken = HashSet::new();
         let hits = match_literal(&spans, "invoice total", "literal", &mut taken);
         let found: Vec<(usize, &str)> = hits.iter().map(|h| (h.span_id, &h.matched[..])).collect();
-        assert_eq!(found, [(0, "invoice"), (0, "total")]);
+        assert_eq!(found, [(0, "total"), (0, "invoice")]);
+    }
+
+    #[test]
+    fn a_phrase_that_is_on_screen_hides_its_words_apart() {
+        let lines = [span("total for this invoice"), span("the invoice total")];
+        let spans = index_spans(&lines);
+        let mut taken = HashSet::new();
+        let hits = match_literal(&spans, "invoice total", "literal", &mut taken);
+        let found: Vec<(usize, &str)> = hits.iter().map(|h| (h.span_id, &h.matched[..])).collect();
+        assert_eq!(found, [(1, "invoice total")]);
+    }
+
+    fn win(handle: i64, x: i64, y: i64, width: i64, height: i64) -> Value {
+        json!({ "handle": handle, "title": "w", "display": "d1",
+            "rect": { "x": x, "y": y, "width": width, "height": height } })
+    }
+
+    #[test]
+    fn a_window_hidden_by_the_one_in_front_is_not_read() {
+        let mut overlay = win(1, 0, 0, 1920, 1080);
+        overlay["through"] = json!(true);
+        let mut small = win(4, 100, 100, 400, 300);
+        small["isMinimized"] = json!(true);
+        let mut other = win(6, 3000, 0, 800, 600);
+        other["display"] = json!("d2");
+        let all = [
+            overlay,
+            win(2, 0, 0, 1920, 1080),
+            win(3, 0, 0, 1920, 1080),
+            small,
+            win(5, 200, 200, 400, 300),
+            other,
+        ];
+        let got = screen_targets(&all);
+        let read: Vec<i64> = got
+            .iter()
+            .map(|(w, _)| w["handle"].as_i64().unwrap())
+            .collect();
+        // The overlay the mouse passes through hides nothing; the two
+        // windows behind the full one cannot be seen at all.
+        assert_eq!(read, [1, 2]);
+        assert!(got[1].1.is_empty());
+    }
+
+    #[test]
+    fn a_match_under_another_window_is_left_out() {
+        let front = Rect::from_value(&json!({ "x": 0, "y": 0, "width": 500, "height": 500 }));
+        let over = [front.unwrap()];
+        let at = |x: i64| Rect::from_value(&json!({ "x": x, "y": 10, "width": 100, "height": 20 }));
+        assert!(under_window(at(100), &over));
+        assert!(!under_window(at(460), &over));
+        assert!(!under_window(at(100), &[]));
+        assert!(!under_window(None, &over));
+        assert!(buried(at(100), &over));
+        // A line that runs out from under the window is kept.
+        assert!(!buried(at(450), &over));
+        assert!(!buried(at(100), &[]));
+        let snap = Snapshot {
+            spans: Vec::new(),
+            source: "uia".into(),
+            windows: vec![win(7, 0, 0, 500, 500), win(8, 0, 0, 800, 600)],
+            above: vec![(json!(7), Vec::new()), (json!(8), over.to_vec())],
+            ocr_error: Value::Null,
+            ocr_used: false,
+            text: String::new(),
+        };
+        // Only the window behind has anything over it.
+        assert!(snap.hides(&json!(8), at(100)));
+        assert!(!snap.hides(&json!(8), at(460)));
+        assert!(!snap.hides(&json!(7), at(100)));
+        assert_eq!(snap.depth(&json!(8)), 1);
+        assert_eq!(snap.depth(&json!(9)), usize::MAX);
+    }
+
+    #[test]
+    fn the_whole_screen_is_what_can_be_seen_front_window_first() {
+        run(async {
+            let (find, _, desktop) = engine(Related::Off, &[]);
+            let back = win(8, 0, 0, 800, 600);
+            let mut front = win(7, 0, 0, 400, 600);
+            front["isForeground"] = json!(true);
+            desktop.reply("listWindows", json!([front, back]));
+            // Both windows answer with the same text: one line under the
+            // front window, one clear of it.
+            let line = |x: i64| {
+                json!({ "text": "Total", "source": "uia", "ref": "e",
+                "rect": { "x": x, "y": 40, "width": 100, "height": 20 } })
+            };
+            let text = json!({ "source": "uia", "spans": [line(100), line(600)] });
+            desktop.reply("getText", text);
+            find.open(Some("screen"), None).await;
+            find.query("total", true);
+            let st = find.state();
+            assert_eq!(st["windows"].as_array().map(Vec::len), Some(2));
+            // The front window's two lines, and of the window behind only
+            // the line that is not under the front one.
+            assert_eq!(st["spans"], json!(3));
+            let xs: Vec<f64> = st["hits"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|h| js_number(&h["rect"]["x"]))
+                .collect();
+            // The same word in the same place in two windows is one match.
+            assert_eq!(xs, [100.0, 600.0]);
+            find.close();
+        });
     }
 
     #[test]

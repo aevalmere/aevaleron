@@ -828,6 +828,12 @@ namespace AevalDesktop
             d["display"] = MonitorDevice(h);
             d["isForeground"] = h == fg;
             d["isMinimized"] = Native.IsIconic(h);
+            // Not counted as hiding what is behind it: a window the mouse
+            // passes through, one that never takes focus, and one kept on
+            // top (0x8). An overlay is one of those, and may be see-through
+            // and as large as the screen.
+            int ex = Native.GetWindowLong(h, Native.GWL_EXSTYLE);
+            d["through"] = (ex & (Native.WS_EX_TRANSPARENT | 0x08000000 | 0x8)) != 0;
             d["elevated"] = IsAbove(PidOf(h));
             d["className"] = cls;
             return d;
