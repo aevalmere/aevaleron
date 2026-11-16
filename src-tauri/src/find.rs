@@ -1048,7 +1048,7 @@ impl State {
         // The window in front first, and in each window what its document
         // holds before the tabs and buttons around it: the page is what a
         // person searching means, as in a browser's own find.
-        let mut out: Vec<Hit> = self.doc.iter().cloned().collect();
+        let mut out: Vec<Hit> = self.doc.to_vec();
         out.extend(mine.cloned());
         if let Some(s) = &self.snapshot {
             out.sort_by_key(|h| s.depth(&h.window));
@@ -3130,8 +3130,10 @@ mod tests {
             desktop.reply("listWindows", json!([front, back]));
             // Both windows answer with the same text: one line under the
             // front window, one clear of it.
-            let line = |x: i64| json!({ "text": "Total", "source": "uia", "ref": "e",
-                "rect": { "x": x, "y": 40, "width": 100, "height": 20 } });
+            let line = |x: i64| {
+                json!({ "text": "Total", "source": "uia", "ref": "e",
+                "rect": { "x": x, "y": 40, "width": 100, "height": 20 } })
+            };
             let text = json!({ "source": "uia", "spans": [line(100), line(600)] });
             desktop.reply("getText", text);
             find.open(Some("screen"), None).await;
