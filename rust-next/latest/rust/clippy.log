@@ -22,21 +22,4 @@
   Downloaded jiff-core v0.1.8
   Downloaded jiff v0.2.46
    Compiling aevaleron v1.1.1 (D:\a\aevaleron\aevaleron\src-tauri)
-error: called `.iter().cloned().collect()` on a slice to create a `Vec`
-    --> src\find.rs:1051:41
-     |
-1051 |         let mut out: Vec<Hit> = self.doc.iter().cloned().collect();
-     |                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^
-     |
-     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.100.0/index.html#iter_cloned_collect
-     = note: `-D clippy::iter-cloned-collect` implied by `-D warnings`
-     = help: to override `-D warnings` add `#[allow(clippy::iter_cloned_collect)]`
-help: calling `.to_vec()` is both faster and more readable
-     |
-1051 -         let mut out: Vec<Hit> = self.doc.iter().cloned().collect();
-1051 +         let mut out: Vec<Hit> = self.doc.to_vec();
-     |
-
-error: could not compile `aevaleron` (lib) due to 1 previous error
-warning: build failed, waiting for other jobs to finish...
-error: could not compile `aevaleron` (lib test) due to 1 previous error
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 15.27s
