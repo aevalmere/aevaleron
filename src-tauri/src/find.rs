@@ -330,7 +330,9 @@ fn buried(rect: Option<Rect>, over: &[Rect]) -> bool {
         at(0.02, 0.9),
         at(0.98, 0.9),
     ];
-    points.iter().all(|(x, y)| over.iter().any(|o| o.holds(*x, *y)))
+    points
+        .iter()
+        .all(|(x, y)| over.iter().any(|o| o.holds(*x, *y)))
 }
 
 /// The windows a whole-screen search reads, front to back, each with the
@@ -3078,7 +3080,10 @@ mod tests {
             other,
         ];
         let got = screen_targets(&all);
-        let read: Vec<i64> = got.iter().map(|(w, _)| w["handle"].as_i64().unwrap()).collect();
+        let read: Vec<i64> = got
+            .iter()
+            .map(|(w, _)| w["handle"].as_i64().unwrap())
+            .collect();
         // The overlay the mouse passes through hides nothing; the two
         // windows behind the full one cannot be seen at all.
         assert_eq!(read, [1, 2]);
