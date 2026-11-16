@@ -2472,6 +2472,7 @@ body[data-fixed-height="1"] #chat {
 
 .confirm-actions {
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
   align-items: center;
   gap: var(--sp-2);

@@ -13,3 +13,6 @@ voiceSpeed
 voiceSpeedE2e
 voiceParakeet
 voiceSpeedWhisper
+voiceSpare
+voiceSpareFetch
+voiceTuned

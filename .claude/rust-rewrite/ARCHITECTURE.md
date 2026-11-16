@@ -856,6 +856,18 @@ Installer size: 4.99 MiB before and after; no new files or DLLs. The exe changes
 
 IPC: invoke `region:note-ready` (the note's page has its listener; routed in `desktop/channels.rs`), listen `region:note {kind, title, lead, ms}` with kinds `copied`, `none`, `reading`, `error`. The window `region-note` is caller `Note` and may call that one channel. The picker learns its purpose from `window.aevalRegionFor = 'text'`, which `region::page_script` adds to the bridge script before the page's own scripts run. Details and limits: `lanes/region-text.md`.
 
+### Voice ready (voice-ready lane)
+
+A dictation never waits for a download. `voice/engine.rs`: when the chosen model is not on disk, `transcribe` uses a spare (`spares(own, language)`: another model on disk that hears the language) and `fetch` brings the chosen one in behind; `upgrade` starts that fetch at app start. `Heard.model` and `Timings.model` name the model that did the work. `whisper::tune` times one pass per thread count once per run (never in the smoke) and keeps the fewest threads within a tenth of the quickest. Every dictation and the tuning line are appended to `voice/timings.log` under the user data folder, trimmed above 64 KB. Lane notes: `lanes/voice-ready.md`.
+
+### Allow similar (allow-similar lane)
+
+`agent:confirm-request` carries `similar: true` when the step may be allowed as similar. `agent:confirm {id, allow, similar}`. A trail row carries `similar: true` when it ran on an earlier Allow similar. The memory is the run's own (`similar_key` in `agent/run.rs`) and ends with the task; nothing `auto::always_ask` covers, no drag and no window close is ever offered. Lane notes: `lanes/allow-similar.md`.
+
+### Find order (find-order lane)
+
+`listWindows` rows carry `through: bool`: a window the mouse passes through, one that never takes focus, or one kept on top, none of which counts as hiding what is behind it. A whole-screen Find reads the windows that show, front to back (`screen_targets`), and lists nothing a window in front covers (`buried` for text, `Snapshot::hides` for a match). `State::hits` lists the front window first, and in each window the document's matches before its controls'. The words of a phrase found apart are shown only when the phrase is nowhere. Lane notes: `lanes/find-order.md`.
+
 ## The rename to Aevaleron (2.0)
 
 The app was AevalBuddy through 1.x and in the 2.0 test builds. The documents in this folder were written under that name and keep it; the code, the pages, the installer and the release files say Aevaleron. What changed, and what an upgrade from an AevalBuddy install does:

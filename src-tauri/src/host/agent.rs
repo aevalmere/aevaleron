@@ -374,7 +374,10 @@ pub async fn route(app: &AppHandle, channel: &str, p: &Value) -> Option<Result<V
         "agent:stop" => json!({ "ok": super::services().agent.stop(None) }),
         "agent:confirm" => {
             let allow = p["allow"].as_bool().unwrap_or(false);
-            json!({ "ok": super::services().agent.confirm(&id_of(&p["id"]), allow) })
+            // "Allow similar": the same step needs no card again in this task.
+            let similar = p["similar"].as_bool().unwrap_or(false);
+            let id = id_of(&p["id"]);
+            json!({ "ok": super::services().agent.answer(&id, allow, similar) })
         }
         "agent:continue" => json!({ "ok": super::services().agent.resume(&str_of(p, "text")) }),
         "agent:consent" => consent(app, p["allow"].as_bool().unwrap_or(false)),

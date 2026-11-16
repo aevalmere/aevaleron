@@ -351,9 +351,13 @@ function sideOf(r) {
   return side;
 }
 
+const ALLOWED_AS_SIMILAR = 'Not asked again: you allowed this same step earlier in this task';
+
 function noteOf(r) {
-  // Automatic mode ran a flagged step without a card: the row says so.
-  return r.error || (r.state === 'skipped' && r.why ? `Not done: ${r.why}` : '') || (r.checked ? `Allowed by the safety check: ${r.checked}` : '');
+  // A flagged step that ran without a card says why: automatic mode's check
+  // allowed it, or the person did with Allow similar.
+  const unasked = r.checked ? `Allowed by the safety check: ${r.checked}` : r.similar ? ALLOWED_AS_SIMILAR : '';
+  return r.error || (r.state === 'skipped' && r.why ? `Not done: ${r.why}` : '') || unasked;
 }
 
 function rowMenu(target, text) {
@@ -654,7 +658,9 @@ function settle(btn, then) {
   }, CONFIRM_SETTLE_MS);
 }
 
-listen('agent:confirm-request', ({ id, text, reason, why, url, value, truncated }) => {
+const SIMILAR_SAYS = 'Allow this step, and the same step whenever it comes up again in this task';
+
+listen('agent:confirm-request', ({ id, text, reason, why, url, value, truncated, similar }) => {
   if (!block) newBlock('');
   if (block.card) block.card.remove();
   const card = el('div', 'confirm-card');
@@ -694,17 +700,28 @@ listen('agent:confirm-request', ({ id, text, reason, why, url, value, truncated 
   skip.type = 'button';
   const allow = el('button', 'accent-btn', 'Allow');
   allow.type = 'button';
+  // Allow similar: this step, and the same one again without a card for
+  // the rest of the task. Offered only for steps the app may let repeat.
+  const again = similar ? el('button', 'retry-btn', 'Allow similar') : null;
+  if (again) {
+    again.type = 'button';
+    again.title = SIMILAR_SAYS;
+    again.setAttribute('aria-label', `Allow similar. ${SIMILAR_SAYS}.`);
+    again.dataset.similar = 'true';
+  }
   let answered = false;
-  const answer = (btn, yes) => {
+  const answer = (btn, yes, alike) => {
     if (answered || btn.getAttribute('aria-disabled') === 'true') return;
     answered = true;
     allow.disabled = true;
     skip.disabled = true;
-    send('agent:confirm', { id, allow: yes });
+    if (again) again.disabled = true;
+    send('agent:confirm', alike ? { id, allow: yes, similar: true } : { id, allow: yes });
   };
   skip.addEventListener('click', () => answer(skip, false));
   allow.addEventListener('click', () => answer(allow, true));
-  actions.append(skip, allow);
+  if (again) again.addEventListener('click', () => answer(again, true, true));
+  actions.append(...[skip, again, allow].filter(Boolean));
   card.appendChild(actions);
   card.dataset.id = String(id);
   block.card = card;
@@ -722,6 +739,7 @@ listen('agent:confirm-request', ({ id, text, reason, why, url, value, truncated 
       if (seen) return;
       seen = true;
       if (!allow.classList.contains('settling')) settle(allow);
+      if (again && !again.classList.contains('settling')) settle(again);
     };
     box.addEventListener(
       'scroll',
@@ -739,10 +757,11 @@ listen('agent:confirm-request', ({ id, text, reason, why, url, value, truncated 
   }
   settle(skip);
   settle(allow, () => seen);
+  if (again) settle(again, () => seen);
 
   setTimeout(() => card.focus(), 30);
   // The how-to is heard, not shown.
-  const heard = `Asking first: ${text}${why ? `. Asking because ${why}` : ''}.${box ? ' The text that will be typed is in the card.' : ''} Tab to Skip or Allow.`;
+  const heard = `Asking first: ${text}${why ? `. Asking because ${why}` : ''}.${box ? ' The text that will be typed is in the card.' : ''} Tab to Skip${again ? ', Allow similar' : ''} or Allow.`;
   say(heard, 'assertive');
   scrollToBottom(true);
   requestResize();
