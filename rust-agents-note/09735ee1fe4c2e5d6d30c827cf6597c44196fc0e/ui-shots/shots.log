@@ -1,0 +1,17 @@
+[UI] laneFiles=ok
+[UI] scene harness/backdrop-dark-editor
+[UI] shot 11-dark-editor-bar-output.png
+[UI] scene harness/backdrop-photo-busy
+[UI] shot 11-photo-busy-bar-output.png
+[UI] scene harness/bar-default-width
+[UI] barDefaultWidth=ok
+[UI] shot 12-bar-default-600.png
+[UI] scene harness/glob-clock
+[UI] shot 13-glob-clock-120.png
+[UI] shot 13-glob-clock-240.png
+[UI] shot 13-glob-clock-360.png
+[UI] globOnClock=ok
+[UI] scene capture/lens-hits-white
+[UI] lens-hits-white.ready=ok
+[UI] lens-hits-white.drawn=ok
+[UI] shot lens-hits-white.png
