@@ -5,12 +5,12 @@
 import { BAR, openBar } from '../kit.mjs';
 
 const SNAPSHOT = {
-  settings: { dictation: true, hotkey: 'Ctrl+Super', cleanup: false, language: 'en', engine: 'parakeet-110m', device: '' },
+  settings: { dictation: true, hotkey: 'Ctrl+Super', cleanup: false, language: 'en', engine: 'whisper-base', device: '', wake: false, wakeWord: 'Aevaleron' },
   hotkeyLabel: 'Ctrl+Win',
   devices: ['Microphone (Realtek Audio)', 'Headset (USB Audio)'],
   engines: [
-    { id: 'parakeet-110m', local: true, bytes: 101335520, ready: false, standIn: false, available: true },
     { id: 'whisper-base', local: true, bytes: 63709472, ready: false, standIn: false, available: true },
+    { id: 'parakeet-110m', local: true, bytes: 101335520, ready: false, standIn: false, available: true },
     { id: 'whisper-tiny', local: true, bytes: 44135072, ready: true, standIn: false, available: true },
     { id: 'whisper-small', local: true, bytes: 193672256, ready: false, standIn: false, available: true },
     { id: 'parakeet-0.6b', local: true, bytes: 548946272, ready: false, standIn: false, available: true },
@@ -27,6 +27,7 @@ const SNAPSHOT = {
   lastTimings: { audioS: 7.9, earlyS: 4.1, pieces: 1, earlyMs: 310, stopMs: 4, waitMs: 0, transcribeMs: 290, cleanupMs: 0, insertMs: 6, totalMs: 300 },
   gemini: false,
   cpuOk: true,
+  wake: { state: 'off' },
 };
 
 export const mocks = {
@@ -153,21 +154,61 @@ export const scenes = [
       }));
       t.check(
         'voiceSettingsPage',
-        page.checked === 'parakeet-110m' && page.gemini && page.summary === 'Ctrl+Win' && page.download && /Nothing is recorded or kept/.test(page.privacy),
+        page.checked === 'whisper-base' && page.gemini && page.summary === 'Ctrl+Win' && page.download && /Nothing is recorded or kept/.test(page.privacy),
         JSON.stringify(page),
       );
-      // Six engines, one line each; only Parakeet 110M says it is the fastest,
-      // and the Parakeet models' licence is named.
+      // Six engines, one line each, Whisper base (the default) first; only
+      // Parakeet 110M says it is the fastest, and the Parakeet models'
+      // licence is named.
       const fastest = page.notes.filter((n) => /fastest/i.test(n));
       t.check(
         'voiceSettingsEngines',
-        page.engine === 'Parakeet 110M' && page.notes.length === 6 && fastest.length === 1 && /^On this PC\. Fastest\./.test(fastest[0]) && /NVIDIA.*CC BY 4\.0/.test(page.credits),
+        page.engine === 'Whisper base' && /default/.test(page.notes[0]) && page.notes.length === 6 && fastest.length === 1 && /^On this PC\. Fastest\./.test(fastest[0]) && /NVIDIA.*CC BY 4\.0/.test(page.credits),
         JSON.stringify(page),
       );
       await st.click('[data-voice-engine="whisper-tiny"]');
       await t.settle(200);
       const set = (await t.calls('settings', 'voice:set')).map((c) => c.payload);
       t.check('voiceSettingsSaves', set.some((p) => p.engine === 'whisper-tiny'), JSON.stringify(set));
+
+      // wake lane: listening for the name, off, then on and listening.
+      await st.evaluate(() => openSection('sec-voice-wake'));
+      await t.settle(400);
+      await t.shot('voice-09-settings-wake', { x: S.x - 10, y: S.y - 10, width: S.w + 20, height: S.h + 20 });
+      const wake = await st.evaluate(() => ({
+        on: document.getElementById('voice-wake').checked,
+        summary: document.getElementById('voice-wake-summary').textContent,
+        label: document.getElementById('voice-wake-label').textContent,
+        word: document.getElementById('voice-wake-word').value,
+        note: document.getElementById('sec-voice-wake').textContent,
+      }));
+      t.check(
+        'voiceWakeOffByDefault',
+        !wake.on && wake.summary === 'Off' && wake.label === 'Start when I say Aevaleron' && wake.word === 'Aevaleron',
+        JSON.stringify(wake),
+      );
+      // The page says plainly that the microphone stays open and nothing is
+      // saved or sent while it waits.
+      t.check(
+        'voiceWakeSaysMicOpen',
+        /microphone stays open/.test(wake.note) && /Nothing is saved or sent while it waits/.test(wake.note) && /red dot/.test(wake.note),
+        wake.note,
+      );
+      await st.evaluate(() => {
+        const sw = document.getElementById('voice-wake');
+        sw.checked = true;
+        sw.dispatchEvent(new Event('change', { bubbles: true }));
+        const f = document.getElementById('voice-wake-word');
+        f.value = 'Jarvis';
+        document.getElementById('voice-wake-save').click();
+      });
+      await t.settle(200);
+      const wakeSet = (await t.calls('settings', 'voice:set')).map((c) => c.payload);
+      t.check(
+        'voiceWakeSaves',
+        wakeSet.some((p) => p.wake === true) && wakeSet.some((p) => p.wakeWord === 'Jarvis'),
+        JSON.stringify(wakeSet),
+      );
     },
   },
 ];

@@ -74,8 +74,11 @@ static THREADS: AtomicI32 = AtomicI32::new(0);
 /// The thread count measured on this PC ([`tune`]); 0 until then.
 static TUNED: AtomicI32 = AtomicI32::new(0);
 static TUNING: AtomicBool = AtomicBool::new(false);
-/// A pass over the test clip longer than this ends the measuring.
-const TUNE_STOP_MS: u64 = 1500;
+/// A pass over the test clip longer than this ends the measuring. Whisper
+/// base, the default, encodes its whole 30 s window on every pass: about
+/// 1.1 s on the runner's four threads and more on two, so the limit leaves
+/// it room (it was 1.5 s, set for Parakeet).
+const TUNE_STOP_MS: u64 = 2500;
 /// Where the last pass spent its time, for the speed probe.
 static STAGES: Mutex<String> = parking_lot::const_mutex(String::new());
 

@@ -5,8 +5,8 @@
 (() => {
   if (!document.getElementById('pg-voice')) return;
   const ENGINE_NAMES = {
-    'parakeet-110m': 'Parakeet 110M',
     'whisper-base': 'Whisper base',
+    'parakeet-110m': 'Parakeet 110M',
     'whisper-tiny': 'Whisper tiny',
     'whisper-small': 'Whisper small',
     'parakeet-0.6b': 'Parakeet 0.6B',
@@ -16,6 +16,7 @@
   const ORDER = ['Ctrl', 'Alt', 'Shift', 'Super'];
   let snap = null;
   let capture = null; // { held: Set, best: [] } while recording a chord
+  let wakeTimer = 0; // asks again while listening is waiting to start
 
   const v = {
     dictation: $('voice-dictation'),
@@ -30,6 +31,10 @@
     progress: $('voice-progress'),
     download: $('voice-download'),
     status: $('voice-engine-status'),
+    wake: $('voice-wake'),
+    wakeWord: $('voice-wake-word'),
+    wakeSave: $('voice-wake-save'),
+    wakeStatus: $('voice-wake-status'),
   };
 
   const label = (acc) => String(acc || '').replace(/Super/g, 'Win');
@@ -111,12 +116,56 @@
     v.cleanupNote.textContent = snap.cleanupModel
       ? `${cost} Uses ${snap.cleanupModel}, a free model, and never adds words. If it is slower than that, you get the words as heard.`
       : `${cost} Needs a free OpenRouter model, set up under Providers. Until then you get the words as heard.`;
+    renderWake(s);
     const t = snap.lastTimings;
     const last = $('voice-last-timing');
     if (last) {
       last.hidden = !t;
       if (t) last.textContent = `Your last dictation: text in ${(t.totalMs / 1000).toFixed(1)} s after you let go.`;
     }
+  }
+
+  // Listening for the name: the switch, the name, and how it stands.
+  function renderWake(s) {
+    const word = s.wakeWord || 'Aevaleron';
+    const w = snap.wake || { state: 'off' };
+    v.wake.checked = !!s.wake;
+    $('voice-wake-label').textContent = `Start when I say ${word}`;
+    if (document.activeElement !== v.wakeWord) v.wakeWord.value = word;
+    let line = '';
+    let error = false;
+    if (s.wake && w.state === 'listening') line = `Listening for "${word}".`;
+    else if (s.wake && w.state === 'waiting') line = w.message || 'Starting…';
+    else if (s.wake && w.state === 'error') {
+      line = w.message || 'It cannot listen right now.';
+      error = true;
+    } else if (s.wake) line = 'Starting…';
+    $('voice-wake-summary').textContent = s.wake ? word : 'Off';
+    wakeStatus(line, error);
+    clearTimeout(wakeTimer);
+    if (s.wake && w.state !== 'listening') wakeTimer = setTimeout(() => !capture && load(), 3000);
+  }
+
+  function wakeStatus(text, error) {
+    v.wakeStatus.hidden = !text;
+    v.wakeStatus.textContent = text || '';
+    v.wakeStatus.classList.toggle('error', !!error);
+  }
+
+  function saveWord() {
+    const word = v.wakeWord.value.trim();
+    if (!snap || !word || word === snap.settings.wakeWord) return;
+    call('voice:set', { wakeWord: word }).then((r) => {
+      if (failed(r) || !r) return;
+      if (!r.ok) {
+        wakeStatus(r.error, true);
+        speak(r.error);
+        return;
+      }
+      speak(`Listening for ${word}.`);
+      v.wakeWord.blur();
+      load();
+    });
   }
 
   function load() {
@@ -214,6 +263,11 @@
   v.change.addEventListener('click', () => (capture ? endCapture() : startCapture()));
   v.dictation.addEventListener('change', () => save({ dictation: v.dictation.checked }));
   v.cleanup.addEventListener('change', () => save({ cleanup: v.cleanup.checked }));
+  v.wake.addEventListener('change', () => save({ wake: v.wake.checked }));
+  v.wakeSave.addEventListener('click', saveWord);
+  v.wakeWord.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') saveWord();
+  });
   v.language.addEventListener('change', () => save({ language: v.language.value }));
   v.mic.addEventListener('change', () => save({ device: v.mic.value }));
   for (const r of document.querySelectorAll('[data-voice-engine]')) {

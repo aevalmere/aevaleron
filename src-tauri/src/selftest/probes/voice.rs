@@ -10,7 +10,9 @@ use serde_json::{json, Value};
 
 use crate::desktop;
 use crate::selftest::{notepad, Cx, Input};
-use crate::voice::{self, capture, engine, insert, model, pill, settings, wav, whisper, Origin};
+use crate::voice::{
+    self, capture, engine, insert, keyword, model, pill, settings, wake, wav, whisper, Origin,
+};
 
 const FIXTURE: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
@@ -33,6 +35,7 @@ pub fn run(cx: &mut Cx) {
         bar_field(cx);
         dictation(cx);
         speed(cx);
+        listen_for_name(cx);
     }
 
     capture::set_fixture(None);
@@ -237,13 +240,13 @@ fn dictation(cx: &mut Cx) {
 /// What the speed gates allow on the runner (4 vCPUs, no GPU), in ms
 /// (measurements in lanes/voice-transcribe.md). The runner is one of two
 /// processors, an EPYC 9V74 or the slower EPYC 7763, and the times below are
-/// in that order. The default engine, Parakeet 110M, kept loaded: the fixture
-/// (7.9 s), the better of two passes, 217 to 227 and 274 to 277; and the
-/// whole release-to-text of a 17 s utterance with a pause, 235 to 237 and 315
-/// to 374. Whisper base on the fixture: 807 to 836 and 978 to 980. The two
-/// fixture gates allow a little over 1.4 times what the slower processor
-/// took; the utterance varied more there and is allowed 1.6 times its
-/// slowest, which is still under what Whisper takes.
+/// in that order. Parakeet 110M, kept loaded: the fixture (7.9 s), the
+/// better of two passes, 217 to 227 and 274 to 277. Whisper base on the
+/// fixture: 807 to 836 and 978 to 980. The two fixture gates allow a little
+/// over 1.4 times what the slower processor took. The default engine,
+/// Whisper base (wake lane), on the whole release-to-text of a 17 s
+/// utterance with a pause: about 1100 on a Xeon 8573C; it is allowed 1.6
+/// times that, as Parakeet's was.
 ///
 /// A runner is at times busy with something else for several seconds (run
 /// 43655509204: every pass two to five times its usual for about ten
@@ -251,7 +254,7 @@ fn dictation(cx: &mut Cx) {
 /// taken again after a wait, `RETRIES` times at most, and the best counts. A
 /// build that is slow stays slow through all of them.
 const SPEED_BUDGET_MS: u64 = 400;
-const E2E_BUDGET_MS: u64 = 600;
+const E2E_BUDGET_MS: u64 = 1800;
 const RETRIES: usize = 2;
 const QUIET_MS: u64 = 5000;
 const WHISPER_BUDGET_MS: u64 = 1400;
@@ -342,11 +345,11 @@ fn tidied(text: &Result<String, String>) -> String {
 }
 
 /// Whisper base on the fixture, kept loaded and with the silence cut; then a
-/// three-second phrase, the smallest model, the default engine (Parakeet) on
-/// the same two clips and a file an earlier build fetched. Last, the
-/// release-to-text time of a long utterance through the real pipeline, which
-/// transcribes its first half while it is held, with the default engine and
-/// with Whisper base.
+/// three-second phrase, the smallest model, Parakeet on the same two clips
+/// and a file an earlier build fetched. Last, the release-to-text time of a
+/// long utterance through the real pipeline, which transcribes its first
+/// half while it is held, with the default engine (Whisper base) and with
+/// Parakeet.
 fn speed(cx: &Cx) {
     let Ok(clip) = fixture_16k() else {
         cx.must("voiceSpeedWhisper", false, "the fixture did not read");
@@ -427,10 +430,10 @@ fn speed(cx: &Cx) {
         format!("started={started} {json} budget={E2E_BUDGET_MS}ms tries={tries}"),
     );
 
-    let (_, timings, field) = e2e(cx, &clip, "whisper-base");
+    let (_, timings, field) = e2e(cx, &clip, settings::PARAKEET);
     let json = serde_json::to_string(&timings).unwrap_or_default();
-    cx.log("voiceSpeedWhisperTimings", &json);
-    cx.log("voiceSpeedWhisperHeard", format!("{field:?}"));
+    cx.log("voiceSpeedParakeetTimings", &json);
+    cx.log("voiceSpeedParakeetHeard", format!("{field:?}"));
 
     spare(cx, &clip);
     tuned(cx, &clip);
@@ -466,13 +469,13 @@ fn spare(cx: &Cx, clip: &[f32]) {
     cx.must("voiceSpareFetch", arrived, waited);
 }
 
-/// The thread measuring ([`whisper::tune`]) on the default engine: it times
-/// each count the runner has, keeps one, and the engine still hears the
-/// fixture with it. Last in the lane, so no gate before it runs on a count
-/// it chose.
+/// The thread measuring ([`whisper::tune`]) on the default engine, Whisper
+/// base: it times each count the runner has, keeps one, and the engine
+/// still hears the fixture with it. Last of the speed checks, so no gate
+/// before it runs on a count it chose.
 fn tuned(cx: &Cx, clip: &[f32]) {
-    let Some(path) = model::usable(model::parakeet()) else {
-        cx.must("voiceTuned", false, "Parakeet is not on disk");
+    let Some(path) = model::usable(model::spec_for("base", "en")) else {
+        cx.must("voiceTuned", false, "Whisper base is not on disk");
         return;
     };
     whisper::preload(&path);
@@ -488,7 +491,7 @@ fn tuned(cx: &Cx, clip: &[f32]) {
     );
 }
 
-/// The default engine, Parakeet 110M, on the fixture and on its first three
+/// Parakeet 110M on the fixture and on its first three
 /// seconds, kept loaded as the app keeps it. It is handed the clip as the app
 /// hands it, silence left on; the same clip cut to the speech, and cut then
 /// given half a second of quiet either side, are logged beside it. The gate
@@ -608,4 +611,250 @@ fn e2e(cx: &Cx, clip: &[f32], id: &str) -> (bool, Option<voice::Timings>, String
          f.dispatchEvent(new Event('input', { bubbles: true })); return true; })()",
     );
     (matches!(started, Some(Ok(()))), timings, field)
+}
+
+// ---------------------------------------------------- listening for the name
+
+/// Speech from Windows' own voice (SAPI), 16 kHz mono: CI has no person to
+/// say the name, and no recording of one is kept in the repo. The file is
+/// in the temp folder only while it is read back.
+fn synth(text: &str) -> Result<Vec<f32>, String> {
+    use std::os::windows::process::CommandExt;
+    const NO_WINDOW: u32 = 0x0800_0000;
+    let file = std::env::temp_dir().join(format!("aeval-wake-{}.wav", std::process::id()));
+    let script = "Add-Type -AssemblyName System.Speech; \
+        $s = New-Object System.Speech.Synthesis.SpeechSynthesizer; \
+        $f = New-Object System.Speech.AudioFormat.SpeechAudioFormatInfo(16000, \
+        [System.Speech.AudioFormat.AudioBitsPerSample]::Sixteen, \
+        [System.Speech.AudioFormat.AudioChannel]::Mono); \
+        $s.SetOutputToWaveFile($env:AEVAL_WAKE_OUT, $f); \
+        $s.Speak($env:AEVAL_WAKE_TEXT); $s.Dispose()";
+    let out = std::process::Command::new("powershell.exe")
+        .args(["-NoProfile", "-NonInteractive", "-Command", script])
+        .env("AEVAL_WAKE_OUT", &file)
+        .env("AEVAL_WAKE_TEXT", text)
+        .creation_flags(NO_WINDOW)
+        .output()
+        .map_err(|e| e.to_string())?;
+    let read = std::fs::read(&file);
+    let _ = std::fs::remove_file(&file);
+    if !out.status.success() {
+        return Err(String::from_utf8_lossy(&out.stderr).trim().to_string());
+    }
+    let (samples, rate) = wav::read(&read.map_err(|e| e.to_string())?)?;
+    let samples = wav::resample(&samples, rate, wav::RATE);
+    // Only the speech, so the pauses below are the ones the scene asks for.
+    let speech = engine::trim(&samples).unwrap_or(&samples[..]);
+    Ok(speech.to_vec())
+}
+
+/// `secs` of silence at 16 kHz.
+fn quiet(secs: f32) -> Vec<f32> {
+    vec![0.0; (secs * wav::RATE as f32) as usize]
+}
+
+/// The clip's length in ms.
+fn clip_ms(samples: &[f32]) -> u64 {
+    samples.len() as u64 * 1000 / wav::RATE as u64
+}
+
+/// Turns listening on or off as Settings does.
+fn set_wake(on: bool) {
+    let mut s = settings::get();
+    s.wake = on;
+    s.wake_word = settings::WAKE_WORD.into();
+    settings::save(&s);
+    voice::refresh(&s);
+}
+
+/// Plays `clip` into the listening and waits for what it sends, at most
+/// `wait` ms after the clip ends.
+fn hear(cx: &Cx, rx: &std::sync::mpsc::Receiver<String>, clip: &[f32], wait: u64) -> Option<String> {
+    while rx.try_recv().is_ok() {}
+    wake::play(clip);
+    let deadline = clip_ms(clip) + wait;
+    let got = rx.recv_timeout(Duration::from_millis(deadline)).ok();
+    // Let the machine go back to waiting before the next scene.
+    cx.sleep(1500);
+    got
+}
+
+/// Each model that could check for the name, on the name alone and on the
+/// first 1.8 s of a sentence that starts with it: time, text and verdict.
+/// The checker is picked from these (`wake::checker_model`).
+fn bench(cx: &Cx, name: &[f32], breath: &[f32]) {
+    let word = settings::WAKE_WORD;
+    let head = &breath[..breath.len().min(wav::RATE as usize * 18 / 10)];
+    let models = [
+        ("Base", model::spec_for("base", "en"), word),
+        ("Tiny", model::spec_for("tiny", "en"), word),
+        ("Parakeet", model::parakeet(), ""),
+    ];
+    for (tag, spec, prompt) in models {
+        let label = format!("voiceWakeBench{tag}");
+        let Some(path) = model::usable(spec) else {
+            cx.log(&label, "not on disk");
+            continue;
+        };
+        let t0 = Instant::now();
+        let engine = match whisper::cold(&path) {
+            Ok(e) => e,
+            Err(e) => {
+                cx.log(&label, e);
+                continue;
+            }
+        };
+        let load_ms = ms(t0);
+        // The first pass after a load is uneven.
+        let _ = whisper::run(&engine, name, "en", prompt);
+        let mut line = format!("load={load_ms}ms");
+        for (what, clip) in [("name", name), ("head", head)] {
+            let t = Instant::now();
+            let text = whisper::run(&engine, clip, "en", prompt);
+            let took = ms(t);
+            let verdict = text.as_deref().map(|t| keyword::verdict(t, word));
+            line.push_str(&format!(" {what}={took}ms {text:?} {verdict:?}"));
+        }
+        cx.log(&label, line);
+    }
+}
+
+/// Listening for the name, on Windows' own voice played into the listening
+/// in real time (`wake::use_test_source`), with the default engine: what it
+/// costs while nobody speaks, one breath, a pause after the name, a
+/// sentence without it, the bare name, the bar's mic first, and off.
+fn listen_for_name(cx: &Cx) {
+    let word = settings::WAKE_WORD;
+    let clips = (|| -> Result<_, String> {
+        Ok((
+            synth(&format!("{word}, what is the weather tomorrow?"))?,
+            synth(word)?,
+            synth("open my calendar for Friday")?,
+            synth("I think we should meet tomorrow to go over the budget.")?,
+        ))
+    })();
+    let (breath, name, ask, other) = match clips {
+        Ok(c) => c,
+        Err(e) => {
+            cx.must("voiceWakeListens", false, format!("no speech to play: {e}"));
+            return;
+        }
+    };
+    bench(cx, &name, &breath);
+
+    let was = settings::get();
+    let mut s = was.clone();
+    s.pick(settings::WHISPER_BASE);
+    s.cleanup = false;
+    settings::save(&s);
+    let (tx, rx) = std::sync::mpsc::channel();
+    wake::set_sink(Some(tx));
+    wake::use_test_source(true);
+    wake::reset_stats();
+    set_wake(true);
+    let up = cx.wait_for(Duration::from_secs(60), wake::listening);
+    let status = wake::status_json();
+    cx.must("voiceWakeListens", up, format!("{status}"));
+    if up {
+        // The checker's model loads on its own thread first.
+        cx.sleep(3000);
+        scenes(cx, &rx, &breath, &name, &ask, &other);
+    }
+    set_wake(false);
+    let off = cx.wait_for(Duration::from_secs(5), || !wake::listening());
+    let status = wake::status_json();
+    cx.must(
+        "voiceWakeOff",
+        off && status["state"] == "off",
+        format!("{status}"),
+    );
+    wake::use_test_source(false);
+    wake::set_sink(None);
+    settings::save(&was);
+    voice::refresh(&was);
+}
+
+/// The listening's processor time, as its thread counts it (ms).
+fn cpu_now(cx: &Cx) -> u64 {
+    // Updated once a second.
+    cx.sleep(1100);
+    wake::stats().cpu_ms
+}
+
+fn scenes(
+    cx: &Cx,
+    rx: &std::sync::mpsc::Receiver<String>,
+    breath: &[f32],
+    name: &[f32],
+    ask: &[f32],
+    other: &[f32],
+) {
+    // Nobody speaks: under 1% of one core.
+    const IDLE_S: u64 = 10;
+    let c0 = cpu_now(cx);
+    let st0 = wake::stats();
+    cx.sleep(IDLE_S * 1000);
+    let c1 = cpu_now(cx);
+    let st1 = wake::stats();
+    let per_cent = c1.saturating_sub(c0) as f64 / ((IDLE_S * 1000 + 1100) as f64) * 100.0;
+    let loops = st1.loops.saturating_sub(st0.loops).max(1);
+    let per_loop = st1.work_us.saturating_sub(st0.work_us) / loops;
+    let checks = st1.checks.saturating_sub(st0.checks);
+    let idle = format!("cpu={per_cent:.2}% of one core, {per_loop}us a pass, checks={checks}");
+    cx.log("voiceWakeIdleCost", &idle);
+    cx.must("voiceWakeIdle", per_cent < 1.0 && checks == 0, idle);
+
+    // The name and the question in one breath.
+    let one = [breath, &quiet(2.0)].concat();
+    let got = hear(cx, rx, &one, 15_000);
+    let st = wake::stats();
+    let timing = format!(
+        "nameToPill={}ms check={}ms ({}) transcribe={}ms speechEndToSent={}ms heard={:?}",
+        st.heard_ms, st.check_ms, st.check_model, st.transcribe_ms, st.sent_ms, st.last_text
+    );
+    cx.log("voiceWakeTimings", &timing);
+    let ok = got.as_deref().is_some_and(|l| {
+        let l = l.to_lowercase();
+        l.contains("weather") && !l.starts_with("aeval")
+    });
+    cx.must("voiceWakeOneBreath", ok, format!("sent={got:?} {timing}"));
+
+    // The name, a pause of 1.2 s, then the question.
+    let paused = [name, &quiet(1.2), ask, &quiet(2.0)].concat();
+    let got = hear(cx, rx, &paused, 15_000);
+    let ok = got.as_deref().is_some_and(|l| l.to_lowercase().contains("calendar"));
+    cx.must("voiceWakePause", ok, format!("sent={got:?}"));
+
+    // A sentence without the name sends nothing.
+    let plain = [other, &quiet(2.0)].concat();
+    let got = hear(cx, rx, &plain, 6_000);
+    let st = wake::stats();
+    cx.must(
+        "voiceWakeIgnores",
+        got.is_none(),
+        format!("sent={got:?} heard={:?}", st.last_text),
+    );
+    cx.sleep(1000);
+
+    // The bare name and nothing after: nothing is sent and the pill goes.
+    let bare = [name, &quiet(4.0)].concat();
+    let got = hear(cx, rx, &bare, 6_000);
+    let shown = cx.on_main(pill::visible).unwrap_or(false);
+    cx.must(
+        "voiceWakeBare",
+        got.is_none() && !shown,
+        format!("sent={got:?} pill={shown}"),
+    );
+
+    // The bar's mic is recording: the name is not listened for.
+    let started = cx.on_main(|app| voice::start(app, Origin::Bar));
+    let busy = matches!(started, Some(Ok(())));
+    let got = hear(cx, rx, &one, 3_000);
+    let _ = cx.on_main(|app| voice::cancel(app, true));
+    cx.sleep(1000);
+    cx.must(
+        "voiceWakeYields",
+        busy && got.is_none(),
+        format!("bar recording={busy} sent={got:?}"),
+    );
 }
