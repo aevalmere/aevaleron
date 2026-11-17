@@ -27,7 +27,7 @@ use crate::windows::flags;
 pub const LABEL: &str = "buddy";
 pub const POLL_MS: u64 = 150;
 /// The tour's card that asks for a key.
-pub const KEY_STEP: i64 = 1;
+pub const KEY_STEP: i64 = 0;
 /// How long `agent_point` gives the cursor to arrive.
 pub const GLIDE_WAIT_MS: u64 = 260;
 const FORWARD_MS: u64 = 16;
@@ -42,8 +42,9 @@ const NEEDS_BAR: &str = "bar";
 
 const BAR_TARGET: &str = "#pill, #query-input";
 const BAR_SCOPE: &str = "#pill, #panel";
-const TOKEN_MESSAGE: &str = "This shows what Enter will do. Aevaleron guesses from what you \
-                             type, and anything risky a task wants to do is checked first; Esc stops it.";
+const TOKEN_MESSAGE: &str = "This shows what Enter will do: answer, or do it for you. \
+                             Aevaleron decides from what you type, and anything risky a task \
+                             wants to do is checked first; Esc stops it.";
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Button {
@@ -69,22 +70,21 @@ pub struct Step {
 pub struct Chords<'a> {
     pub capture_query: &'a str,
     // The tour quotes only the main chord now (B-033); host/mod.rs still
-    // fills these in.
-    #[allow(dead_code)]
-    pub find_on_screen: &'a str,
+    // fills this in.
     #[allow(dead_code)]
     pub agent_task: &'a str,
 }
 
-/// The first-run tour (D-06): what works without a key comes first, each step
-/// can be skipped, and each moves on when the thing it asks for actually
-/// happens. It quotes only the main chord, and never an empty one.
+/// The first-run tour (D-06): the card asking for a key comes first when
+/// there is none, each step can be skipped, and each moves on when the thing
+/// it asks for actually happens. It quotes only the main chord, and never an
+/// empty one.
 pub fn walkthrough(k: &Chords<'_>) -> Vec<Step> {
     let chord = k.capture_query.trim();
-    let first = if chord.is_empty() {
-        "Click the orb, then type a word you can see on screen.".to_string()
+    let ask = if chord.is_empty() {
+        "Click the orb, then ask anything about your screen.".to_string()
     } else {
-        format!("Press {chord}, then type a word you can see on screen.")
+        format!("Press {chord}, then ask anything about your screen.")
     };
     let button = |id: &str, label: &str, primary: bool| Button {
         id: id.into(),
@@ -92,14 +92,6 @@ pub fn walkthrough(k: &Chords<'_>) -> Vec<Step> {
         primary,
     };
     vec![
-        Step {
-            win: "overlay".into(),
-            target_selector: BAR_TARGET.into(),
-            click_scope: BAR_SCOPE.into(),
-            message: first,
-            advance_on: "find-hit".into(),
-            ..Default::default()
-        },
         Step {
             card: true,
             needs: NEEDS_NO_KEY.into(),
@@ -116,7 +108,7 @@ pub fn walkthrough(k: &Chords<'_>) -> Vec<Step> {
             needs: NEEDS_KEY.into(),
             target_selector: BAR_TARGET.into(),
             click_scope: BAR_SCOPE.into(),
-            message: "Now ask anything about your screen.".into(),
+            message: ask,
             advance_on: "first-answer".into(),
             ..Default::default()
         },
@@ -1071,7 +1063,6 @@ mod tests {
     fn tour(chord: &str) -> Vec<Step> {
         walkthrough(&Chords {
             capture_query: chord,
-            find_on_screen: "",
             agent_task: "",
         })
     }
@@ -1080,16 +1071,16 @@ mod tests {
     fn walkthrough_order_and_no_double_spaces() {
         let w = tour("Ctrl+Alt+Space");
         let events: Vec<&str> = w.iter().map(|s| s.advance_on.as_str()).collect();
-        assert_eq!(events, ["find-hit", "key-saved", "first-answer", ""]);
+        assert_eq!(events, ["key-saved", "first-answer", ""]);
         assert_eq!(
-            w[0].message,
-            "Press Ctrl+Alt+Space, then type a word you can see on screen."
+            w[1].message,
+            "Press Ctrl+Alt+Space, then ask anything about your screen."
         );
         assert!(w[KEY_STEP as usize].card);
-        assert_eq!(w[1].buttons[0].id, "connect");
-        assert_eq!(w[1].buttons[1].id, "later");
-        assert_eq!(w[3].target_selector, "#pill, #intent");
-        assert_eq!(w[3].buttons[0].label, "Got it");
+        assert_eq!(w[0].buttons[0].id, "connect");
+        assert_eq!(w[0].buttons[1].id, "later");
+        assert_eq!(w[2].target_selector, "#pill, #intent");
+        assert_eq!(w[2].buttons[0].label, "Got it");
         for chord in ["Ctrl+Alt+Space", "", "  "] {
             for s in tour(chord) {
                 assert!(!s.message.contains("  "), "{}", s.message);
@@ -1101,12 +1092,12 @@ mod tests {
     #[test]
     fn steps_apply_by_whether_a_key_exists() {
         let w = tour("Ctrl+Alt+Space");
-        assert_eq!(first_applicable(&w, 1, false), Some(1));
-        assert_eq!(first_applicable(&w, 2, false), Some(3));
-        assert_eq!(first_applicable(&w, 1, true), Some(2));
-        assert_eq!(first_applicable(&w, 4, true), None);
-        assert_eq!(position(&w, 3, false), (2, 3));
-        assert_eq!(position(&w, 2, true), (1, 3));
+        assert_eq!(first_applicable(&w, 0, false), Some(0));
+        assert_eq!(first_applicable(&w, 1, false), Some(2));
+        assert_eq!(first_applicable(&w, 0, true), Some(1));
+        assert_eq!(first_applicable(&w, 3, true), None);
+        assert_eq!(position(&w, 2, false), (1, 2));
+        assert_eq!(position(&w, 1, true), (0, 2));
     }
 
     #[test]

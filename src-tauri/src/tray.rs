@@ -184,11 +184,7 @@ pub fn template(i: &Input) -> Vec<Item> {
         out.push(Item::new("stop", "Stop the task", Some("Esc".into())));
         out.push(Item::sep());
     }
-    out.push(Item::new(
-        "capture",
-        "Ask, find, or do…",
-        key("captureQuery"),
-    ));
+    out.push(Item::new("capture", "Ask or do…", key("captureQuery")));
     out.push(Item::new(
         "region",
         "Ask about an area…",
@@ -200,7 +196,6 @@ pub fn template(i: &Input) -> Vec<Item> {
         "Copy text from screen…",
         key("copyRegionText"),
     ));
-    out.push(Item::new("find", "Find on screen…", key("findOnScreen")));
     out.push(Item::new("agent", "Do a task…", key("agentTask")));
     out.push(Item::sep());
     let toggle = if i.hidden {
@@ -695,7 +690,6 @@ fn on_menu(app: &AppHandle, id: &str) {
             }
             // region-text lane
             "region-text" => crate::region_text::start(&app),
-            "find" => w::open_bar(&app, Some("find"), None),
             "agent" => w::open_bar(&app, Some("agent"), None),
             "toggle" => w::toggle_visibility(&app),
             "new" => w::new_chat(&app),
@@ -754,10 +748,9 @@ mod tests {
         assert_eq!(
             l,
             vec![
-                "Ask, find, or do…",
+                "Ask or do…",
                 "Ask about an area…",
                 "Copy text from screen…",
-                "Find on screen…",
                 "Do a task…",
                 "-",
                 "Hide the overlay",
@@ -875,7 +868,7 @@ mod tests {
                 "R&&D · VS Code",
                 "3 more",
                 "-",
-                "Ask, find, or do…",
+                "Ask or do…",
             ]
         );
         assert_eq!(text(&items[2]), "site · Codex\tneeds you");

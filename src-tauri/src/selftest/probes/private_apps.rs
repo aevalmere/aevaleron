@@ -5,7 +5,6 @@
 //! for it, as the app asks:
 //!
 //! - `privateAppsCapture`: no screenshot is taken;
-//! - `privateAppsFind`: Find opens, reads nothing and says why;
 //! - `privateAppsAsk`: Ask's window text is not read, and the desktop
 //!   helper is not even asked for it;
 //! - `privateAppsBar`: the bar's notice says the one line;
@@ -77,7 +76,6 @@ pub fn run(cx: &mut Cx) {
     );
 
     capture_refused(cx);
-    find_refused(cx);
     ask_refused(cx, &handle);
     bar_says(cx);
     let gate = gate_cost();
@@ -115,22 +113,6 @@ fn capture_refused(cx: &Cx) {
         "privateAppsCapture",
         shot.is_none() && why.as_deref() == Some(LINE),
         format!("shot={} why={why:?} {ms}ms", shot.is_some()),
-    );
-}
-
-/// Find, opened on the window in front as the bar opens it: it reads no
-/// text and its status line says why.
-fn find_refused(cx: &Cx) {
-    let find = &host::services().find;
-    find.begin(Some("window"), None);
-    let state = cx.block_on(find.read());
-    find.close();
-    let said = state["status"]["text"].as_str().unwrap_or_default();
-    let spans = state["spans"].as_u64().unwrap_or(0);
-    cx.must(
-        "privateAppsFind",
-        said == LINE && spans == 0,
-        format!("status={said:?} spans={spans}"),
     );
 }
 

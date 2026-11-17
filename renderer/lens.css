@@ -1,26 +1,11 @@
 /* The lens has no surface of its own: it sits over whatever is on screen,
-   white documents and black editors alike. So marks use the bright accent
-   rather than grape soda (a smudge on a dark editor), and every mark has a
-   dark rim so it holds up on pale content. Colours, radii, type and motion
-   are glass.css tokens; the two below are the lens's own mixes of them.
-   DESIGN.md, "v2: Find, Agent, and the command bar" and "Material and Find". */
+   white documents and black editors alike, so the frame has a dark rim that
+   holds up on pale content. Colours, radii, type and motion are glass.css
+   tokens; the ones below are the lens's own mixes of them. */
 
 :root {
-  /* --accent-bright at 22%: black text under it stays readable on white, and
-     it still shows on a dark editor. */
-  --hit-fill: rgb(94 134 180 / 0.26);
-  /* The marks' accent: between pastel and signal, so a 1.5 px ring reads on
-     a dark editor and, with its dark rim, on a white page. The agent's frame
-     takes signal itself. */
-  --accent-bright: #86AAD4;
   --accent: #5E86B4;
-  /* The rim that keeps a ring legible against pale content, the job
-     --danger-edge does for the warning. */
-  --hit-rim: rgb(0 0 0 / 0.55);
-  /* The loupe's inner light and drop shadow, the chips' fill and top light,
-     and the plate's outer rim. */
-  --loupe-light: rgb(255 255 255 / 0.35);
-  --loupe-shadow: rgb(0 0 0 / 0.35);
+  /* The chip's fill and the frame's outer rim. */
   --chip-fill: rgb(var(--tint) / 0.9);
   --plate-rim: rgb(0 0 0 / 0.5);
 }
@@ -41,116 +26,27 @@ body {
   pointer-events: none;
 }
 
-/* Literal hits are filled, related and concept hits outlined: outline versus
-   fill is the whole distinction, so no second colour is needed. */
-.hit {
-  position: fixed;
-  left: 0;
-  top: 0;
-  border-radius: var(--r-key);
-  opacity: 0;
-  animation: hit-in var(--d-fast) var(--ease-out) forwards;
-}
-
-@keyframes hit-in {
-  to {
-    opacity: 1;
-  }
-}
-
-.hit.literal {
-  background: var(--hit-fill);
-  box-shadow: 0 0 0 var(--px) var(--hit-rim);
-}
-
-.hit.related,
-.hit.concept {
-  border: 1.5px solid var(--accent-bright);
-  box-shadow: 0 0 0 var(--px) var(--hit-rim), inset 0 0 0 var(--px) var(--hit-rim);
-}
-
-/* The current hit. Translate plus size, on the glide curve: the size moves
-   too because a scaled 2px ring stops being 2px (DESIGN.md records it). */
-#ring {
-  position: fixed;
-  left: 0;
-  top: 0;
-  width: 0;
-  height: 0;
-  border-radius: var(--r-row);
-  box-shadow: 0 0 0 2px var(--accent-bright), 0 0 0 3px var(--hit-rim);
-  opacity: 0;
-  transition: transform var(--d-med) var(--ease-glide), width var(--d-med) var(--ease-glide),
-    height var(--d-med) var(--ease-glide), opacity var(--d-fast) ease;
-}
-
-#ring.on {
-  opacity: 1;
-}
-
-/* The magnifier: the pixels under the hit, cut at full resolution and grown
-   1.18 inside a thin glass rim, so it reads as the word made bigger rather
-   than as a button. */
-#ring .loupe {
-  position: absolute;
-  inset: 0;
-  border-radius: var(--r-row);
-  background-size: 100% 100%;
-  background-repeat: no-repeat;
-  opacity: 0;
-  transform: scale(1);
-}
-
-#ring.loupe-on {
-  box-shadow: none;
-}
-
-#ring.loupe-on .loupe {
-  opacity: 1;
-  transform: scale(1.18);
-  box-shadow: inset 0 0 0 var(--px) var(--loupe-light), 0 0 0 1.5px var(--accent-bright),
-    0 0 0 2.5px var(--hit-rim), 0 6px 16px var(--loupe-shadow);
-  transition: transform var(--d-morph) var(--ease-settle), opacity var(--d-fast) ease;
-}
-
-/* The why chip and the agent's chip: the solid tier of thin glass. A one-line
-   chip is a capsule; one that wraps is a card. */
-#why,
+/* The agent's chip: the solid tier of thin glass, a capsule. */
 #chip {
   position: fixed;
-  left: 0;
-  top: 0;
+  top: var(--sp-3);
+  left: 50%;
+  transform: translateX(-50%);
   padding: var(--sp-2) var(--sp-3);
   border-radius: var(--r-cap);
   background: var(--chip-fill);
   box-shadow: var(--edge), var(--shadow-menu);
   color: var(--label);
   font-size: var(--fs-row);
+  font-weight: var(--w-strong);
   line-height: var(--lh-row);
+  white-space: nowrap;
   opacity: 0;
+  transition: opacity var(--d-fast) ease;
 }
 
-#why {
-  max-width: 360px;
-  transition: transform var(--d-med) var(--ease-glide), opacity var(--d-fast) ease;
-}
-
-#why.multi {
-  border-radius: var(--r-card);
-}
-
-#why.on,
 #chip.on {
   opacity: 1;
-}
-
-#chip {
-  top: var(--sp-3);
-  left: 50%;
-  transform: translateX(-50%);
-  font-weight: var(--w-strong);
-  white-space: nowrap;
-  transition: opacity var(--d-fast) ease;
 }
 
 /* While the agent runs: DESIGN's 2px grape-soda frame inside the edges of the
@@ -170,23 +66,7 @@ body {
   opacity: 1;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .hit {
-    animation: none;
-    opacity: 1;
-  }
-  #ring,
-  #why,
-  #ring.loupe-on .loupe {
-    transition: opacity var(--d-fast) ease;
-  }
-}
-
 @media (forced-colors: active) {
-  #ring .loupe {
-    display: none;
-  }
-  #why,
   #chip {
     border: 1px solid CanvasText;
     background: Canvas;

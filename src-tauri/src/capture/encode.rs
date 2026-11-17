@@ -52,20 +52,6 @@ impl Rgb {
         [self.data[i], self.data[i + 1], self.data[i + 2]]
     }
 
-    /// A copy of one rectangle; the caller has clamped it inside the image.
-    pub fn crop(&self, x: u32, y: u32, width: u32, height: u32) -> Rgb {
-        let mut data = Vec::with_capacity(width as usize * height as usize * 3);
-        for row in y..y + height {
-            let start = (row as usize * self.width as usize + x as usize) * 3;
-            data.extend_from_slice(&self.data[start..start + width as usize * 3]);
-        }
-        Rgb {
-            width,
-            height,
-            data,
-        }
-    }
-
     /// Lanczos3, the filter behind Chromium's thumbnail scaler and
     /// `nativeImage.resize({ quality: 'best' })` (CAP-04, CAP-13).
     pub fn resize(&self, width: u32, height: u32) -> Rgb {
@@ -364,15 +350,6 @@ mod tests {
         for (a, b) in via_rgb.data.iter().zip(&direct.data) {
             assert!((i16::from(*a) - i16::from(*b)).abs() <= 1, "{a} {b}");
         }
-    }
-
-    #[test]
-    fn crop_copies_the_right_pixels() {
-        let img = checker(8, 8);
-        let c = img.crop(2, 2, 2, 2);
-        assert_eq!(c.width, 2);
-        assert_eq!(c.pixel(0, 0), img.pixel(2, 2));
-        assert_eq!(c.pixel(1, 1), img.pixel(3, 3));
     }
 
     #[test]

@@ -12,15 +12,8 @@ const full = (name, src, z) => ({ name, src, x: 0, y: 0, w: W, h: H, z, fixed: t
 // A dark editor under the window, for the backdrops shots.mjs does not paint.
 const editor = full('editor', '/lib/backdrop-fixture.html?kind=black', 0);
 
-// design-visual §4 state 52: literal hits, a related hit with its why chip as
-// the current one, a concept hit.
-const HITS = [
-  { i: 0, kind: 'literal', x: 220, y: 180, w: 64, h: 18 },
-  { i: 1, kind: 'literal', x: 420, y: 228, w: 64, h: 18 },
-  { i: 2, kind: 'related', x: 220, y: 276, w: 92, h: 18, why: '"Invoice" relates to "payment": an invoice is a request for payment' },
-  { i: 3, kind: 'concept', x: 220, y: 324, w: 150, h: 18, why: 'the total due is what you owe' },
-];
-
+// The agent's control frame and its chip, over a white page and a dark
+// editor.
 function lensScene(name, backdrop, windows) {
   return {
     name,
@@ -29,21 +22,18 @@ function lensScene(name, backdrop, windows) {
     async run(t) {
       const lens = t.frame('lens');
       t.check(`${name}.ready`, (await t.calls('lens', 'lens:ready')).length === 1, 'lens.js never invoked lens:ready');
-      await t.emit('lens', 'lens:draw', { hits: HITS, current: 2, frame: { chip: 'Using your computer' } });
-      await t.settle(500);
-      const drawn = await lens.evaluate(() => ({
-        hits: document.querySelectorAll('.hit').length,
-        ring: document.getElementById('ring').classList.contains('on'),
-        why: document.getElementById('why').classList.contains('on'),
-        multi: document.getElementById('why').classList.contains('multi'),
-      }));
-      t.check(`${name}.drawn`, drawn.hits === 4 && drawn.ring && drawn.why, JSON.stringify(drawn));
-      await t.shot(name, { x: 0, y: 0, width: 800, height: 480 });
-      // A one-line why is a capsule.
-      await t.emit('lens', 'lens:draw', { hits: HITS, current: 3, frame: null });
+      await t.emit('lens', 'lens:draw', { frame: { chip: 'Using your computer' } });
       await t.settle(400);
-      const single = await lens.evaluate(() => !document.getElementById('why').classList.contains('multi'));
-      t.check(`${name}.whyCapsule`, single, 'a one-line why chip is not a capsule');
+      const drawn = await lens.evaluate(() => ({
+        frame: document.getElementById('frame').classList.contains('on'),
+        chip: document.getElementById('chip').textContent,
+      }));
+      t.check(`${name}.drawn`, drawn.frame && drawn.chip === 'Using your computer', JSON.stringify(drawn));
+      await t.shot(name, { x: 0, y: 0, width: 800, height: 480 });
+      await t.emit('lens', 'lens:draw', { frame: null });
+      await t.settle(300);
+      const gone = await lens.evaluate(() => !document.getElementById('frame').classList.contains('on'));
+      t.check(`${name}.frameOff`, gone, 'the frame stayed after it was taken down');
     },
   };
 }
@@ -64,16 +54,15 @@ const key = (f, k, alt) =>
 // four steps. The card says its message at once, the close button shares the
 // text row, and the pips have a row only when there are steps to count.
 const TOUR = [
-  { kind: 'step', message: 'Press Ctrl+Shift+Space, then type a word you can see on screen.', skippable: true },
   {
     kind: 'card',
     message: 'To get answers, connect an AI provider. OpenRouter has free models.',
     buttons: [{ id: 'connect', label: 'Connect', primary: true }, { id: 'later', label: 'Later', primary: false }],
   },
-  { kind: 'step', message: 'Now ask anything about your screen.', skippable: true },
+  { kind: 'step', message: 'Press Ctrl+Shift+Space, then ask anything about your screen.', skippable: true },
   {
     kind: 'step',
-    message: 'This shows what Enter will do. Aevaleron guesses from what you type, and anything risky a task wants to do is checked first; Esc stops it.',
+    message: 'This shows what Enter will do: answer, or do it for you. Aevaleron decides from what you type, and anything risky a task wants to do is checked first; Esc stops it.',
     buttons: [{ id: 'done', label: 'Got it', primary: true }],
   },
 ];
@@ -145,8 +134,8 @@ const tourScenes = TOUR.map((step, i) =>
 
 
 export const scenes = [
-  lensScene('lens-hits-white', 'white', [full('lens', '/renderer/lens.html', 1)]),
-  lensScene('lens-hits-dark-editor', 'white', [editor, full('lens', '/renderer/lens.html', 1)]),
+  lensScene('lens-frame-white', 'white', [full('lens', '/renderer/lens.html', 1)]),
+  lensScene('lens-frame-dark-editor', 'white', [editor, full('lens', '/renderer/lens.html', 1)]),
   {
     name: 'region-idle-white',
     backdrop: 'white',

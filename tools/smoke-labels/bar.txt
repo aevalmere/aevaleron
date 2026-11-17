@@ -4,6 +4,7 @@
 # commit that makes it print; never remove one to get green.
 # Electron's (PARITY): lib/smoke-v2.js, lib/smoke-v21.js, lib/smoke-glass.js
 intentTable
+intentOffersDo
 intentPrefixes
 intentWorstMs
 intentFast
@@ -19,3 +20,5 @@ earlyKeys
 barOpenMs
 barOpenStages
 barMultiline
+# New with ask-or-do: the wake lane's text entry
+textEntryDecides

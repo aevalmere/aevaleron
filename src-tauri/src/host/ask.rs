@@ -42,10 +42,9 @@ use super::{services, BarContext};
 pub struct SubmitOpts {
     /// Re-run the turn already at the end of the transcript.
     pub retry: bool,
-    /// The bar guessed Ask; the answer offers Find instead.
-    pub inferred: bool,
-    /// Always send the picture (Find's "Ask about this").
-    pub with_image: bool,
+    /// The bar could not tell ask from do and asked; the answer offers
+    /// "Do this instead", one press to run the line as a task.
+    pub offer_do: bool,
     /// The bar's `@` pick for this one question: that provider and model
     /// answer, with no reading step and no failover (B-122).
     pub pin: Option<(Provider, String)>,
@@ -598,7 +597,8 @@ async fn read_visible_text(
 }
 
 /// main.js prefetchBarContext: starts the desktop engine and the catalogue,
-/// reads the foreground window's text and sends `bar:context`.
+/// reads the foreground window's text for the question to come, and sends
+/// `bar:context` (the app in front, for the bar's suggestions).
 pub fn prefetch_bar_context(app: &AppHandle) {
     if no_uia() {
         return;
@@ -647,14 +647,9 @@ pub fn prefetch_bar_context(app: &AppHandle) {
             .filter(|t| !t.is_empty())
             .or_else(|| fg.as_ref().map(|f| text_of(&f["title"])))
             .unwrap_or_default();
-        let text = exact.as_ref().map(|e| e.text.clone()).unwrap_or_default();
-        let screen: String = text.chars().take(16000).collect();
-        windows::emit(
-            &app,
-            windows::OVERLAY,
-            "bar:context",
-            json!({ "screen": screen, "title": title, "process": process, "chars": text.encode_utf16().count() }),
-        );
+        let chars = exact.as_ref().map_or(0, |e| e.text.encode_utf16().count());
+        let context = json!({ "title": title, "process": process, "chars": chars });
+        windows::emit(&app, windows::OVERLAY, "bar:context", context);
     });
 }
 
@@ -971,7 +966,6 @@ pub async fn submit_to(
         .unwrap_or(0);
     let text_only = shot_taken.is_some()
         && !use_brain
-        && !o.with_image
         && exact_len >= TEXT_ONLY_CHARS
         && !is_visual(&text);
     let shot = if text_only { None } else { shot_taken };
@@ -1354,7 +1348,7 @@ pub async fn submit_to(
                 "query:done",
                 json!({
                     "usage": usage,
-                    "inferred": o.inferred,
+                    "offerDo": o.offer_do,
                     "question": text,
                     "sent": sent,
                     "msgId": gen,
@@ -1403,11 +1397,6 @@ pub async fn submit_to(
     json!({ "status": status })
 }
 
-/// The bar's question, to its target output.
-pub async fn submit(app: &AppHandle, question: &str, o: SubmitOpts) -> Value {
-    submit_to(app, None, question, o).await
-}
-
 /// `models:list`: the picker for a job, with the model in use now.
 async fn models_list(p: &Value) -> Value {
     let sv = services();
@@ -1435,7 +1424,6 @@ async fn models_list(p: &Value) -> Value {
         match kind {
             Kind::Vision => super::live_models(true).await.0,
             Kind::Text => super::live_models(true).await.1,
-            Kind::Find => sv.llm.resolve_live(Kind::Find, &s.get_find_model()).await,
             Kind::Agent => sv.llm.resolve_live(Kind::Agent, &s.get_agent_model()).await,
         }
     };
@@ -1499,11 +1487,14 @@ pub async fn route(
         "query:submit" => {
             let q = text_of(&p["question"]);
             let o = SubmitOpts {
-                inferred: crate::store::truthy(p.get("inferred")),
+                offer_do: crate::store::truthy(p.get("offerDo")),
                 pin: pin_of(p),
                 ..SubmitOpts::default()
             };
-            submit(app, &q, o).await
+            // From an answer window (its trail's "Just answer"): into that
+            // window. From the bar: its target.
+            let own = outputs::is_output(label).then(|| label.to_string());
+            submit_to(app, own, &q, o).await
         }
         "query:cancel" => {
             // The caller's own window, else the focused output (B-040).

@@ -74,7 +74,7 @@ const MEASURE: &str = r#"(async () => {
 
 const VIEW: &str = r#"(() => {
   const hidden = (id) => document.getElementById(id).hidden;
-  return [document.body.dataset.view || '', hidden('opanel'), hidden('chat')].join(':');
+  return [hidden('opanel'), hidden('chat')].join(':');
 })()"#;
 
 const SCROLL: &str = r#"(() => {
@@ -183,19 +183,16 @@ fn check(cx: &Cx, label: &str) {
         format!("{shape:?}"),
     );
 
-    // Which view the window is in before and after a conversation lands in
-    // it, and whether a Find is still open: one that outlived the bar
-    // probes would hide the transcript behind its results.
+    // Which panes show before and after a conversation lands in the window.
     let before = cx.eval(label, VIEW);
     let l = label.to_string();
     cx.on_main(move |app| windows::emit(app, &l, "chat:sync", long_chat()));
     // The window grows to fit, then stops at its ceiling.
     cx.sleep(1200);
     let after = cx.eval(label, VIEW);
-    let open = cx.on_main(|app| crate::state::shared(app).lock().find_open);
     cx.log(
         "sheetView",
-        format!("{label} before={before:?} after={after:?} findOpen={open:?}"),
+        format!("{label} before={before:?} after={after:?}"),
     );
 
     transcript(cx, label);

@@ -57,8 +57,9 @@
         <path vector-effect="non-scaling-stroke" d="M10 6.5V10l2.5 1.5" />
       </g>
     </symbol>
-    <!-- Ask, Find and Do: the intent token's glyphs, and the kind of an
-         output window. -->
+    <!-- Ask and Do: the intent token's glyphs, and the kind of an output
+         window. The viewfinder was Find's; it keeps its slot so the sprite's
+         positions do not move. -->
     <symbol id="s-bubble" viewBox="0 0 20 20">
       <g fill="none" stroke="#000" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
         <path vector-effect="non-scaling-stroke" d="M10 3.75c3.73 0 6.5 2.55 6.5 5.75s-2.77 5.75-6.5 5.75c-.8 0-1.55-.11-2.25-.33L4.25 16.25l.95-2.85C4.27 12.36 3.5 11 3.5 9.5c0-3.2 2.77-5.75 6.5-5.75z" />

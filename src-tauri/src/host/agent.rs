@@ -103,21 +103,7 @@ fn page_name(path: &str) -> String {
         .to_string()
 }
 
-/// setOutputView('chat') on one output. `force` sends even when the view
-/// was already chat, as startAgentRun did.
-fn set_view_chat(app: &AppHandle, label: &str, force: bool) {
-    let changed = outputs::with(app, label, |o| {
-        let changed = o.view != "chat";
-        o.view = "chat".into();
-        changed
-    })
-    .unwrap_or(false);
-    if changed || force {
-        windows::emit(app, label, "view:set", json!({ "view": "chat" }));
-    }
-}
-
-/// main.js showTrail: the run's output in chat view, shown; focused when
+/// main.js showTrail: the run's output, shown; focused when
 /// the run needs an answer.
 pub fn show_trail(app: &AppHandle, focus: bool) {
     let label = run_label().filter(|l| outputs::with(app, l, |_| ()).is_some());
@@ -125,7 +111,6 @@ pub fn show_trail(app: &AppHandle, focus: bool) {
         outputs::show_trail(app, focus);
         return;
     };
-    set_view_chat(app, &label, false);
     outputs::show(app, &label);
     if focus {
         if let Some(w) = windows::window(app, &label) {
@@ -239,7 +224,6 @@ pub async fn start_run(app: &AppHandle, req: StartReq) -> Value {
             s.card = card.clone();
         }
         if let Some(label) = card {
-            set_view_chat(app, &label, true);
             outputs::show(app, &label);
             windows::emit(app, &label, "agent:consent-request", payload);
             if let Some(w) = windows::window(app, &label) {
@@ -247,9 +231,6 @@ pub async fn start_run(app: &AppHandle, req: StartReq) -> Value {
             }
         }
         return status("consent");
-    }
-    if sv.find.is_open() {
-        shared(app).call(app, |k| k.close_find.as_ref());
     }
     // Its own window (K-04), or the one the consent card just asked in.
     let card = slots().lock().card.take();
@@ -271,7 +252,6 @@ pub async fn start_run(app: &AppHandle, req: StartReq) -> Value {
         };
         windows::emit(app, l, "chat:user", json!({ "gen": gen, "text": task }));
         windows::emit(app, l, "agent:begin", json!({ "task": task }));
-        set_view_chat(app, l, true);
     }
     if !super::online() {
         if let Some(l) = &label {

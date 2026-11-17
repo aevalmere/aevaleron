@@ -24,11 +24,10 @@ use crate::store::{self, ACTIONS};
 /// KEY-15.
 pub fn action_label(action: &str) -> Option<&'static str> {
     Some(match action {
-        "captureQuery" => "Ask, find, or do",
+        "captureQuery" => "Ask or do",
         "captureRegion" => "Ask about an area",
         // region-text lane
         "copyRegionText" => "Copy text from screen",
-        "findOnScreen" => "Find on screen",
         "agentTask" => "Do a task",
         "toggleVisibility" => "Hide or show the overlay",
         _ => return None,
@@ -771,7 +770,7 @@ mod tests {
 
     #[test]
     fn labels() {
-        assert_eq!(action_label("captureQuery"), Some("Ask, find, or do"));
+        assert_eq!(action_label("captureQuery"), Some("Ask or do"));
         assert_eq!(
             action_label("toggleVisibility"),
             Some("Hide or show the overlay")
@@ -827,7 +826,7 @@ mod tests {
         fn apply(&mut self, chord: &str, escape: bool) -> bool {
             let chords = vec![
                 ("captureQuery".to_string(), chord.to_string()),
-                ("findOnScreen".to_string(), String::new()),
+                ("agentTask".to_string(), String::new()),
             ];
             self.run(chords, escape)
         }
@@ -839,7 +838,7 @@ mod tests {
         assert!(rig.apply("Ctrl+Alt+Space", false));
         assert_eq!(rig.keys.calls, ["-all", "+Ctrl+Alt+Space"]);
         assert_eq!(rig.results["captureQuery"], Some(true));
-        assert_eq!(rig.results["findOnScreen"], None);
+        assert_eq!(rig.results["agentTask"], None);
         // Opening the bar again changes nothing, so nothing is touched.
         assert!(!rig.apply("Ctrl+Alt+Space", false));
         assert!(rig.keys.calls.is_empty());

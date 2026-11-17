@@ -336,8 +336,7 @@ body[data-anchor-v="bottom"] #panel[data-morph="out"] > :not(.panel-top) {
   height: var(--ico-i);
 }
 
-/* The model for this one question (@, bar.js): beside the token, and muted
-   under Find, which uses its own model. */
+/* The model for this one question (@, bar.js): beside the token. */
 #model-chip {
   flex: 0 1 auto;
   min-width: 0;
@@ -462,13 +461,13 @@ body[data-region="1"] #region-btn {
 }
 
 .intent-token[data-intent="ask"] .g-ask,
-.intent-token[data-intent="find"] .g-find,
 .intent-token[data-intent="do"] .g-do {
   display: block;
 }
 
-/* A low-confidence guess is the same word with a quieter glyph; the word
-   itself stays at full contrast. */
+/* A line that could be either (asked, with "Do this instead" on the
+   answer) is the same word with a quieter glyph; the word itself stays at
+   full contrast. */
 .intent-token[data-locked="false"][data-confidence="low"] {
   background: var(--fill-1);
 }
@@ -552,26 +551,6 @@ body[data-region="1"] #region-btn {
 
 /* ---------------------------------------------------- rows under the bar */
 
-.guess-card {
-  --r: var(--r-card);
-  padding: var(--sp-3) var(--sp-4);
-  font-size: var(--fs-row);
-  line-height: 1.45;
-  color: var(--label);
-  animation: drop-in 260ms var(--ease-settle);
-}
-
-.guess-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--sp-2);
-  margin-top: var(--sp-3);
-}
-
-.guess-actions kbd {
-  margin-left: 6px;
-}
-
 #examples {
   display: flex;
   flex-wrap: wrap;
@@ -618,17 +597,6 @@ body[data-region="1"] #region-btn {
   white-space: pre-line;
   font-variant-numeric: tabular-nums;
   color: var(--label);
-}
-
-/* The scope reads as a control: a capsule with a chevron. */
-.g-chip.scope::after {
-  content: "";
-  width: 6px;
-  height: 6px;
-  margin: -3px 0 0 2px;
-  border-right: 1.5px solid currentColor;
-  border-bottom: 1.5px solid currentColor;
-  transform: rotate(45deg);
 }
 
 #region-chip .ico {
@@ -769,7 +737,7 @@ body[data-grow="up"] #opanel {
   pointer-events: none;
 }
 
-/* The kind is the bar token's glyph (Ask, Find, Do) at 16 px, its word in
+/* The kind is the bar token's glyph (Ask, Do) at 16 px, its word in
    aria-label. */
 .sheet-kind {
   width: var(--ico-s);
@@ -1021,17 +989,14 @@ body:not([data-more="1"]):not([data-scrolled="1"]) #chat.edge-fade {
 /* The transcript's thumb is quieter at rest and brightens while it moves
    (body[data-scrolling], 800 ms after a scroll). The edge-fade mask says
    there is more; there is no tint band at the bottom. */
-#chat::-webkit-scrollbar-thumb,
-#find-view::-webkit-scrollbar-thumb {
+#chat::-webkit-scrollbar-thumb {
   background: var(--tint-w-18);
   background-clip: padding-box;
   transition: background var(--d-fast) ease;
 }
 
 body[data-scrolling] #chat::-webkit-scrollbar-thumb,
-body[data-scrolling] #find-view::-webkit-scrollbar-thumb,
-#chat::-webkit-scrollbar-thumb:hover,
-#find-view::-webkit-scrollbar-thumb:hover {
+#chat::-webkit-scrollbar-thumb:hover {
   background: var(--tint-w-40);
   background-clip: padding-box;
 }
@@ -1880,155 +1845,6 @@ body[data-fixed-height="1"] #chat {
   min-width: 96px;
 }
 
-/* ------------------------------------------------------------------ find
-
-   The list and the screen share one mark: a small rounded rectangle, filled
-   for the words themselves, outlined for something related. The marks hang
-   in the gutter, so a match's text starts 16 px from the glass, where an
-   answer's does (F41). */
-
-#find-view {
-  display: flex;
-  flex-direction: column;
-  /* Rows a hairline apart: their fills never touch. */
-  gap: 2px; /* optical */
-  max-height: var(--chat-max, 520px);
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  scrollbar-gutter: stable;
-  margin: 0 -10px 0 -12px;
-  padding-inline-start: max(0px, calc((100% - var(--measure)) / 2));
-  padding-inline-end: max(var(--sp-2), calc((100% - var(--measure)) / 2));
-}
-
-/* A row's fill starts 8 px inside the glass edge, so its words land on the
-   sheet's 20 px text inset. */
-.find-row {
-  position: relative;
-  display: flex;
-  align-items: flex-start;
-  width: 100%;
-  text-align: left;
-  padding: var(--sp-2) var(--sp-3);
-  border-radius: var(--r-plate);
-  transition: background var(--d-fast) ease;
-}
-
-.find-row:hover {
-  background: var(--fill-1);
-}
-
-/* The current row is a raised glass pill: a brighter fill and its own rim.
-   The swatch already carries the hit's colour, so no stripe at the edge. */
-.find-row.current {
-  background: var(--fill-2);
-  box-shadow: inset 0 var(--px) 0 var(--tint-w-10);
-}
-
-.find-row:focus-visible {
-  outline-offset: -2px;
-}
-
-.find-row.offscreen .find-snippet {
-  color: var(--label-2);
-}
-
-/* In the row's own padding, centred on the first line of text. */
-.kind-mark {
-  position: absolute;
-  left: 2px; /* centred in the row's 12 px padding */
-  top: 14px;
-  width: 8px;
-  height: 8px;
-  border-radius: 2px;
-  background: var(--tint-accent-75);
-  box-shadow: inset 0 1px 0 var(--tint-w-40), 0 0 0 var(--px) var(--tint-k-40);
-}
-
-.kind-mark.related,
-.kind-mark.concept {
-  background: none;
-  box-shadow: inset 0 0 0 1.5px var(--accent-bright), 0 0 0 var(--px) var(--tint-k-40);
-}
-
-.find-body {
-  display: grid;
-  gap: 2px; /* optical */
-  min-width: 0;
-  flex: 1 1 auto;
-}
-
-/* What Enter will do on the row, in one word at its end: caption text in
-   the second label colour, on the snippet's first line. No fill, no edge. */
-.find-act {
-  flex: none;
-  margin-inline-start: var(--sp-3);
-  font-size: var(--t-caption, 13px);
-  line-height: var(--lh-row, 20px);
-  color: var(--label-2);
-  white-space: nowrap;
-}
-
-/* A menu command is not on screen: its mark is a short bar, the shape of a
-   menu row, in place of the square that stands for words in the window. */
-.kind-mark.menu {
-  top: 17px;
-  height: 2px;
-  border-radius: 1px;
-  background: var(--label-2);
-  box-shadow: none;
-}
-
-.find-snippet {
-  font-size: var(--t-row, 14px);
-  line-height: var(--lh-row, 20px);
-  word-break: break-word;
-  color: var(--label);
-}
-
-.find-snippet b {
-  font-weight: var(--w-strong, 600);
-}
-
-.find-why {
-  font-size: var(--t-caption, 13px);
-  line-height: var(--lh-caption, 18px);
-  color: var(--label-2);
-}
-
-/* Empty and offline: a headline, a line under it, and what to do next
-   (U24): actions only, no keys and no how-to. */
-.find-empty-wrap {
-  display: grid;
-  gap: var(--sp-3);
-  padding: var(--sp-1) 0 var(--sp-2) var(--sp-3);
-}
-
-.find-empty {
-  font-size: var(--t-caption, 13px);
-  line-height: var(--lh-caption, 18px);
-  color: var(--label-2);
-  white-space: pre-line;
-}
-
-.find-empty::first-line {
-  font-size: var(--t-body, 15px);
-  font-weight: var(--w-strong, 600);
-  color: var(--label);
-}
-
-.find-next {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--sp-2);
-}
-
-.find-next > button {
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
 /* ------------------------------------------------------------ agent trail
 
    Outcome first, then the plan as the checklist (F22). A step's state is
@@ -2624,31 +2440,17 @@ html[data-motion="reduced"] .trow.running .trow-mark::before {
 @media (forced-colors: active) {
   #panel,
   #opanel,
-  .guess-card,
   #intent-menu,
   .confirm-card,
   .msg.consent {
     border: 1px solid CanvasText;
     forced-color-adjust: auto;
   }
-  .intent-token[data-locked="true"],
-  .find-row.current {
+  .intent-token[data-locked="true"] {
     border: 1px solid Highlight;
   }
   #intent-menu li[aria-selected="true"] {
     background: Highlight;
     color: HighlightText;
-  }
-  .kind-mark {
-    forced-color-adjust: none;
-    background: Highlight;
-  }
-  .kind-mark.related,
-  .kind-mark.concept {
-    background: Canvas;
-    box-shadow: inset 0 0 0 1.5px Highlight;
-  }
-  .kind-mark.menu {
-    background: CanvasText;
   }
 }

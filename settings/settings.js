@@ -1,6 +1,6 @@
 'use strict';
 
-// Settings. One column of pages (Providers, Models, Answers, Find, Tasks,
+// Settings. One column of pages (Providers, Models, Answers, Tasks,
 // Privacy, Shortcuts, General), each a title and grouped rows. A row is one
 // line, name and value, and the whole line is the button that opens it.
 //
@@ -1298,7 +1298,6 @@ function picksAreDefaults(d) {
   return (
     (!d.defaultModel || d.model === d.defaultModel) &&
     !d.brainEnabled &&
-    (!d.defaultFindModel || d.findModel === d.defaultFindModel) &&
     (!d.defaultAgentModel || d.agentModel === d.defaultAgentModel)
   );
 }
@@ -1358,19 +1357,17 @@ async function useRecommendedModels() {
   const d = data;
   const saves = [];
   if (d.defaultModel) saves.push(call('settings:save-model', { model: d.defaultModel }));
-  if (d.defaultFindModel) saves.push(call('settings:save-find-model', { model: d.defaultFindModel }));
   if (d.defaultAgentModel) saves.push(call('settings:save-agent-model', { model: d.defaultAgentModel }));
   if (d.brainEnabled) saves.push(call('settings:set-brain-enabled', { on: false }));
   if (prov.ordered) {
     for (const p of prov.list.filter((q) => q.hasKey && q.id !== 'openrouter')) {
-      for (const ch of ['settings:save-model', 'settings:save-brain', 'settings:save-find-model', 'settings:save-agent-model']) {
+      for (const ch of ['settings:save-model', 'settings:save-brain', 'settings:save-agent-model']) {
         saves.push(call(ch, { provider: p.id, model: '' }));
       }
     }
   }
   await Promise.all(saves);
   data.model = d.defaultModel || data.model;
-  data.findModel = d.defaultFindModel || data.findModel;
   data.agentModel = d.defaultAgentModel || data.agentModel;
   data.brainEnabled = false;
   brainEnabled.checked = false;
@@ -1380,8 +1377,8 @@ async function useRecommendedModels() {
 
 // ----------------------------------------------------------------- combos
 
-// Four pickers with identical behaviour (the screen model, the optional
-// answer model, the Find model and the task model): written once. The list
+// Three pickers with identical behaviour (the screen model, the optional
+// answer model and the task model): written once. The list
 // is a solid menu inside the page (glass on glass is never drawn), grouped
 // by tier, with type-ahead.
 const combos = [];
@@ -1596,18 +1593,6 @@ const brainCombo = makeCombo({
   },
 });
 
-const findCombo = makeCombo({
-  rootId: 'find-combo',
-  button: $('find-combo-btn'),
-  label: $('find-combo-label'),
-  detail: $('find-combo-detail'),
-  list: $('find-combo-list'),
-  note: $('find-model-note'),
-  kind: 'find',
-  summaryId: 'find-model-summary',
-  saveChannel: 'settings:save-find-model',
-});
-
 const agentCombo = makeCombo({
   rootId: 'agent-combo',
   button: $('agent-combo-btn'),
@@ -1625,10 +1610,9 @@ function reloadCombos() {
   if (p === 'openrouter') {
     modelCombo.setCurrent(data.model || '');
     brainCombo.setCurrent(data.brain || '');
-    findCombo.setCurrent(data.findModel || '');
     agentCombo.setCurrent(data.agentModel || '');
   }
-  return Promise.all([modelCombo.load(p), brainCombo.load(p), findCombo.load(p), agentCombo.load(p)]);
+  return Promise.all([modelCombo.load(p), brainCombo.load(p), agentCombo.load(p)]);
 }
 
 function showBrainPicker(on) {
@@ -1705,23 +1689,13 @@ $('open-skills').addEventListener('click', () => {
   });
 });
 
-// ------------------------------------------------------------- find, agent
+// ------------------------------------------------------------------- agent
 
-const findOcr = $('find-ocr');
 const agentSteps = $('agent-steps');
 const agentStepsValue = $('agent-steps-value');
 const agentShots = $('agent-screenshots');
 const agentCursor = $('agent-cursor');
 const agentStatus = makeStatus($('agent-status'));
-
-function renderFindSettings(f) {
-  data.find = f;
-  checkRadios('[data-find-scope]', (b) => b.dataset.findScope === f.scope);
-  checkRadios('[data-find-related]', (b) => b.dataset.findRelated === f.related);
-  findOcr.checked = !!f.ocr;
-  const rel = { ask: ' · related on request', auto: ' · related automatic', off: '' }[f.related] || '';
-  setSummary('find-summary', `${f.scope === 'screen' ? 'Whole screen' : 'This window'}${rel}`);
-}
 
 function renderAgentSettings(a) {
   data.agent = a;
@@ -1754,16 +1728,6 @@ const PERMISSION = {
 };
 
 // Each resolves true once saved; a failed save puts the page back as stored.
-const setFind = (patch) =>
-  call('settings:set-find', patch).then((r) => {
-    if (!failed(r)) {
-      if (r && r.find) renderFindSettings(r.find);
-      return true;
-    }
-    if (data.find) renderFindSettings(data.find);
-    unsaved();
-    return false;
-  });
 const setAgent = (patch) =>
   call('settings:set-agent', patch).then((r) => {
     if (!failed(r)) {
@@ -1776,14 +1740,9 @@ const setAgent = (patch) =>
   });
 
 document.addEventListener('click', (e) => {
-  const scope = e.target.closest('[data-find-scope]');
-  if (scope) setFind({ scope: scope.dataset.findScope });
-  const rel = e.target.closest('[data-find-related]');
-  if (rel) setFind({ related: rel.dataset.findRelated });
   const perm = e.target.closest('[data-permission]');
   if (perm) setAgent({ permission: perm.dataset.permission });
 });
-findOcr.addEventListener('change', () => setFind({ ocr: findOcr.checked }));
 agentSteps.addEventListener('input', () => {
   agentStepsValue.textContent = agentSteps.value;
   agentSteps.style.setProperty('--k', String((Number(agentSteps.value) - 10) / 40));
@@ -1808,7 +1767,7 @@ function renderRecipients() {
   if (names.length === 1) first = `Asking sends your question and a screenshot, or the window's text, to ${names[0]}.`;
   else if (names.length) first = `Asking sends your question and a screenshot, or the window's text, to the first ready provider: ${names.join(', then ')}.`;
   else first = "Nothing is sent until a provider is ready. Then asking sends your question and a screenshot, or the window's text, to it.";
-  $('recipients-text').textContent = `${first} Tasks send one each step. Free models are offered on the condition that their providers may keep and train on what they receive. Paid models don't. Exact Find never leaves this computer; related Find sends the window's text to the Find model.`;
+  $('recipients-text').textContent = `${first} Tasks send one each step. Free models are offered on the condition that their providers may keep and train on what they receive. Paid models don't.`;
 }
 
 const saveHistory = $('save-history');
@@ -1880,7 +1839,7 @@ const shortcutFree = $('shortcut-free');
 const setShortcutError = makeStatus(shortcutError);
 
 function renderShortcuts() {
-  setSummary('shortcut-summary', [data.shortcuts.captureQuery, data.shortcuts.findOnScreen, data.shortcuts.agentTask].filter(Boolean).join(' · '));
+  setSummary('shortcut-summary', [data.shortcuts.captureQuery, data.shortcuts.agentTask].filter(Boolean).join(' · '));
   for (const row of shortcutList.querySelectorAll('.sc-row[data-action]')) {
     const action = row.dataset.action;
     const kbd = row.querySelector('.sc-current');
@@ -2499,9 +2458,8 @@ function renderAll(d) {
   setSummary('share-summary', d.canHide !== false ? 'Hidden' : 'Visible');
   $('share-line').textContent =
     d.canHide !== false
-      ? `Every Aevaleron window, the highlights and the pointer included, is left out of screen shares and recordings (Windows build ${d.winBuild || 'unknown'}).`
+      ? `Every Aevaleron window, the task frame and the pointer included, is left out of screen shares and recordings (Windows build ${d.winBuild || 'unknown'}).`
       : `Windows build ${d.winBuild} cannot hide windows from a screen share; that needs build 19041 or later. People watching your screen can see Aevaleron.`;
-  renderFindSettings(d.find || { scope: 'window', related: 'ask', ocr: true });
   renderAgentSettings(d.agent || { permission: 'auto', maxSteps: 25, screenshots: true, returnCursor: true });
   showPaid.checked = !!d.showPaid;
   brainEnabled.checked = !!d.brainEnabled;

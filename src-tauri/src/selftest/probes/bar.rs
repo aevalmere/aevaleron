@@ -6,6 +6,7 @@
 use std::time::Duration;
 
 use serde_json::{json, Value};
+use tauri::Manager;
 use tauri_plugin_clipboard_manager::ClipboardExt;
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Shortcut};
 use windows_sys::Win32::Foundation::HWND;
@@ -30,8 +31,9 @@ const STYLE_MASK: u32 = !0x1000_0000;
 /// One window's styles at one stage: (stage, window, style, extended style).
 type Sample = (&'static str, String, u32, u32);
 
-const INTENT_LABELS: [&str; 4] = [
+const INTENT_LABELS: [&str; 5] = [
     "intentTable",
+    "intentOffersDo",
     "intentPrefixes",
     "intentFast",
     "intentDoNeedsMargin",
@@ -108,10 +110,10 @@ const EXAMPLES_JS: &str = r#"
 
 // lib/smoke-v21.js basics(): the guess against what a person types, the
 // prefixes, the cost per keystroke and the margin rule, run in the page.
+// Every phrase Find used to take is here too, as an ask or a task.
 const INTENT_JS: &str = r##"
 (() => {
   const I = window.AevalIntent;
-  const SCREEN = 'Invoice 2291 Total due $4,120.00 Please settle by Friday Submit Cancel refund policy 0x1F3A';
   const TABLE = [
     ['why is the build red', 'ask'],
     ['how do I save this as pdf', 'ask'],
@@ -138,11 +140,19 @@ const INTENT_JS: &str = r##"
     ['0x1F3A', 'ask'],
     ['Please settle by Friday', 'ask'],
     ['where is the submit button', 'ask'],
-    ['/invoice', 'find'],
-    ['//total', 'find'],
-    ['/ deadline', 'find'],
+    ['/invoice', 'ask'],
+    ['//total', 'ask'],
+    ['/ deadline', 'ask'],
     ['find invoice', 'ask'],
+    ['find "price"', 'ask'],
     ['where is the cancel button', 'ask'],
+    ["where's the save button", 'ask'],
+    ['locate the download link', 'ask'],
+    ['look for the word deadline', 'ask'],
+    ['show me where the settings are', 'ask'],
+    ['search for flights to Paris', 'do'],
+    ['jump to the next chapter', 'do'],
+    ['highlight the deadline in this document', 'do'],
     ['rename these screenshots by date', 'do'],
     ['open Notepad and write a haiku', 'do'],
     ['send the report to Sam', 'do'],
@@ -156,37 +166,48 @@ const INTENT_JS: &str = r##"
     ['open a new tab and search for the weather', 'do'],
     ['move these files into a folder called old', 'do'],
   ];
-  const PARSE = [
-    ['/invoice', 'find', 'invoice', false],
-    ['//total', 'find', 'total', true],
-    ['?why', 'ask', 'why', false],
-    ['> open notepad', 'do', 'open notepad', false],
-    ['/etc/hosts', null, '/etc/hosts', false],
+  // The middle: asked, with "Do this instead" on the answer.
+  const OFFER = [
+    ['save', true],
+    ['can you open notepad?', true],
+    ['open notepad?', true],
+    ['why is the build red', false],
+    ['open notepad', false],
+    ['?open notepad', false],
   ];
-  const ctx = { screen: SCREEN, screenFolded: I.fold(SCREEN) };
+  const PARSE = [
+    ['?why', 'ask', 'why'],
+    ['> open notepad', 'do', 'open notepad'],
+    ['/invoice', null, '/invoice'],
+    ['//total', null, '//total'],
+    ['/etc/hosts', null, '/etc/hosts'],
+  ];
   const wrong = [];
   for (const [text, want] of TABLE) {
-    const got = I.classify(text, ctx).intent;
+    const got = I.classify(text).intent;
     if (got !== want) wrong.push(`"${text}" ${got}!=${want}`);
   }
+  const offer = [];
+  for (const [text, want] of OFFER) {
+    const got = I.classify(text).offerDo;
+    if (got !== want) offer.push(`"${text}" ${got}!=${want}`);
+  }
   const badParse = [];
-  for (const [raw, lock, body, literal] of PARSE) {
+  for (const [raw, lock, body] of PARSE) {
     const p = I.parse(raw);
-    if (p.lock !== lock || p.body !== body || p.literal !== literal) {
-      badParse.push(`${raw}:${JSON.stringify(p)}`);
+    if (p.lock !== lock || p.body !== body) badParse.push(`${raw}:${JSON.stringify(p)}`);
+  }
+  I.score('warm up');
+  let worst = 0;
+  for (let round = 0; round < 3; round += 1) {
+    for (const [text] of TABLE) {
+      const t0 = performance.now();
+      I.score(`${text} `.repeat(40));
+      worst = Math.max(worst, performance.now() - t0);
     }
   }
-  // Under 5 ms a keystroke against a full window of screen text.
-  const big = I.fold(SCREEN.repeat(150));
-  I.score('warm up', { screenFolded: big });
-  let worst = 0;
-  for (const [text] of TABLE) {
-    const t0 = performance.now();
-    I.score(text, { screenFolded: big });
-    worst = Math.max(worst, performance.now() - t0);
-  }
-  const weak = I.classify('fix it', {});
-  return { n: TABLE.length, wrong, badParse, worst, weak: { i: weak.intent, m: weak.margin } };
+  const weak = I.classify('fix it');
+  return { n: TABLE.length, wrong, offer, badParse, worst, weak: { i: weak.intent, m: weak.margin } };
 })()
 "##;
 
@@ -206,6 +227,7 @@ fn probe(cx: &Cx) {
     token_reply(cx);
     early_keys(cx);
     lines_and_suggestions(cx);
+    text_entry(cx);
     page(cx, &TYPE_JS.replace("$TEXT", "''"));
     collapse(cx);
 }
@@ -305,8 +327,8 @@ fn saved_flag() -> bool {
 
 // ------------------------------------------------------------------ labels
 
-/// intentTable, intentPrefixes, intentWorstMs, intentFast and
-/// intentDoNeedsMargin (lib/smoke-v21.js).
+/// intentTable, intentOffersDo, intentPrefixes, intentWorstMs, intentFast
+/// and intentDoNeedsMargin (lib/smoke-v21.js).
 fn intent(cx: &Cx) {
     let r = match cx.eval(OVERLAY, INTENT_JS) {
         Ok(v) => v,
@@ -323,12 +345,14 @@ fn intent(cx: &Cx) {
     cx.log("intentTable", format!("{right}/{n}"));
     let table = n >= 40 && wrong.is_empty();
     cx.must("intentTable", table, wrong.join(" | "));
+    let offer = strings(&r["offer"]);
+    cx.must("intentOffersDo", offer.is_empty(), offer.join(" | "));
     let bad = strings(&r["badParse"]);
     cx.must("intentPrefixes", bad.is_empty(), bad.join(" | "));
     let worst = r["worst"].as_f64().unwrap_or(f64::MAX);
     cx.log("intentWorstMs", format!("{worst:.2}"));
     cx.must("intentFast", worst < 5.0, format!("{worst:.2}ms"));
-    // A guessed task is never a run: the margin rule leaves weak ones as Ask.
+    // Only a clear task runs: the margin rule leaves weak ones as Ask.
     let weak = &r["weak"];
     let margin = weak["m"].as_f64().unwrap_or(0.0);
     let ok = weak["i"] != "do" || margin >= 0.15;
@@ -410,8 +434,8 @@ fn sample(cx: &Cx, stage: &'static str, out: &mut Vec<Sample>) {
     }
 }
 
-/// barKeys: Tab is never taken by the field; Ctrl+1..3 lock the token and
-/// keep the text; Backspace on an empty locked field unlocks it
+/// barKeys: Tab is never taken by the field; Ctrl+1 and Ctrl+2 lock the
+/// token and keep the text; Backspace on an empty locked field unlocks it
 /// (lib/smoke-v2.js).
 fn bar_keys(cx: &Cx) {
     open(cx);
@@ -419,18 +443,16 @@ fn bar_keys(cx: &Cx) {
     let tab = press(cx, "Tab", false);
     type_text(cx, "invoice");
     press(cx, "2", true);
-    let jumped = text(&page(cx, TOKEN_JS));
-    let kept = text(&page(cx, VALUE_JS));
-    press(cx, "3", true);
     let do_lock = text(&page(cx, TOKEN_JS));
+    let kept = text(&page(cx, VALUE_JS));
     press(cx, "1", true);
     let back = text(&page(cx, TOKEN_JS));
     page(cx, EMPTY_JS);
     press(cx, "Backspace", false);
     let unlocked = text(&page(cx, TOKEN_JS));
-    let seen = format!("tab={tab}:{jumped}:{kept}:{do_lock}:{back}:{unlocked}");
+    let seen = format!("tab={tab}:{do_lock}:{kept}:{back}:{unlocked}");
     cx.log("barKeys", &seen);
-    let locks = jumped == "find!" && do_lock == "do!" && back == "ask!";
+    let locks = do_lock == "do!" && back == "ask!";
     let ok = tab == json!(false) && kept == "invoice" && locks && !unlocked.ends_with('!');
     cx.must("barKeys", ok, seen);
 }
@@ -491,6 +513,48 @@ fn early_keys(cx: &Cx) {
     let samples = windows::bar_open_samples();
     cx.log("barOpenMs", format!("{samples:?}"));
     cx.log("barOpenStages", windows::bar_open_stages().join(" "));
+}
+
+/// textEntryDecides: a line handed to the bar as if typed and Entered
+/// (`windows::submit_text`, the wake word's way in) is decided like typing:
+/// a clear task goes the way of a leading > (`agent:start`, pushed to the
+/// history as `>text`), a question and the unclear middle are asked. Run
+/// with no key, so the task is turned away before anything happens.
+fn text_entry(cx: &Cx) {
+    let s = store::get();
+    let had = s.get_api_key();
+    s.clear_api_key();
+    if s.has_api_key() {
+        // Another provider's key would let the task start for real.
+        if !had.is_empty() {
+            s.set_api_key(&had);
+        }
+        cx.log("textEntryDecides", "skipped: a key is still set");
+        return;
+    }
+    open(cx);
+    let mut got = Vec::new();
+    let cases = [
+        ("open notepad", ">open notepad"),
+        ("what does this error mean", "what does this error mean"),
+        ("save", "save"),
+        ("?open notepad", "?open notepad"),
+    ];
+    for (line, want) in cases {
+        type_text(cx, "");
+        let line = line.to_string();
+        cx.on_main(move |app| windows::submit_text(app, &line));
+        let ok = cx.wait_for(WAIT, || last_question() == want);
+        got.push(format!("{want}={ok}"));
+    }
+    let seen = cx.app.state::<crate::ipc::Seen>().snapshot();
+    let started = seen.get(OVERLAY).is_some_and(|c| c.contains("agent:start"));
+    if !had.is_empty() {
+        s.set_api_key(&had);
+    }
+    type_text(cx, "");
+    let ok = started && got.iter().all(|g| g.ends_with("=true"));
+    cx.must("textEntryDecides", ok, format!("{} agentStart={started}", got.join(" ")));
 }
 
 /// barMultiline (B-056): three pasted lines stay three rows, and Enter sends

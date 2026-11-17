@@ -159,16 +159,6 @@ impl DesktopAdapter {
                 d.key(keys, repeat, opt(&a, "windowHandle")).await
             }
             "scrollTo" => d.scroll_to(str_of(&a, "ref").unwrap_or("")).await,
-            "findText" => {
-                let query = str_of(&a, "query").unwrap_or("");
-                let max = uint(&a["max"], 400);
-                d.find_text(opt(&a, "windowHandle"), query, max).await
-            }
-            "scrollToText" => {
-                let r = str_of(&a, "ref").unwrap_or("");
-                let query = str_of(&a, "query").unwrap_or("");
-                d.scroll_to_text(r, query, uint(&a["n"], 0)).await
-            }
             "docText" => {
                 let max = uint(&a["maxChars"], 60000);
                 let budget = uint(&a["budgetMs"], 700);
@@ -182,22 +172,6 @@ impl DesktopAdapter {
                 let action = str_of(&a, "action").unwrap_or("invoke");
                 d.invoke(str_of(&a, "ref").unwrap_or(""), action).await
             }
-            "selectText" => {
-                let r = str_of(&a, "ref").unwrap_or("");
-                let query = str_of(&a, "query").unwrap_or("");
-                let point = |k: &str| num(&a[k]).map(|f| f.round() as i64);
-                let near = point("x").zip(point("y"));
-                d.select_text(r, query, uint(&a["n"], 0), near).await
-            }
-            "selection" => d.selection(str_of(&a, "ref").unwrap_or("")).await,
-            "menuItems" => {
-                let budget = uint(&a["budgetMs"], 300);
-                let max = uint(&a["max"], 400);
-                let depth = uint(&a["depth"], 4);
-                d.menu_items(opt(&a, "windowHandle"), budget, max, depth)
-                    .await
-            }
-            "menuInvoke" => d.menu_invoke(opt(&a, "windowHandle"), &whole(&a)).await,
             "restoreCursor" => d.restore_cursor().await,
             "cancel" => d.cancel().await,
             "start" => d.start().await.map(|_| json!({ "ok": true })),
@@ -218,7 +192,7 @@ impl DesktopOps for DesktopAdapter {
 }
 
 /// What main.js passed to `desktop.init`: physical input goes to the agent
-/// (takeover) and to Find (a wheel re-reads); a synthetic Escape lets go of
+/// (takeover); a synthetic Escape lets go of
 /// the global Stop until it has passed. The own-window list keeps (c)'s
 /// default, which reads every window of this app.
 pub fn init_desktop_deps(app: &AppHandle) {
@@ -226,15 +200,11 @@ pub fn init_desktop_deps(app: &AppHandle) {
     let after = app.clone();
     crate::desktop::client().init(Deps {
         want_input: Some(Arc::new(|| {
-            super::try_services().is_some_and(|s| s.agent.is_running() || s.find.is_open())
+            super::try_services().is_some_and(|s| s.agent.is_running())
         })),
         on_user_input: Some(Arc::new(|ev: &Value| {
-            let Some(s) = super::try_services() else {
-                return;
-            };
-            s.agent.on_user_input(ev);
-            if ev["kind"] == "wheel" && s.find.is_open() {
-                s.find.nudge();
+            if let Some(s) = super::try_services() {
+                s.agent.on_user_input(ev);
             }
         })),
         before_synthetic_key: Some(Arc::new(move || crate::hotkeys::suspend_escape(&before))),

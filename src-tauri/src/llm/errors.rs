@@ -364,8 +364,7 @@ backup. Retry in a moment.";
 
 const SERVER_ONCE: &str = "OpenRouter returned a server error on this model. Retry in a moment.";
 
-const OFFLINE_TEXT: &str =
-    "No connection. Finding words on your screen still works; answers need the internet.";
+const OFFLINE_TEXT: &str = "No connection. Answers and tasks need the internet.";
 
 /// The sentence and the actions for an error, or `None` for Stop.
 pub fn explain(err: &ApiError, a: &About<'_>) -> Option<Explained> {

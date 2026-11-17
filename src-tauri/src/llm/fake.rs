@@ -1,6 +1,6 @@
 //! `AEVAL_FAKE_LLM=1`: every chat request is answered from fixtures in
-//! tools/fixtures/llm/*.jsonl instead of the network, so Find and the agent
-//! behave the same way on every run of the smoke test (PARITY MODEL-08).
+//! tools/fixtures/llm/*.jsonl instead of the network, so the agent behaves
+//! the same way on every run of the smoke test (PARITY MODEL-08).
 //! The catalogue fetch is not faked. Port of lib/fake-llm.js; see that file
 //! for the fixture format.
 //!
@@ -39,10 +39,7 @@ use super::errors::ApiError;
 use super::provider::Provider;
 use super::wire;
 
-const EMBEDDED: [&str; 2] = [
-    include_str!("../../../tools/fixtures/llm/agent.jsonl"),
-    include_str!("../../../tools/fixtures/llm/find.jsonl"),
-];
+const EMBEDDED: [&str; 1] = [include_str!("../../../tools/fixtures/llm/agent.jsonl")];
 
 /// The request log keeps this many bodies (newest last).
 pub const REQUEST_LOG: usize = 400;
@@ -138,12 +135,6 @@ fn var_re() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
     const PATTERN: &str = r"\{\{([A-Za-z0-9_]+)\}\}";
     RE.get_or_init(|| Regex::new(PATTERN).expect("var pattern"))
-}
-
-fn span_re() -> &'static Regex {
-    static RE: OnceLock<Regex> = OnceLock::new();
-    const PATTERN: &str = r"^\[([0-9]+)\]\s?([^\r\x{2028}\x{2029}]*)$";
-    RE.get_or_init(|| Regex::new(PATTERN).expect("span pattern"))
 }
 
 /// `String(s || '').toLowerCase().trim()`.
@@ -331,15 +322,6 @@ impl Fake {
         Some(found)
     }
 
-    /// Every fixture `want` admits that `pred` accepts.
-    fn all(&self, want: &Want<'_>, pred: impl Fn(&Value) -> bool) -> Vec<Value> {
-        let list = self.fixtures.lock();
-        list.iter()
-            .filter(|x| want.admits(x) && pred(x))
-            .cloned()
-            .collect()
-    }
-
     /// A status or a stall a probe scripted for this request.
     async fn scripted_reply(
         &self,
@@ -425,49 +407,7 @@ impl Fake {
         }
         let empty = Vec::new();
         let msgs = body["messages"].as_array().unwrap_or(&empty);
-        let user_text = msgs
-            .iter()
-            .filter(|m| m["role"] == "user")
-            .map(|m| text_of(&m["content"]))
-            .collect::<Vec<_>>()
-            .join("\n");
-
         match purpose {
-            "find-expand" => {
-                let f = self.take(&want, |x| lower(x["query"].as_str()) == q);
-                if let Some(f) = &f {
-                    sleep(delay_of(f), cancel).await?;
-                }
-                let lines = f.map(|f| self.fill(&f["lines"])).unwrap_or(Value::Null);
-                let chunks: Vec<String> = lines
-                    .as_array()
-                    .map(|a| a.iter().map(|l| format!("{l}\n")).collect())
-                    .unwrap_or_default();
-                Ok(sse(&chunks))
-            }
-            "find-correlate" => {
-                let mut out = Vec::new();
-                let matching = self.all(&want, |x| lower(x["query"].as_str()) == q);
-                for f in &matching {
-                    let needle = lower(f["match"].as_str());
-                    for line in user_text.split('\n') {
-                        let Some(m) = span_re().captures(line) else {
-                            continue;
-                        };
-                        if !lower(Some(&m[2])).contains(&needle) {
-                            continue;
-                        }
-                        let id = m[1].parse::<u64>().map(Value::from);
-                        let id = id.unwrap_or_else(|_| json!(m[1].parse::<f64>().unwrap_or(0.0)));
-                        let score = f["score"].as_f64().filter(|s| *s != 0.0).unwrap_or(0.8);
-                        let why = self.fill(&f["why"]);
-                        let why = if why.is_string() { why } else { json!("") };
-                        let row = json!({ "id": id, "score": score, "why": why });
-                        out.push(format!("{row}\n"));
-                    }
-                }
-                Ok(sse(&out))
-            }
             "agent" => self.agent_turn(&want, body, msgs, cancel, meta).await,
             _ => {
                 let f = self.take(&want, |x| !scripted(x));
@@ -609,7 +549,7 @@ mod tests {
     #[test]
     fn embedded_fixtures_load() {
         let fake = Fake::load();
-        assert!(fake.fixtures.lock().len() >= 10);
+        assert!(fake.fixtures.lock().len() >= 7);
     }
 
     #[test]
@@ -664,25 +604,6 @@ mod tests {
         assert_eq!(out, want);
         let (_, out) = ask(&fake, json!({ "stream": true }), &Meta::purpose("reader"));
         assert!(out.contains("SCREEN: Notepad"));
-    }
-
-    #[test]
-    fn correlate_answers_with_the_span_holding_the_match() {
-        let fixtures = vec![json!({ "purpose": "find-correlate", "query": "owe",
-            "match": "Total Due", "score": 0.9, "why": "the balance" })];
-        let fake = Fake::from_fixtures(fixtures);
-        let meta = Meta {
-            purpose: "find-correlate".into(),
-            query: Some(" OWE ".into()),
-            task: None,
-            overall: None,
-        };
-        let user = "Spans:\n[0] Invoice\n[3] total due: $5\n[4]nothing";
-        let body = json!({ "messages": [{ "role": "user", "content": user }] });
-        let (_, out) = ask(&fake, body, &meta);
-        let want = r#"{\"id\":3,\"score\":0.9,\"why\":\"the balance\"}\n"#;
-        assert!(out.contains(want));
-        assert!(!out.contains(r#"\"id\":0"#));
     }
 
     #[test]

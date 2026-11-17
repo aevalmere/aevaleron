@@ -18,8 +18,6 @@ const pillLabel = document.querySelector('.pill-label');
 const barEl = document.getElementById('bar');
 const barStatus = document.getElementById('bar-status');
 const barStatusText = document.getElementById('bar-status-text');
-const barStatusAction = document.getElementById('bar-status-action');
-const findScopeBtn = document.getElementById('find-scope');
 
 let state = { mode: 'pill', hasKey: false, captureOk: true };
 let watchSelector = null;
@@ -351,15 +349,14 @@ function renderNotice() {
     noticeSettings.dataset.section = 'sec-private';
     noticeSettings.hidden = false;
     notice.hidden = false;
-  } else if (!state.hasKey && now !== 'find') {
-    noticeText.textContent =
-      now === 'do' ? 'Tasks need an AI provider.' : 'Answers need an AI provider. Finding words on screen works without one.';
+  } else if (!state.hasKey) {
+    noticeText.textContent = now === 'do' ? 'Tasks need an AI provider.' : 'Answers need an AI provider.';
     noticeSettings.textContent = 'Connect a provider';
     noticeSettings.dataset.section = 'pg-providers';
     noticeSettings.hidden = false;
     notice.hidden = false;
-  } else if (state.offline && now !== 'find') {
-    noticeText.textContent = 'No connection. Finding words on screen still works; answers need the internet.';
+  } else if (state.offline) {
+    noticeText.textContent = 'No connection. Answers and tasks need the internet.';
     noticeSettings.hidden = true;
     notice.hidden = false;
   } else if (!state.captureOk && now === 'ask') {

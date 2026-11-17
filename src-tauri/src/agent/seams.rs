@@ -1,5 +1,5 @@
-//! The two seams split (b) reaches the rest of the app through, so Find, the
-//! agent and Ask compile and test without the desktop helper or a window
+//! The two seams split (b) reaches the rest of the app through, so the agent
+//! and Ask compile and test without the desktop helper or a window
 //! (ARCHITECTURE.md section 10).
 //!
 //! [`DesktopOps`] is lib/desktop/index.js as JSON: the method names and the

@@ -17,7 +17,6 @@ glassLoaded
 snapCost
 glassCost
 lensFirstDraw
-lensWhyClear
 buddyPoints
 buddyPointsDone
 walkthrough

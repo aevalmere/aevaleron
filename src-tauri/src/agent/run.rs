@@ -890,8 +890,8 @@ impl Agent {
             state: "planning".into(),
             focus_violations: 0,
             focus_detail: None,
-            // Started from text the app handed over (Do it, Retry, a Find
-            // hit): the person approves a plan before anything is done.
+            // Started from text the app handed over (Do it, Retry): the
+            // person approves a plan before anything is done.
             plan_gate: o.plan_gate,
             plan_approved: false,
             plan_shown: false,

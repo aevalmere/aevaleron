@@ -28,7 +28,7 @@ pub trait LlmSettings: Send + Sync {
         Vec::new()
     }
     /// The stored OpenRouter model id for a job (`model`, `brain`,
-    /// `findModel`, `agentModel` in aevaleron.json), default included.
+    /// `agentModel` in aevaleron.json), default included.
     fn model(&self, kind: Kind) -> String;
     /// Rewrites a chosen OpenRouter id that left the catalogue
     /// (`healModel`, `healBrain`, `healAgentModel`; a no-op for an id the
@@ -61,7 +61,7 @@ impl fmt::Debug for Active {
     }
 }
 
-const KINDS: [Kind; 4] = [Kind::Vision, Kind::Text, Kind::Find, Kind::Agent];
+const KINDS: [Kind; 3] = [Kind::Vision, Kind::Text, Kind::Agent];
 
 /// One provider failover may send a request to, with its key and the model
 /// each job would use on it (contract K-16).
@@ -69,7 +69,7 @@ const KINDS: [Kind; 4] = [Kind::Vision, Kind::Text, Kind::Find, Kind::Agent];
 pub struct Candidate {
     pub provider: Provider,
     pub key: String,
-    models: [String; 4],
+    models: [String; 3],
 }
 
 impl fmt::Debug for Candidate {
@@ -308,10 +308,10 @@ mod tests {
     fn a_native_key_alone_is_used() {
         let s = MemorySettings::with_key("sk-proj-z");
         assert_eq!(active(&s).unwrap().provider, Provider::OpenAi);
-        assert_eq!(model_for(&s, Provider::OpenAi, Kind::Find), "gpt-6-luna");
-        let pick = (Provider::OpenAi, Kind::Find);
+        assert_eq!(model_for(&s, Provider::OpenAi, Kind::Text), "gpt-6.1-sol");
+        let pick = (Provider::OpenAi, Kind::Text);
         s.native.lock().insert(pick, "gpt-6.1-terra".into());
-        assert_eq!(model_for(&s, Provider::OpenAi, Kind::Find), "gpt-6.1-terra");
+        assert_eq!(model_for(&s, Provider::OpenAi, Kind::Text), "gpt-6.1-terra");
     }
 
     #[test]
@@ -345,7 +345,7 @@ mod tests {
         // Each candidate carries the model each job would use on it.
         let c = &candidates_with(&s, Kind::Vision, &t, 0)[0];
         assert_eq!(c.model(Kind::Vision), "gemini-3.8-flash");
-        assert_eq!(c.model(Kind::Find), "gemini-3.5-flash-lite");
+        assert_eq!(c.model(Kind::Text), "gemini-4-argon");
         assert_eq!(c.active().key, "AIzaW");
         assert!(!format!("{c:?}").contains("AIzaW"));
     }
@@ -434,7 +434,7 @@ mod tests {
         t.set(Provider::OpenRouter, "sk-or-v1-x", blocked);
         let got = ids(&candidates_with(&s, Kind::Vision, &t, 0));
         assert_eq!(got[0], Provider::OpenRouter);
-        let got = ids(&candidates_with(&s, Kind::Find, &t, 0));
+        let got = ids(&candidates_with(&s, Kind::Text, &t, 0));
         assert!(!got.contains(&Provider::OpenRouter));
         // Everything cooling down: the question still goes to the first
         // provider with a key.

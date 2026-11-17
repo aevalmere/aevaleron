@@ -10,12 +10,12 @@
 //! Every reader asks [`check`] before it reads:
 //!
 //! - `capture::grab`, the one source of screen pixels (Ask's screenshot, a
-//!   picked area, the lens's loupe, the glass backdrop);
+//!   picked area, the glass backdrop);
 //! - `Desktop::call`, the one door to the desktop helper ([`check_op`]
 //!   before an op is sent, [`check_reply`] on what a read op answers), which
-//!   covers Ask's window text, Find, and every read and action of the agent;
-//! - Ask, Find, the area picker and the lens themselves, so each can say why
-//!   it did nothing;
+//!   covers Ask's window text and every read and action of the agent;
+//! - Ask, the area picker and the lens themselves, so each can say why it
+//!   did nothing;
 //! - the agents lane's chat watcher, which reads other apps' windows without
 //!   the helper.
 //!
@@ -268,15 +268,13 @@ pub fn op_reads(op: &str, args: &Value) -> Vec<Read> {
     };
     match op {
         // Text and tree reads, and the keyboard, which goes to one window.
-        "readTree" | "getText" | "findText" | "docText" | "focused" | "type" | "key" => {
+        "readTree" | "getText" | "docText" | "focused" | "type" | "key" => {
             if by_ref {
                 Vec::new()
             } else {
                 vec![window.unwrap_or(Read::Screen)]
             }
         }
-        // Find's menu commands: a window's menu, read or run.
-        "menuItems" | "menuInvoke" => vec![window.unwrap_or(Read::Screen)],
         // Pixels come from the screen as composed, whatever window was
         // asked for.
         "capture" | "ocr" => {
@@ -302,10 +300,7 @@ pub fn op_reads(op: &str, args: &Value) -> Vec<Read> {
 
 /// The ops that read "the window in front" when given no window.
 fn reads_front(op: &str) -> bool {
-    matches!(
-        op,
-        "readTree" | "getText" | "findText" | "docText" | "capture" | "ocr"
-    )
+    matches!(op, "readTree" | "getText" | "docText" | "capture" | "ocr")
 }
 
 /// The gate for a desktop helper op, asked just before it is sent. An op
@@ -337,7 +332,7 @@ pub fn check_op(op: &str, args: &mut Value) -> Result<(), Refused> {
 pub fn check_reply(op: &str, reply: &Value) -> Result<(), Refused> {
     let reads = matches!(
         op,
-        "readTree" | "getText" | "findText" | "docText" | "focused" | "elementAt" | "resolve"
+        "readTree" | "getText" | "docText" | "focused" | "elementAt" | "resolve"
     );
     if !reads {
         return Ok(());
@@ -880,12 +875,10 @@ mod tests {
         let named = json!({ "windowHandle": 4660 });
         assert_eq!(op_reads("getText", &named), [Read::Window(4660)]);
         assert_eq!(op_reads("readTree", &json!({})), [Read::Screen]);
-        assert_eq!(op_reads("menuItems", &named), [Read::Window(4660)]);
-        assert_eq!(op_reads("menuInvoke", &json!({})), [Read::Screen]);
         let null = json!({ "windowHandle": null });
         assert_eq!(op_reads("docText", &null), [Read::Screen]);
         assert_eq!(
-            op_reads("findText", &json!({ "windowHandle": "w1234" })),
+            op_reads("docText", &json!({ "windowHandle": "w1234" })),
             [Read::Window(0x1234)]
         );
         // Pixels are the screen's, and the named window's too.

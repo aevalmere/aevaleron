@@ -43,7 +43,6 @@ pub const FAST_MS: u64 = 500;
 pub const SLOW_MS: u64 = 5000;
 pub const RETRY_MS: u64 = 30000;
 pub const FRAME_QUALITY: u8 = 72;
-pub const LOUPE_QUALITY: u8 = 90;
 pub const SCHEME: &str = "aeval-frame";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -66,7 +65,6 @@ struct Fixture {
     name: String,
     small: Arc<Vec<u8>>,
     full: Arc<Vec<u8>>,
-    full_image: Rgb,
     display: screen::Display,
 }
 
@@ -103,7 +101,7 @@ struct Inner {
 struct Backdrop {
     inner: Mutex<Inner>,
     wake: Condvar,
-    /// Newest bytes per key (`<display id>`, `loupe`, `fixture-full`).
+    /// Newest bytes per key (`<display id>`, `fixture-full`).
     frames: RwLock<HashMap<String, Arc<Vec<u8>>>>,
     seq: AtomicU64,
 }
@@ -790,7 +788,6 @@ pub fn use_fixture(name: Option<&str>) -> Result<(), String> {
         name: name.to_string(),
         small: Arc::new(small_j),
         full: Arc::new(full_j),
-        full_image: full,
         display,
     });
     broadcast_tier();
@@ -847,34 +844,6 @@ pub fn render_fixture(
     };
     let _ = win.destroy();
     result
-}
-
-/// A crop of what is behind a DIP rect at full resolution, for the Find
-/// lens's magnifier. One capture per current-hit change, never on a timer.
-/// `display` is the `Display::id` the rect was placed on (B-005).
-pub fn crop(rect: Rect, display: Option<u32>) -> Option<Vec<u8>> {
-    {
-        let g = lock();
-        if let Some(f) = &g.fixture {
-            let b = f.display.bounds;
-            let img = &f.full_image;
-            let x = ((rect.x - b.x).round().max(0.0) as u32).min(img.width.saturating_sub(1));
-            let y = ((rect.y - b.y).round().max(0.0) as u32).min(img.height.saturating_sub(1));
-            let w = (rect.width.round().max(1.0) as u32).min(img.width - x);
-            let h = (rect.height.round().max(1.0) as u32).min(img.height - y);
-            return encode::jpeg(&img.crop(x, y, w, h), LOUPE_QUALITY);
-        }
-    }
-    if tier() == "solid" {
-        return None;
-    }
-    let cut = capture::crop_dip(rect, display)?;
-    encode::jpeg(&cut, LOUPE_QUALITY)
-}
-
-/// The loupe as a URL the lens page can load.
-pub fn crop_url(rect: Rect, display: Option<u32>) -> Option<String> {
-    crop(rect, display).map(|b| store("loupe", Arc::new(b)))
 }
 
 /// The fixture's full picture, for photographing a window that draws no glass.

@@ -3,17 +3,12 @@
 <head>
   <meta charset="UTF-8" />
   <meta http-equiv="Content-Security-Policy"
-        content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data: blob: http://aeval-frame.localhost aeval-frame:; connect-src ipc: http://ipc.localhost http://aeval-frame.localhost aeval-frame:" />
+        content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src ipc: http://ipc.localhost" />
   <title>Aevaleron lens</title>
   <link rel="stylesheet" href="glass.css" />
   <link rel="stylesheet" href="lens.css" />
 </head>
 <body>
-  <div id="hits" aria-hidden="true"></div>
-  <!-- One ring for the current hit. It travels between hits instead of being
-       redrawn, which is the motion Find is remembered for. -->
-  <div id="ring" aria-hidden="true"><div class="loupe"></div></div>
-  <div id="why" role="status"></div>
   <div id="frame" aria-hidden="true"></div>
   <div id="chip" role="status"></div>
   <script src="lens.js"></script>

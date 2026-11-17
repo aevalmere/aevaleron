@@ -340,104 +340,40 @@ fn cpu_over(d: Duration) -> f64 {
     (cpu_ms() - c0) / t0.elapsed().as_secs_f64() / 10.0
 }
 
-/// smoke-v2-desktop.js: a fresh lens told its hits and frame once, with
-/// nothing sent after, draws them (`lensFirstDraw`), and the current hit's
-/// why chip comes to rest clear of the other hits (`lensWhyClear`).
+/// smoke-v2-desktop.js: a fresh lens told its frame once, with nothing sent
+/// after, draws it with its chip (`lensFirstDraw`).
 fn lens_first_draw(cx: &Cx) {
     let d = screen::primary(&screen::all_displays());
     let label = lens::label_for(d.id);
-    let at = |x: f64, y: f64, width: f64| Rect::new(d.bounds.x + x, d.bounds.y + y, width, 18.0);
-    let hit = |i: i64, kind: &str, rect: Rect, why: &str| {
-        let why = match why {
-            "" => Value::Null,
-            w => json!(w),
-        };
-        lens::Hit {
-            i,
-            kind: kind.to_string(),
-            rect: Some(rect),
-            why,
-            offscreen: false,
-        }
-    };
     lens::destroy(&cx.app);
-    let first = vec![
-        hit(0, "literal", at(140.0, 120.0, 64.0), ""),
-        hit(1, "literal", at(260.0, 168.0, 64.0), ""),
-        hit(2, "related", at(140.0, 216.0, 64.0), "smoke"),
-    ];
-    lens::set_hits(&cx.app, first, 1);
     lens::set_frame(&cx.app, Some(&d), "smoke");
-    let read_js = "(() => document.querySelectorAll('.hit').length + ':' \
-                   + document.getElementById('ring').classList.contains('on') + ':' \
-                   + document.getElementById('frame').classList.contains('on'))()";
+    let read_js = "(() => document.getElementById('frame').classList.contains('on') + ':'                    + document.getElementById('chip').textContent)()";
     let read = || match cx.eval(&label, read_js) {
         Ok(Value::String(s)) => s,
         Ok(v) => v.to_string(),
         Err(e) => format!("error:{e}"),
     };
-    let drew = cx.wait_for(Duration::from_secs(5), || read() == "3:true:true");
+    let drew = cx.wait_for(Duration::from_secs(5), || read() == "true:smoke");
     let last = read();
-    cx.log("lensFirstDraw", format!("hits:ring:frame={last}"));
-    let why = format!("hits:ring:frame={last} want 3:true:true");
+    cx.log("lensFirstDraw", format!("frame:chip={last}"));
+    let why = format!("frame:chip={last} want true:smoke");
     cx.must("lensFirstDraw", drew, why);
     // The page said so itself, once its listeners were up (B-034).
     let seen = cx.app.state::<ipc::Seen>().snapshot();
     let said = seen.get(&label).is_some_and(|c| c.contains("lens:ready"));
     let ready = said && lens::is_ready(&label);
     check(cx, "lensReady", ready, format!("said={said} ready={ready}"));
-
-    let invoice = "\"Invoice\" relates to \"payment\": an invoice is a request for payment";
-    let owe = "the total due is what you owe";
-    let second = vec![
-        hit(0, "literal", at(260.0, 168.0, 64.0), ""),
-        hit(1, "related", at(140.0, 216.0, 92.0), invoice),
-        hit(2, "concept", at(140.0, 264.0, 150.0), owe),
-    ];
-    lens::set_hits(&cx.app, second, 1);
-    let why_js = "(() => { const w = document.getElementById('why'); \
-                  if (!w.classList.contains('on')) return null; \
-                  const a = w.getBoundingClientRect(); \
-                  const over = [...document.querySelectorAll('.hit')] \
-                  .filter((e) => e.dataset.i !== '1').filter((e) => { \
-                  const b = e.getBoundingClientRect(); \
-                  return b.left < a.right && b.right > a.left \
-                  && b.top < a.bottom && b.bottom > a.top; }).length; \
-                  return 'covers=' + over + ' at=' + Math.round(a.left) + ',' \
-                  + Math.round(a.top); })()";
-    let probe = || cx.eval(&label, why_js).ok().filter(|v| v.is_string());
-    let _ = cx.wait_for(Duration::from_secs(3), || probe().is_some());
-    // The chip glides into place; measure where it comes to rest.
-    cx.sleep(400);
-    let settled = probe().and_then(|v| v.as_str().map(String::from));
-    let value = settled.clone().unwrap_or_else(|| "null".into());
-    cx.log("lensWhyClear", &value);
-    let clear = settled.is_some_and(|s| s.starts_with("covers=0 "));
-    cx.must("lensWhyClear", clear, value);
-    lens::clear(&cx.app);
     lens::set_frame(&cx.app, None, "");
     lens::destroy(&cx.app);
 }
 
-/// B-030: Find's hits hold the backdrop at its fast pace; once they are gone
-/// and only the orb shows, it is back at 5 s within 6 s.
+/// B-030: the agent's frame holds the backdrop at its fast pace; once it is
+/// gone and only the orb shows, it is back at 5 s within 6 s.
 fn backdrop_idle(cx: &Cx) {
     let d = screen::primary(&screen::all_displays());
-    let hit = lens::Hit {
-        i: 0,
-        kind: "literal".into(),
-        rect: Some(Rect::new(
-            d.bounds.x + 140.0,
-            d.bounds.y + 120.0,
-            64.0,
-            18.0,
-        )),
-        why: Value::Null,
-        offscreen: false,
-    };
-    lens::set_hits(&cx.app, vec![hit], 0);
+    lens::set_frame(&cx.app, Some(&d), "smoke");
     let fast = cx.wait_for(Duration::from_secs(5), || !backdrop::slow_paced());
-    lens::clear(&cx.app);
+    lens::set_frame(&cx.app, None, "");
     let t = Instant::now();
     let slow = cx.wait_for(Duration::from_secs(6), backdrop::slow_paced);
     let ms = t.elapsed().as_millis();
@@ -527,9 +463,8 @@ fn point_resolved(cx: &Cx) {
     buddy::cancel();
 }
 
-/// smoke-v2.js B23 on the tour's new order: what works without a key, the
-/// card asking for one, the first question once there is one, the bar's
-/// token (D-06). Runs without a key and then with a fake one; what was
+/// smoke-v2.js B23 on the tour's order: the card asking for a key, the
+/// first question once there is one, the bar's token (D-06). Runs without a key and then with a fake one; what was
 /// stored is put back, and so is the bar, which the last step opens.
 fn onboarding(cx: &Cx) {
     buddy::cancel();
@@ -540,13 +475,11 @@ fn onboarding(cx: &Cx) {
     shared(&cx.app).call(&cx.app, |h| h.start_tour.as_ref());
     let _ = cx.wait_for(Duration::from_secs(2), buddy::is_active);
     let first = buddy::step_index();
-    buddy::notify("find-hit");
-    let second = buddy::step_index();
     s.set_api_key("sk-or-smoke-fake");
     buddy::notify("key-saved");
-    let third = buddy::step_index();
+    let second = buddy::step_index();
     buddy::notify("first-answer");
-    let fourth = buddy::step_index();
+    let third = buddy::step_index();
     buddy::cancel();
     if had.is_empty() {
         s.clear_api_key();
@@ -560,8 +493,8 @@ fn onboarding(cx: &Cx) {
             shared(&cx.app).lock().mode == mode
         });
     }
-    let value = format!("{first}>{second}>{third}>{fourth}");
-    check(cx, "onboardingSteps", value == "0>1>2>3", value);
+    let value = format!("{first}>{second}>{third}");
+    check(cx, "onboardingSteps", value == "0>1>2", value);
 }
 
 /// B-031: the window is kept, so a new answer's points show at once, and the
