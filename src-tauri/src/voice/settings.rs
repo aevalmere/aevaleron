@@ -336,7 +336,12 @@ mod tests {
     fn the_name_is_checked_before_it_is_kept() {
         let taken: Vec<String> = Vec::new();
         let cur = VoiceSettings::default();
-        let on = merge(&cur, &json!({ "wake": true, "wakeWord": "  Jarvis " }), &taken).unwrap();
+        let on = merge(
+            &cur,
+            &json!({ "wake": true, "wakeWord": "  Jarvis " }),
+            &taken,
+        )
+        .unwrap();
         assert!(on.wake);
         assert_eq!(on.wake_word, "Jarvis");
         let back = from_value(Some(&on.stored()));

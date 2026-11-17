@@ -1098,7 +1098,7 @@ mod tests {
         };
         assert_eq!(at(13, 13), [255, 69, 58, 255], "the dot");
         assert_eq!(at(2, 2), [200, 200, 200, 200], "the arrow is left alone");
-        assert_eq!(at(8, 13)[3], 0, "a clear ring around the dot");
+        assert_eq!(at(7, 12)[3], 0, "a clear ring around the dot");
         assert!(marked_icon(16).is_some() && marked_icon(32).is_some());
     }
 

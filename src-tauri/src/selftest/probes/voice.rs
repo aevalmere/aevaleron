@@ -669,7 +669,12 @@ fn set_wake(on: bool) {
 
 /// Plays `clip` into the listening and waits for what it sends, at most
 /// `wait` ms after the clip ends.
-fn hear(cx: &Cx, rx: &std::sync::mpsc::Receiver<String>, clip: &[f32], wait: u64) -> Option<String> {
+fn hear(
+    cx: &Cx,
+    rx: &std::sync::mpsc::Receiver<String>,
+    clip: &[f32],
+    wait: u64,
+) -> Option<String> {
     while rx.try_recv().is_ok() {}
     wake::play(clip);
     let deadline = clip_ms(clip) + wait;
@@ -822,7 +827,9 @@ fn scenes(
     // The name, a pause of 1.2 s, then the question.
     let paused = [name, &quiet(1.2), ask, &quiet(2.0)].concat();
     let got = hear(cx, rx, &paused, 15_000);
-    let ok = got.as_deref().is_some_and(|l| l.to_lowercase().contains("calendar"));
+    let ok = got
+        .as_deref()
+        .is_some_and(|l| l.to_lowercase().contains("calendar"));
     cx.must("voiceWakePause", ok, format!("sent={got:?}"));
 
     // A sentence without the name sends nothing.

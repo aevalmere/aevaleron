@@ -406,9 +406,7 @@ impl Machine {
             self.rest_until = now + len;
             self.rest_len = (len * 2).min(REST_MAX);
             self.phase = Phase::Resting;
-            return Some(Action::Rest {
-                ms: len * FRAME_MS,
-            });
+            return Some(Action::Rest { ms: len * FRAME_MS });
         }
         self.phase = if self.gate.quiet() >= REARM {
             Phase::Waiting
@@ -888,7 +886,9 @@ fn act(
             let v = super::state(Origin::Dictation, "working", json!({ "wake": true }));
             pill::update(app, v);
             let quiet = Duration::from_millis(u64::from(END_SILENCE) * FRAME_MS);
-            let spoke_end = Instant::now().checked_sub(quiet).unwrap_or_else(Instant::now);
+            let spoke_end = Instant::now()
+                .checked_sub(quiet)
+                .unwrap_or_else(Instant::now);
             let audio = wav::resample(&samples, rate, wav::RATE);
             let (a, k, t, g) = (app.clone(), key.clone(), tx.clone(), *pill_gen);
             WORKING.store(true, Ordering::SeqCst);
@@ -1174,7 +1174,11 @@ mod tests {
         let Some(Action::Finish(all)) = a.last() else {
             panic!("{a:?}")
         };
-        assert!(all.len() / F >= 40 + CHECK_PAUSE as usize + 50, "{}", all.len() / F);
+        assert!(
+            all.len() / F >= 40 + CHECK_PAUSE as usize + 50,
+            "{}",
+            all.len() / F
+        );
         assert_eq!(m.phase(), Phase::Busy);
         // While it is sent, nothing is heard; then it listens again.
         assert!(run(&mut m, &loud(), 40).is_empty());
@@ -1281,7 +1285,12 @@ mod tests {
             rested = m.checked(&Verdict::No);
             run(&mut m, &quiet(), REARM as usize);
         }
-        assert_eq!(rested, Some(Action::Rest { ms: REST * FRAME_MS }));
+        assert_eq!(
+            rested,
+            Some(Action::Rest {
+                ms: REST * FRAME_MS
+            })
+        );
         assert_eq!(m.phase(), Phase::Resting);
         // While it rests, speech is not checked.
         assert!(run(&mut m, &loud(), 40).is_empty());
@@ -1294,7 +1303,12 @@ mod tests {
             rested = m.checked(&Verdict::No);
             run(&mut m, &quiet(), REARM as usize);
         }
-        assert_eq!(rested, Some(Action::Rest { ms: 2 * REST * FRAME_MS }));
+        assert_eq!(
+            rested,
+            Some(Action::Rest {
+                ms: 2 * REST * FRAME_MS
+            })
+        );
     }
 
     #[test]
@@ -1317,7 +1331,16 @@ mod tests {
         run(&mut m, &loud(), 40);
         run(&mut m, &quiet(), CHECK_PAUSE as usize);
         m.checked(&yes("read this"));
-        let a = run(&mut m, &loud(), MAX_FRAMES);
+        // Speech, with the dips between words that tell it from a steady
+        // tone (which becomes the room's floor and ends the input).
+        let mut a = Vec::new();
+        for _ in 0..MAX_FRAMES / 28 + 2 {
+            a.extend(run(&mut m, &loud(), 25));
+            a.extend(run(&mut m, &quiet(), 3));
+            if !a.is_empty() {
+                break;
+            }
+        }
         let Some(Action::Finish(all)) = a.last() else {
             panic!("{a:?}")
         };

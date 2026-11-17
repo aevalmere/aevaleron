@@ -324,27 +324,42 @@ mod tests {
             Verdict::Yes { rest } => rest,
             v => panic!("{t:?}: {v:?}"),
         };
-        assert_eq!(rest("Aevaleron, what is on my screen?"), "what is on my screen?");
+        assert_eq!(
+            rest("Aevaleron, what is on my screen?"),
+            "what is on my screen?"
+        );
         assert_eq!(rest("Hey Avaleron."), "");
         assert_eq!(rest("A valeron open Notepad"), "open Notepad");
     }
 
     #[test]
     fn another_name_works_the_same_way() {
-        assert!(matches!(verdict("Jarvis, lights.", "Jarvis"), Verdict::Yes { .. }));
-        assert!(matches!(verdict("Hey Jarvas.", "Jarvis"), Verdict::Yes { .. }));
+        assert!(matches!(
+            verdict("Jarvis, lights.", "Jarvis"),
+            Verdict::Yes { .. }
+        ));
+        assert!(matches!(
+            verdict("Hey Jarvas.", "Jarvis"),
+            Verdict::Yes { .. }
+        ));
         assert_eq!(verdict("Travis, lights.", "Jarvis"), Verdict::No);
         // A short name must be heard as it is, but for its vowels.
         assert!(matches!(verdict("Max, hi.", "Max"), Verdict::Yes { .. }));
         assert_eq!(verdict("Mat, hi.", "Max"), Verdict::No);
         // Two words, the first a filler of its own.
-        assert!(matches!(verdict("Hey buddy, hi.", "Hey Buddy"), Verdict::Yes { .. }));
+        assert!(matches!(
+            verdict("Hey buddy, hi.", "Hey Buddy"),
+            Verdict::Yes { .. }
+        ));
     }
 
     #[test]
     fn the_name_comes_off_the_line() {
         let s = |t: &str| strip(t, NAME);
-        assert_eq!(s("Aevaleron, what is on my screen?"), "What is on my screen?");
+        assert_eq!(
+            s("Aevaleron, what is on my screen?"),
+            "What is on my screen?"
+        );
         assert_eq!(s("Hey Avaleron. What time is it?"), "What time is it?");
         // Loosely: the check heard the name, the final pass wrote it so.
         assert_eq!(s("Avalon, what time is it"), "What time is it");
