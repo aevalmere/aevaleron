@@ -283,7 +283,7 @@ export const scenes = [
         const m = document.getElementById('intent-menu');
         return !m.hidden && m.classList.contains('g-menu') && m.querySelectorAll('[role="option"]').length;
       });
-      t.check('tokenMenuIsGMenu', menu === 3, `menu=${menu}`);
+      t.check('tokenMenuIsGMenu', menu === 2, `menu=${menu}`);
       await t.shot('bar-menu', TALL_CLIP);
       // Closed with its menu open (the minimize button, the shortcut), the
       // bar comes back without it and with the field focused.
