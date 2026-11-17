@@ -257,10 +257,15 @@
       card.classList.remove('measuring');
       void card.offsetWidth; // restart the animation
       card.classList.add('in');
-      // Where the pointer already is decides whether clicks go through.
-      if (pointer) move(pointer.x, pointer.y);
-      else setThrough(true);
+      if (!pointer) setThrough(true);
     });
+  });
+
+  // Landed under a pointer that has not moved: it is on the card now.
+  card.addEventListener('animationend', (e) => {
+    // `show` alone when Windows animations are off.
+    const landed = e.animationName === 'drop' || e.animationName === 'show';
+    if (landed && pointer && card.classList.contains('in')) move(pointer.x, pointer.y);
   });
 
   window.aeval.on('agents:hide', () => {
