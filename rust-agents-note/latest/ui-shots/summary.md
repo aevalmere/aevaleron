@@ -1,12 +1,12 @@
-# ui-shots: cancelled
+# ui-shots: success
 
 - Workflow: ui-shots
-- Run: [44028790824](https://github.com/aevalmere/aevaleron/actions/runs/44028790824), attempt 1, on push
-- Commit: 09735ee1fe4c2e5d6d30c827cf6597c44196fc0e
+- Run: [44028868206](https://github.com/aevalmere/aevaleron/actions/runs/44028868206), attempt 1, on push
+- Commit: 4d0310d2ebbc29da74df03a741bba9fb27d7837c
 - Ref: rust/agents-note
-- Conclusion: **cancelled**
-- Finished: 2026-11-17T06:09:37Z
-- Screenshots: https://github.com/aevalmere/aevaleron/tree/shots/rust-d-ui/rust/agents-note/09735ee1fe4c2e5d6d30c827cf6597c44196fc0e (/ in the ref becomes -)
+- Conclusion: **success**
+- Finished: 2026-11-17T06:25:35Z
+- Screenshots: https://github.com/aevalmere/aevaleron/tree/shots/rust-d-ui/rust/agents-note/4d0310d2ebbc29da74df03a741bba9fb27d7837c (/ in the ref becomes -)
 
 | Step | Outcome | Log |
 |---|---|---|
@@ -14,7 +14,7 @@
 | Node | success |  |
 | Bridge unit checks | success | [bridge.log](bridge.log) |
 | Install Playwright | success | [playwright.log](playwright.log) |
-| Screenshots and renderer checks | cancelled | [shots.log](shots.log) |
+| Screenshots and renderer checks | success | [shots.log](shots.log) |
 | Upload screenshots | success |  |
 | Publish to the shots branch | success |  |
 
