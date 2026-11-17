@@ -959,34 +959,15 @@ async fn write_down(s: &VoiceSettings, audio: Vec<f32>, word: &str) -> Result<St
 }
 
 /// The one place a heard line goes to the assistant: as if it had been
-/// typed in the bar and Enter pressed. The bar opens showing it, it is sent
-/// as a question the bar guessed (`query:submit`, inferred), the field is
-/// cleared as a typed send clears it, and the answer shows as for any
-/// question. The rust/ask-do lane's entry point, which decides between
-/// answering and doing, replaces the body of this function.
+/// typed in the bar and Enter pressed (`windows::submit_text`). The bar
+/// opens and decides it the way it decides typing: a clear task starts,
+/// a question is answered.
 pub fn submit(app: &AppHandle, line: &str) {
     if let Some(sink) = SINK.lock().as_ref() {
         let _ = sink.send(line.to_string());
         return;
     }
-    let app = app.clone();
-    let line = line.to_string();
-    tauri::async_runtime::spawn(async move {
-        crate::windows::open_bar(&app, None, Some(line.clone()));
-        let o = crate::host::ask::SubmitOpts {
-            inferred: true,
-            ..Default::default()
-        };
-        let r = crate::host::ask::submit(&app, &line, o).await;
-        let status = r.get("status").and_then(Value::as_str).unwrap_or("");
-        // Without a provider, or when it did not start, the words stay in
-        // the field, as typed ones do.
-        if !matches!(status, "needs-key" | "error") {
-            crate::store::get().push_input_history(&line);
-            let clear = json!({ "text": "", "mode": "ask" });
-            crate::windows::emit(&app, crate::windows::OVERLAY, "bar:prefill", clear);
-        }
-    });
+    crate::windows::submit_text(app, line);
 }
 
 // ------------------------------------------------------------- the check
