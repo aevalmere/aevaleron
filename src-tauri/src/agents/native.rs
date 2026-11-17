@@ -116,6 +116,7 @@ const TH32CS_SNAPPROCESS: u32 = 0x2;
 const PROCESS_QUERY_LIMITED_INFORMATION: u32 = 0x1000;
 const STILL_ACTIVE: u32 = 259;
 const ATTACH_PARENT_PROCESS: u32 = u32::MAX;
+const GA_ROOT: u32 = 2;
 const GA_ROOTOWNER: u32 = 3;
 const GW_OWNER: u32 = 4;
 const GWL_EXSTYLE: i32 = -20;
@@ -522,6 +523,15 @@ pub fn from_hook_process(project: &str, agent: &str) -> Found {
 pub fn foreground() -> i64 {
     // SAFETY: a query.
     unsafe { GetForegroundWindow() as i64 }
+}
+
+/// The top-level window `hwnd` belongs to; 0 for none.
+pub fn root(hwnd: i64) -> i64 {
+    if hwnd == 0 {
+        return 0;
+    }
+    // SAFETY: a query; a stale handle answers 0.
+    unsafe { GetAncestor(hwnd as isize, GA_ROOT) as i64 }
 }
 
 /// The process that owns `hwnd`, and its exe's file name ("Claude.exe").

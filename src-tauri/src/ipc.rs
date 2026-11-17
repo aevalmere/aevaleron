@@ -160,7 +160,7 @@ pub const INVOKE_CHANNELS: &[&str] = &[
     "agents:hover",
     "agents:open",
     "agents:dismiss",
-    "agents:act",
+    "agents:pass",
     "agents:get",
     "agents:set",
     "agents:test",
@@ -1357,7 +1357,7 @@ mod tests {
             // agents lane
             (
                 Caller::Agents,
-                vec![glass, include_str!("../../renderer/agents.js")],
+                vec![include_str!("../../renderer/agents.js")],
             ),
             // region-text lane
             (

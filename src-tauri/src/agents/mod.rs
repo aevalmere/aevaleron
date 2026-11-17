@@ -1,13 +1,15 @@
 //! Watching the coding agents on this PC (Claude Code, Codex, Gemini CLI,
 //! Copilot CLI, Cursor, Windsurf, OpenCode): the PC stays awake while any of
-//! them works, and when one finishes or needs you a card comes out of the
-//! bar saying which. Clicking it, or Alt+Tab while it shows, jumps to that
+//! them works, and when one finishes or needs you a notification drops from
+//! the top of the screen saying which, where Aevalsistant puts its own and
+//! looking the same. Clicking it, or Alt+Tab while it shows, jumps to that
 //! agent's window. Ported from Aevalsistant.
 //!
 //! Nothing here runs until the person turns it on: connecting agents edits
 //! their config files (`specs`), so it is theirs to decide. Hook calls
 //! arrive from `hook` over a named pipe; `sessions` keeps them; this
-//! file wires them to the power request, the card window and Settings.
+//! file wires them to the power request, the notification window and
+//! Settings.
 
 mod chats;
 pub mod hook;
@@ -33,15 +35,20 @@ use crate::capture::{self, PxRect};
 use crate::desktop::win;
 use crate::state::Rect;
 
-/// The card's window.
+/// The notification's window.
 pub const LABEL: &str = "agents";
-/// The card is 420 wide; the window adds room for its shadow.
-const CARD_WIDTH: f64 = 452.0;
-/// Between the bar and the card.
-const GAP: f64 = 2.0;
+/// The card is 420 wide with 22 of room for its shadow each side, as
+/// Aevalsistant's (Toast.cs, ToastArt.W and Pad). DIPs.
+const WINDOW_WIDTH: f64 = 464.0;
 /// The countdown runs only while the person is at the keyboard.
 const AWAY_AFTER_MS: u64 = 20_000;
 const TICK_MS: u64 = 250;
+/// No notification goes sooner than this, whatever Settings says.
+const MIN_CARD_MS: u64 = 5_000;
+/// The app's offer to turn watching on waits longer for its answer.
+const OFFER_MS: u64 = 20_000;
+/// A Stop hook can fire a moment before the reply is on disk.
+const SNIPPET_WAIT_MS: u64 = 300;
 /// Rows under the head; the rest are counted.
 const MAX_ROWS: usize = 6;
 /// Sessions the tray menu lists; the rest are counted.
@@ -159,22 +166,40 @@ fn save_prefs(p: &Prefs) {
     crate::store::get().set_raw("agents", json!(p));
 }
 
-/// A button on a card the app itself shows.
-type Action = (&'static str, &'static str);
-
-struct Showing {
+/// A notification waiting its turn. The newest ready one is on screen; the
+/// others come back when it is withdrawn (Aevalsistant's queue).
+struct Pending {
+    id: u64,
     card: CardRequest,
-    actions: Vec<Action>,
+    /// The app's offer to turn agent watching on: a click opens Settings.
+    offer: bool,
+    /// False while the reply is read from the transcript.
+    ready: bool,
+}
+
+/// The notification window while it is up.
+struct Up {
     elapsed: u64,
     total: u64,
     /// The page has measured it and the window is up.
     placed: bool,
+    /// The display it went up on, kept until it goes.
+    spot: Option<Spot>,
+}
+
+/// A display's work area in physical pixels, and its scale.
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct Spot {
+    work: Rect,
+    scale: f64,
 }
 
 struct State {
     book: SessionBook,
     awake: power::Awake,
-    showing: Option<Showing>,
+    pending: Vec<Pending>,
+    next_id: u64,
+    up: Option<Up>,
     hover: bool,
     /// `Prefs::alt_tab`, kept here so the keyboard hook never reads the
     /// store.
@@ -191,7 +216,9 @@ fn state() -> &'static Mutex<State> {
         Mutex::new(State {
             book: SessionBook::default(),
             awake: power::Awake::new(),
-            showing: None,
+            pending: Vec::new(),
+            next_id: 0,
+            up: None,
             hover: false,
             alt_tab: true,
             errors: HashMap::new(),
@@ -322,13 +349,12 @@ fn on_event(e: &HookEvent) {
     }
     let request = state().lock().book.apply(e, now_ms());
     refresh_power(&p);
+    // A new prompt or the end of a session: its news is old.
+    if e.name == "UserPromptSubmit" || e.name == "SessionEnd" {
+        withdraw(&e.session_id, &p);
+    }
     match request {
-        Some(mut card) if p.wants(&card) => {
-            if card.wants_snippet {
-                card.detail = last_reply(card.session_id.as_deref());
-            }
-            show_card(card, Vec::new(), &p);
-        }
+        Some(card) if p.wants(&card) => enqueue(card, false, &p),
         _ => refresh_card(&p),
     }
     sync_tray();
@@ -476,9 +502,9 @@ fn sleep_later(how: power::LidSleep) {
     });
 }
 
-// -------------------------------------------------------------------- card
+// ------------------------------------------------------------ notification
 
-/// The rows under the card's head, and how many more there are.
+/// The rows under the notification's head, and how many more there are.
 fn rows(book: &SessionBook, head: Option<&str>, nest: bool, now: u64) -> (Vec<Value>, usize) {
     let all = book.tree(head, nest);
     let more = all.len().saturating_sub(MAX_ROWS);
@@ -491,16 +517,17 @@ fn rows(book: &SessionBook, head: Option<&str>, nest: bool, now: u64) -> (Vec<Va
                 .subagent_id
                 .as_ref()
                 .and_then(|id| s.subagents.iter().find(|(k, _)| k == id));
+            // A subagent's row goes to its session's window, since that is
+            // where it runs.
             Some(match sub {
                 Some((id, a)) => json!({
                     "session": s.id,
                     "subagent": id,
                     "depth": row.depth,
-                    "name": Some(a.kind.as_str()).filter(|k| !k.is_empty()).unwrap_or("Subagent"),
+                    "name": Some(a.kind.as_str()).filter(|k| !k.is_empty()).unwrap_or("subagent"),
                     "place": "",
                     "state": "working",
                     "text": sessions::subagent_text(a, now),
-                    "canJump": false,
                 }),
                 None => json!({
                     "session": s.id,
@@ -509,7 +536,6 @@ fn rows(book: &SessionBook, head: Option<&str>, nest: bool, now: u64) -> (Vec<Va
                     "place": s.place(),
                     "state": sessions::state_of(s).as_str(),
                     "text": sessions::status_text(s, now),
-                    "canJump": native::is_window(s.hwnd),
                 }),
             })
         })
@@ -517,32 +543,43 @@ fn rows(book: &SessionBook, head: Option<&str>, nest: bool, now: u64) -> (Vec<Va
     (list, more)
 }
 
+/// The notification on screen: the newest one that is ready.
+fn top(st: &State) -> Option<&Pending> {
+    st.pending.iter().rev().find(|p| p.ready)
+}
+
+/// The window a pending notification goes to: its session's newest window.
+fn hwnd_of(st: &State, p: &Pending) -> i64 {
+    p.card
+        .session_id
+        .as_deref()
+        .and_then(|id| st.book.get(id))
+        .map_or(p.card.hwnd, |s| s.hwnd)
+}
+
+/// Alt+Tab is taken over only when it would go somewhere new: with that
+/// window already in front it stays the normal window switcher.
+fn can_jump(hwnd: i64) -> bool {
+    native::is_window(hwnd) && native::root(native::foreground()) != hwnd
+}
+
 /// `agents:card`: everything the page draws.
-fn payload(st: &State, p: &Prefs, from: &str) -> Value {
-    let Some(showing) = &st.showing else {
+fn payload(st: &State, p: &Prefs) -> Value {
+    let Some(top) = top(st).filter(|_| st.up.is_some()) else {
         return Value::Null;
     };
-    let c = &showing.card;
+    let c = &top.card;
     let (list, more) = rows(&st.book, c.session_id.as_deref(), p.show_children, now_ms());
-    let can_jump = native::is_window(c.hwnd);
-    let actions: Vec<Value> = showing
-        .actions
-        .iter()
-        .map(|(id, label)| json!({ "id": id, "label": label }))
-        .collect();
     json!({
         "kind": c.kind.as_str(),
         "title": c.title,
         "place": c.host,
         "detail": c.detail,
         "session": c.session_id,
-        "canJump": can_jump,
-        "altTab": p.alt_tab && can_jump,
+        "altTab": p.alt_tab && can_jump(hwnd_of(st, top)),
         "expand": p.expand_on_hover,
         "rows": list,
         "more": more,
-        "actions": actions,
-        "from": from,
     })
 }
 
@@ -572,6 +609,13 @@ fn window(app: &AppHandle) -> Option<tauri::WebviewWindow> {
             // Never takes the keyboard, and stays out of screenshots.
             win::tool_window(raw, true);
             capture::exclude_window(raw);
+            // The shared window flags keep it that way, and let the mouse
+            // through everywhere but the card: the page says where the card
+            // is (`agents:pass`) from the pointer moves forwarded to it.
+            let flags = crate::windows::flags::Meta::default();
+            crate::windows::flags::adopt(app, &w, flags);
+            crate::windows::flags::set_focusable(raw, false);
+            crate::windows::flags::set_click_through(&w, true);
             crate::crash::guard_webview(&w, |app, label| {
                 if let Some(w) = app.get_webview_window(label) {
                     let _ = w.destroy();
@@ -586,29 +630,105 @@ fn window(app: &AppHandle) -> Option<tauri::WebviewWindow> {
     }
 }
 
-/// Puts `card` up, in place of any card showing now.
-fn show_card(card: CardRequest, actions: Vec<Action>, p: &Prefs) {
-    let Some(app) = APP.get() else { return };
+/// A new notification (Aevalsistant's Enqueue): it replaces any from the
+/// same session and goes on top. One whose reply is still being written
+/// waits a moment, unseen, and is read from the transcript then.
+fn enqueue(card: CardRequest, offer: bool, p: &Prefs) {
+    let snippet = card.wants_snippet;
     let kind = card.kind;
-    let total = if actions.is_empty() {
-        p.card_ms(kind)
-    } else {
-        // A question from the app waits longer for its answer.
-        20_000
-    };
-    {
+    let id = {
         let mut st = state().lock();
-        st.hover = false;
-        st.showing = Some(Showing {
+        if let Some(sid) = card.session_id.clone() {
+            st.pending
+                .retain(|x| x.card.session_id.as_deref() != Some(sid.as_str()));
+        }
+        st.next_id += 1;
+        let id = st.next_id;
+        st.pending.push(Pending {
+            id,
             card,
-            actions,
-            elapsed: 0,
-            total,
-            placed: false,
+            offer,
+            ready: !snippet,
         });
+        id
+    };
+    if snippet {
+        std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(SNIPPET_WAIT_MS));
+            let _ = crate::crash::guard("agents-snippet", || fill_snippet(id));
+        });
+        return;
     }
+    chime(kind, p);
+    show_top(true, p);
+}
+
+/// The reply is on disk now: fill it in and show the notification, unless
+/// it was withdrawn meanwhile.
+fn fill_snippet(id: u64) {
+    let session = {
+        let st = state().lock();
+        match st.pending.iter().find(|x| x.id == id) {
+            Some(x) => x.card.session_id.clone(),
+            None => return,
+        }
+    };
+    let reply = last_reply(session.as_deref());
+    let kind = {
+        let mut st = state().lock();
+        let Some(x) = st.pending.iter_mut().find(|x| x.id == id) else {
+            return;
+        };
+        x.card.detail = reply;
+        x.card.wants_snippet = false;
+        x.ready = true;
+        x.card.kind
+    };
+    let p = prefs();
+    chime(kind, &p);
+    show_top(true, &p);
+}
+
+fn chime(kind: CardKind, p: &Prefs) {
     if p.sound && kind != CardKind::Info && !native::do_not_disturb() {
         native::chime(kind == CardKind::NeedsYou);
+    }
+}
+
+/// Puts the newest ready notification up, or keeps it up with what changed.
+/// `restart` starts its countdown again.
+fn show_top(restart: bool, p: &Prefs) {
+    let Some(app) = APP.get() else { return };
+    let none = {
+        let mut st = state().lock();
+        let total = top(&st).map(|t| {
+            if t.offer {
+                OFFER_MS
+            } else {
+                p.card_ms(t.card.kind).max(MIN_CARD_MS)
+            }
+        });
+        match total {
+            None => true,
+            Some(total) => {
+                let up = st.up.get_or_insert(Up {
+                    elapsed: 0,
+                    total,
+                    placed: false,
+                    spot: None,
+                });
+                if restart {
+                    up.elapsed = 0;
+                    up.total = total;
+                }
+                false
+            }
+        }
+    };
+    if none {
+        // Nothing ready to show: the window goes, the queue stays.
+        take_down();
+        return;
     }
     let a = app.clone();
     let p = p.clone();
@@ -621,98 +741,117 @@ fn show_card(card: CardRequest, actions: Vec<Action>, p: &Prefs) {
     });
 }
 
-/// Sends the card showing now to the page (which answers with its height).
+/// Sends the notification on screen to the page (which answers with its
+/// height).
 fn send_card(app: &AppHandle, p: &Prefs) {
-    let (from, _) = spot(app, 0.0);
-    let data = payload(&state().lock(), p, from);
+    let data = payload(&state().lock(), p);
     if !data.is_null() {
         crate::windows::emit(app, LABEL, "agents:card", data);
     }
 }
 
-/// The rows changed under a card that is up.
+/// The rows changed under a notification that is up.
 fn refresh_card(p: &Prefs) {
     let Some(app) = APP.get() else { return };
-    let placed = state().lock().showing.as_ref().is_some_and(|s| s.placed);
+    let placed = state().lock().up.as_ref().is_some_and(|u| u.placed);
     if placed {
         send_card(app, p);
     }
 }
 
-/// Where a card `height` tall goes: under the bar, centred on it, or above
-/// it when there is no room below. Also which edge it grows out of.
-fn spot(app: &AppHandle, height: f64) -> (&'static str, Rect) {
-    let area = crate::windows::bar_area();
-    if !crate::windows::bar_on_screen(app) {
-        return ("top", place_alone(area, height));
+/// A session's news is old (a new prompt, or it ended): its notification
+/// goes, and the one under it comes back.
+fn withdraw(session: &str, p: &Prefs) {
+    let (gone, left) = {
+        let mut st = state().lock();
+        let before = st.pending.len();
+        st.pending
+            .retain(|x| x.card.session_id.as_deref() != Some(session));
+        (st.pending.len() != before, !st.pending.is_empty())
+    };
+    if !gone {
+        return;
     }
-    let bar = crate::windows::bar_rect(app);
-    place_card(bar, area, height)
-}
-
-/// With no bar on screen (the button is off and the bar is closed) the card
-/// hangs from the top of the screen, in the middle.
-fn place_alone(area: Rect, height: f64) -> Rect {
-    let width = CARD_WIDTH.min(area.width);
-    let x = area.x + ((area.width - width) / 2.0).round();
-    Rect::new(x, area.y, width, height.min(area.height))
-}
-
-fn place_card(bar: Rect, area: Rect, height: f64) -> (&'static str, Rect) {
-    let width = CARD_WIDTH.min(area.width);
-    let left = bar.x + bar.width / 2.0 - width / 2.0;
-    let x = left.clamp(area.x, (area.x + area.width - width).max(area.x));
-    let below = bar.y + bar.height + GAP;
-    if below + height <= area.y + area.height {
-        ("top", Rect::new(x, below, width, height))
+    if left {
+        show_top(false, p);
     } else {
-        let y = (bar.y - GAP - height).max(area.y);
-        ("bottom", Rect::new(x, y, width, height))
+        hide_card();
     }
 }
 
-/// `agents:size`: the page measured the card. The window takes that size
-/// beside the bar and shows, without taking focus.
+/// The display under the pointer, as Aevalsistant picks it.
+fn spot_now() -> Spot {
+    let (x, y) = crate::windows::screen::cursor_px();
+    let d = crate::windows::screen::matching_px(Rect::new(x, y, 1.0, 1.0));
+    Spot {
+        work: d.work_px,
+        scale: d.scale,
+    }
+}
+
+/// The window for a page `height` DIPs tall: centred on the work area,
+/// against its top edge (so under a taskbar at the top), physical pixels.
+/// The card sits 16 DIPs down inside it, as Aevalsistant's does.
+fn place_px(spot: Spot, height: f64) -> PxRect {
+    let width = (WINDOW_WIDTH * spot.scale).ceil();
+    let x = spot.work.x + ((spot.work.width - width) / 2.0).trunc();
+    PxRect {
+        x: x as i32,
+        y: spot.work.y as i32,
+        width: width as i32,
+        height: (height * spot.scale).ceil() as i32,
+    }
+}
+
+/// `agents:size`: the page measured the notification (open, with its whole
+/// message). The window takes that size at the top of the display under
+/// the pointer and shows, without taking focus.
 fn page_size(app: &AppHandle, p: &Value) -> Value {
     let height = p
         .get("height")
         .and_then(Value::as_f64)
         .unwrap_or(0.0)
-        .clamp(40.0, 640.0);
+        .clamp(40.0, 900.0);
     let Some(w) = app.get_webview_window(LABEL) else {
         return Value::Null;
     };
-    if state().lock().showing.is_none() {
-        return Value::Null;
-    }
-    let (from, at) = spot(app, height);
-    let px = crate::windows::screen::dip_to_px(at);
-    let rect = PxRect {
-        x: px.x.round() as i32,
-        y: px.y.round() as i32,
-        width: px.width.round() as i32,
-        height: px.height.round() as i32,
+    let spot = {
+        let mut st = state().lock();
+        let Some(up) = st.up.as_mut() else {
+            return Value::Null;
+        };
+        *up.spot.get_or_insert_with(spot_now)
     };
-    win::place(&w, rect);
+    win::place(&w, place_px(spot, height));
     let raw = capture::hwnd_of(&w);
     win::show_inactive(raw);
     win::raise(raw);
-    if let Some(s) = state().lock().showing.as_mut() {
-        s.placed = true;
+    if let Some(u) = state().lock().up.as_mut() {
+        u.placed = true;
     }
-    json!({ "from": from })
+    json!({ "ok": true })
+}
+
+/// `agents:pass`: whether the pointer is off the card, so clicks go
+/// through to whatever is under the window.
+fn page_pass(app: &AppHandle, p: &Value) -> Value {
+    let through = p.get("ignore").and_then(Value::as_bool).unwrap_or(true);
+    if let Some(w) = app.get_webview_window(LABEL) {
+        crate::windows::flags::set_click_through(&w, through);
+    }
+    json!({ "ok": true })
 }
 
 /// How long the window waits for the page to say `agents:hidden` before it
-/// goes anyway. The fold takes 260 ms and two frames; this only runs out
+/// goes anyway. The lift takes 220 ms and two frames; this only runs out
 /// when the page cannot answer.
 const HIDE_WAIT_MS: u64 = 600;
 
-/// `agents:hidden`: the page has folded the card and painted the frame
+/// `agents:hidden`: the page has lifted the card away and painted the frame
 /// without it, so the window can go with nothing on it.
 fn page_hidden(app: &AppHandle) -> Value {
-    // Unless another card came up meanwhile.
-    if state().lock().showing.is_none() {
+    // Unless another notification came up meanwhile.
+    if state().lock().up.is_none() {
         if let Some(w) = app.get_webview_window(LABEL) {
             win::hide(capture::hwnd_of(&w));
         }
@@ -720,13 +859,20 @@ fn page_hidden(app: &AppHandle) -> Value {
     json!({ "ok": true })
 }
 
-/// Takes the card down. The page folds it first and says when it is gone
-/// (`agents:hidden`); the window hides then.
+/// Takes the notification down and forgets the queue (an expired, clicked
+/// or dismissed notification takes the ones under it too).
 fn hide_card() {
+    state().lock().pending.clear();
+    take_down();
+}
+
+/// Takes the window down. The page lifts the card away first and says when
+/// it is gone (`agents:hidden`); the window hides then.
+fn take_down() {
     let Some(app) = APP.get() else { return };
     {
         let mut st = state().lock();
-        if st.showing.take().is_none() {
+        if st.up.take().is_none() {
             return;
         }
         st.hover = false;
@@ -735,8 +881,8 @@ fn hide_card() {
     let a = app.clone();
     std::thread::spawn(move || {
         std::thread::sleep(Duration::from_millis(HIDE_WAIT_MS));
-        // Unless another card came up meanwhile.
-        if state().lock().showing.is_some() {
+        // Unless another notification came up meanwhile.
+        if state().lock().up.is_some() {
             return;
         }
         let a2 = a.clone();
@@ -755,51 +901,65 @@ fn window_of(session: &str) -> i64 {
         .get(session)
         .map(|s| s.hwnd)
         .or_else(|| {
-            let c = &st.showing.as_ref()?.card;
-            (c.session_id.as_deref() == Some(session)).then_some(c.hwnd)
+            let p = st
+                .pending
+                .iter()
+                .find(|x| x.card.session_id.as_deref() == Some(session))?;
+            Some(p.card.hwnd)
         })
         .unwrap_or(0)
 }
 
-/// Brings a session's window to the front, as a click on its row in the
-/// card does. False when the window is gone.
+/// Brings a session's window to the front, as a click on its row does.
+/// False when the window is gone.
 pub fn jump(session: &str) -> bool {
     native::focus(window_of(session))
 }
 
-/// `agents:open`: a row or the head was clicked.
+/// `agents:open`: a click on the head (no session) or on a row. The
+/// notification goes either way, then that window comes to the front; the
+/// offer opens Settings, Agents instead.
 fn open(p: &Value) -> Value {
-    let hwnd = match p.get("session").and_then(Value::as_str) {
-        Some(id) => window_of(id),
-        None => state().lock().showing.as_ref().map_or(0, |s| s.card.hwnd),
+    let (hwnd, offer) = match p.get("session").and_then(Value::as_str) {
+        Some(id) => (window_of(id), false),
+        None => {
+            let st = state().lock();
+            top(&st).map_or((0, false), |t| (hwnd_of(&st, t), t.offer))
+        }
     };
-    let ok = native::focus(hwnd);
     hide_card();
-    json!({ "ok": ok })
+    if offer {
+        if let Some(app) = APP.get() {
+            crate::windows::open_settings(app, Some("sec-watch-agents"));
+        }
+        return json!({ "ok": true });
+    }
+    json!({ "ok": native::focus(hwnd) })
 }
 
-/// Alt+Tab while a card with a window behind it is up: jump there. Called
-/// from the keyboard hook, so it never waits; true swallows the key.
+/// Alt+Tab while a notification with a window behind it is up: jump there.
+/// Called from the keyboard hook, so it never waits; true swallows the key.
 pub fn alt_tab() -> bool {
     let Some(st) = state().try_lock() else {
         return false;
     };
-    let hwnd = match &st.showing {
-        Some(s) if s.placed && st.alt_tab => s.card.hwnd,
+    let placed = st.up.as_ref().is_some_and(|u| u.placed);
+    let hwnd = match top(&st) {
+        Some(t) if placed && st.alt_tab => hwnd_of(&st, t),
         _ => 0,
     };
     drop(st);
-    if !native::is_window(hwnd) {
+    if !can_jump(hwnd) {
         return false;
     }
     std::thread::spawn(move || {
-        native::focus(hwnd);
         hide_card();
+        native::focus(hwnd);
     });
     true
 }
 
-/// The card's countdown, the session sweep and the hook re-check.
+/// The notification's countdown, the session sweep and the hook re-check.
 fn tick_loop() {
     let mut ticks: u64 = 0;
     loop {
@@ -809,12 +969,12 @@ fn tick_loop() {
             let expired = {
                 let mut st = state().lock();
                 let hover = st.hover;
-                match st.showing.as_mut() {
-                    Some(s) if s.placed => {
+                match st.up.as_mut() {
+                    Some(u) if u.placed => {
                         if !hover && native::idle_ms() < AWAY_AFTER_MS {
-                            s.elapsed += TICK_MS;
+                            u.elapsed += TICK_MS;
                         }
-                        s.elapsed >= s.total
+                        u.elapsed >= u.total
                     }
                     _ => false,
                 }
@@ -846,20 +1006,34 @@ fn sweep() {
     if !p.enabled {
         return;
     }
-    let changed = {
+    let (changed, dropped, left) = {
         let mut st = state().lock();
-        if st.book.is_empty() {
-            return;
-        }
-        st.book.sweep(
-            now_ms(),
-            |s| native::is_alive(s.pid, s.pid_start),
-            probe,
-            |s, id| s.subagent_transcript(id).and_then(|t| modified_ms(&t)),
-        )
+        let changed = !st.book.is_empty()
+            && st.book.sweep(
+                now_ms(),
+                |s| native::is_alive(s.pid, s.pid_start),
+                probe,
+                |s, id| s.subagent_transcript(id).and_then(|t| modified_ms(&t)),
+            );
+        // Notifications for sessions that are gone go with them.
+        let before = st.pending.len();
+        let State { book, pending, .. } = &mut *st;
+        pending.retain(|x| {
+            x.card
+                .session_id
+                .as_deref()
+                .map_or(true, |id| book.get(id).is_some())
+        });
+        (changed, pending.len() != before, !pending.is_empty())
     };
     if changed {
         refresh_power(&p);
+    }
+    if dropped && left {
+        show_top(true, &p);
+    } else if dropped {
+        hide_card();
+    } else if changed {
         refresh_card(&p);
     }
 }
@@ -1116,7 +1290,8 @@ fn set(patch: &Value) -> Value {
         save_prefs(&after);
         state().lock().alt_tab = after.alt_tab;
         if !after.enabled {
-            // Nothing is watched any more: let the PC sleep, drop the card.
+            // Nothing is watched any more: let the PC sleep, drop the
+            // notification.
             state().lock().book = SessionBook::default();
             hide_card();
         }
@@ -1149,7 +1324,7 @@ fn info(title: &str, detail: &str) -> CardRequest {
     }
 }
 
-/// `agents:test`: a card as a finished agent's would look.
+/// `agents:test`: a notification as a finished agent's would look.
 fn test_card() -> Value {
     let mut card = info(
         "rover finished",
@@ -1157,12 +1332,14 @@ fn test_card() -> Value {
     );
     card.kind = CardKind::Done;
     card.host = "Terminal".to_string();
-    show_card(card, Vec::new(), &prefs());
+    let p = prefs();
+    enqueue(card, false, &p);
     json!({ "ok": true })
 }
 
 /// Once, a while after the first start with this in the app: the offer to
-/// turn agent watching on.
+/// turn agent watching on. A click opens Settings, Agents, where the switch
+/// is; a notification has no buttons.
 fn offer_later() {
     std::thread::spawn(|| {
         std::thread::sleep(Duration::from_secs(90));
@@ -1182,27 +1359,11 @@ fn offer_later() {
             });
             let card = info(
                 "Watch your coding agents?",
-                "Aevaleron can keep this PC awake while Claude Code, Codex and the others work, and tell you when one finishes or needs you.",
+                "Aevaleron can keep this PC awake while Claude Code, Codex and the others work, and tell you when one finishes or needs you. Click to turn it on in Settings.",
             );
-            let actions = vec![("enable", "Turn on"), ("later", "Not now")];
-            show_card(card, actions, &p);
+            enqueue(card, true, &p);
         });
     });
-}
-
-/// `agents:act`: a button on one of the app's own cards.
-fn act(p: &Value) -> Value {
-    let id = p.get("id").and_then(Value::as_str).unwrap_or_default();
-    hide_card();
-    if id == "enable" {
-        set(&json!({ "enabled": true }));
-        let done = info(
-            "Agent watching is on",
-            "Restart any agent sessions that are open now. Settings, Agents has the rest.",
-        );
-        show_card(done, Vec::new(), &prefs());
-    }
-    json!({ "ok": true })
 }
 
 #[cfg(test)]
@@ -1267,23 +1428,37 @@ mod tests {
     }
 
     #[test]
-    fn the_card_sits_under_the_bar_or_above_it() {
-        let area = Rect::new(0.0, 0.0, 1920.0, 1040.0);
-        let bar = Rect::new(660.0, 20.0, 600.0, 56.0);
-        let (from, at) = place_card(bar, area, 120.0);
-        assert_eq!(from, "top");
-        assert_eq!((at.x, at.y, at.width), (734.0, 78.0, 452.0));
-        // A bar at the bottom of the screen: the card goes above it.
-        let low = Rect::new(660.0, 960.0, 600.0, 56.0);
-        let (from, at) = place_card(low, area, 120.0);
-        assert_eq!(from, "bottom");
-        assert_eq!(at.y + at.height, 958.0);
-        // Never off the side of the work area.
-        let edge = Rect::new(0.0, 20.0, 56.0, 56.0);
-        assert_eq!(place_card(edge, area, 120.0).1.x, 0.0);
-        let alone = place_alone(area, 120.0);
-        assert_eq!(alone.y, area.y);
-        assert_eq!(alone.x + alone.width / 2.0, area.x + area.width / 2.0);
+    fn the_notification_hangs_from_the_top_centre_like_aevalsistants() {
+        let px = |r: PxRect| (r.x, r.y, r.width, r.height);
+        // 100%: 464 wide, centred, against the top of the work area.
+        let one = Spot {
+            work: Rect::new(0.0, 0.0, 1920.0, 1032.0),
+            scale: 1.0,
+        };
+        assert_eq!(px(place_px(one, 102.0)), (728, 0, 464, 102));
+        // A taskbar at the top: the work area starts under it.
+        let top_bar = Spot {
+            work: Rect::new(0.0, 48.0, 1920.0, 1032.0),
+            scale: 1.0,
+        };
+        assert_eq!(place_px(top_bar, 102.0).y, 48);
+        // 125% and 150%: the same DIPs in more pixels, still centred.
+        let five_four = Spot {
+            work: Rect::new(0.0, 0.0, 2560.0, 1380.0),
+            scale: 1.25,
+        };
+        assert_eq!(px(place_px(five_four, 102.0)), (990, 0, 580, 128));
+        let three_two = Spot {
+            work: Rect::new(0.0, 0.0, 2880.0, 1560.0),
+            scale: 1.5,
+        };
+        assert_eq!(px(place_px(three_two, 102.0)), (1092, 0, 696, 153));
+        // A second display to the left of the primary, at 150%.
+        let left = Spot {
+            work: Rect::new(-2880.0, 120.0, 2880.0, 1560.0),
+            scale: 1.5,
+        };
+        assert_eq!(px(place_px(left, 102.0)), (-1788, 120, 696, 153));
     }
 
     #[test]
@@ -1306,7 +1481,6 @@ mod tests {
         assert_eq!(list[0]["state"], "working");
         assert_eq!(list[0]["text"], "working 5m");
         assert_eq!(list[0]["place"], "VS Code");
-        assert_eq!(list[0]["canJump"], false);
         assert!(
             list.iter().all(|r| r["session"] != "s0"),
             "the head is above"

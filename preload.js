@@ -147,7 +147,7 @@ const INVOKE_CHANNELS = new Set([
   'agents:hover',
   'agents:open',
   'agents:dismiss',
-  'agents:act',
+  'agents:pass',
   'agents:get',
   'agents:set',
   'agents:test',

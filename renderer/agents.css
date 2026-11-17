@@ -1,408 +1,546 @@
-/* The agents card (agents.html): one thin glass card that grows out of the
-   bar when a coding agent finishes or needs you. Tokens from glass.css; the
-   window is exactly the card plus 16 px of room for its shadow, never takes
-   the keyboard, and stays out of screenshots. */
+/* The agents notification (agents.html), drawn to Aevalsistant's numbers
+   (its src/Toast.cs and docs/DESIGN.md): a 420 px paper card, 16 px from
+   the top of the work area, in the middle, with a 22 px margin round it for
+   the shadow. Every length is a DIP, so it scales with the display as
+   Aevalsistant's does. The lane note (.claude/rust-rewrite/lanes/
+   agents-note.md) has the source line for each value. */
 
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
+:root {
+  /* Theme.cs, sampled from Aevalsistant's profile image. */
+  --paper: #fff6f1;
+  --paper-deep: #fbebe3;
+  --paper-edge: #f0ddd3;
+  /* PaperEdge at alpha 200, the card's hairline at rest. */
+  --edge: rgb(240 221 211 / 0.784);
+  --ink: #3e3438;
+  --slate: #586c7d;
+  --slate-soft: #9db0b9;
+  --slate-mist: #c9d5da;
+  --blush: #e9a9ae;
+  --clip: #8e4a52;
+  --skin: #fbe3d6;
+  --hair: #8fa3ae;
+  /* Two blurred copies of the card in Theme.Shadow (#5A3A3A): 6 px down
+     with 17%, and 1 px down with 10%. The blur radii are what three box
+     blurs of radius 5 and 1 come to as a CSS blur. */
+  --shadow: 0 6px 11px rgb(90 58 58 / 0.17), 0 1px 3px rgb(90 58 58 / 0.1);
+  --r-card: 16px;
+  --r-row: 8px;
+  --r-key: 5px;
+  --r-elbow: 4px;
+  /* A keycap is its letters and 6 px each side, 24 px at least. */
+  --key-pad: 6px;
+  /* Under the hairline, before the first row. */
+  --list-top: 6px;
+  /* Ease.Enter and Ease.Exit. */
+  --enter: cubic-bezier(0.16, 1, 0.3, 1);
+  --exit: cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 html,
 body {
+  margin: 0;
   width: 100%;
   height: 100%;
   background: transparent;
   overflow: hidden;
-  font-family: var(--font-text);
 }
 
-/* Which edge of the window touches the bar: the card hangs from it and
-   grows out of it. */
 body {
-  --from-y: -18px;
+  font-family: "Segoe UI Variable Text", "Segoe UI", sans-serif;
+  color: var(--ink);
+  user-select: none;
+  cursor: default;
 }
 
-body[data-from="bottom"] {
-  --from-y: 18px;
+p,
+ul {
+  margin: 0;
+  padding: 0;
 }
 
 #card {
-  --r: var(--r-sheet);
   position: absolute;
-  left: 16px;
-  right: 16px;
+  left: 22px;
   top: 16px;
-  padding: var(--sp-3) var(--sp-4);
-  color: var(--label);
-  font-size: var(--t-row);
-  line-height: var(--lh-row);
-  transform-origin: 50% 0;
+  width: 420px;
+  border-radius: var(--r-card);
+  background: var(--paper);
+  box-shadow: var(--shadow);
+  cursor: pointer;
 }
 
-body[data-from="bottom"] #card {
-  top: auto;
-  bottom: 16px;
-  transform-origin: 50% 100%;
-}
-
-#card[hidden] {
+#card[hidden],
+#keys[hidden],
+#list[hidden],
+#place[hidden] {
   display: none;
+}
+
+/* The hairline round the card: PaperEdge, SlateMist while the pointer is
+   on it. Drawn over the content's box, so the content keeps its place. */
+#card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border: 1px solid var(--edge);
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+#card.hover::after {
+  border-color: var(--slate-mist);
 }
 
 /* Drawn but not yet shown: Rust is told its height first. */
 #card.measuring {
-  opacity: 0;
+  visibility: hidden;
 }
 
 /* ------------------------------------------------------------------ motion */
 
-/* Out of the bar: a small drop at the bar edge that swells into the card.
-   The width arrives first and the height follows on the looser spring, so
-   it stretches and then settles a little past its size and back, the way a
-   liquid does. Each property is moved by the compositor: transform (the
-   width), scale and translate (the height and the travel) and opacity,
-   with a blur for the first 160 ms only, while the card is still small. */
+/* From just above the top edge (--from, set by agents.js) down to its
+   place over 360 ms, opaque by 55% of the way. Out: 10 px up and gone over
+   220 ms. With Windows animations off it fades in place. */
 #card.in {
   animation:
-    card-swell-x 420ms var(--ease-liquid-soft) both,
-    card-swell-y var(--d-glob) var(--ease-liquid) both,
-    card-clear 160ms ease-out both;
+    drop 360ms var(--enter) both,
+    show 198ms var(--enter) both;
 }
 
-@keyframes card-swell-x {
-  from {
-    transform: scaleX(0.34);
-  }
-}
-
-@keyframes card-swell-y {
-  from {
-    translate: 0 var(--from-y);
-    scale: 1 0.18;
-  }
-}
-
-@keyframes card-clear {
-  from {
-    opacity: 0;
-    filter: blur(8px);
-  }
-}
-
-/* The words arrive once there is a card to hold them. */
-#card.in > :not(.gl) {
-  animation: card-words 240ms ease 150ms both;
-}
-
-@keyframes card-words {
-  from {
-    opacity: 0;
-  }
-}
-
-/* Back into the bar. */
 #card.out {
-  animation: card-fold var(--d-glob-close) var(--ease-out) both;
+  animation: lift 220ms var(--exit) both;
   pointer-events: none;
 }
 
-@keyframes card-fold {
-  to {
-    opacity: 0;
-    transform: translateY(calc(var(--from-y) * 0.6)) scale(0.82, 0.6);
-    filter: blur(6px);
+@keyframes drop {
+  from {
+    transform: translateY(var(--from, -140px));
   }
 }
 
-@keyframes card-fade {
+@keyframes show {
   from {
     opacity: 0;
   }
 }
 
-@keyframes card-fade-out {
+@keyframes lift {
   to {
+    transform: translateY(-10px);
     opacity: 0;
   }
 }
 
-html[data-motion="reduced"] #card.in {
-  animation: card-fade var(--d-reduced) ease both;
-}
-
-html[data-motion="reduced"] #card.in > :not(.gl) {
-  animation: none;
-}
-
-html[data-motion="reduced"] #card.out {
-  animation: card-fade-out var(--d-reduced) ease both;
+@keyframes hide {
+  to {
+    opacity: 0;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
   #card.in {
-    animation: card-fade var(--d-reduced) ease both;
-  }
-
-  #card.in > :not(.gl) {
-    animation: none;
+    animation: show 180ms var(--enter) both;
   }
 
   #card.out {
-    animation: card-fade-out var(--d-reduced) ease both;
+    animation: hide 160ms var(--exit) both;
   }
 }
 
 /* -------------------------------------------------------------------- head */
 
+/* 64 px; resting on the card opens it by --grow to show the whole message
+   (240 ms in, 200 ms back). */
 #head {
+  position: relative;
+  height: calc(64px + var(--grow, 0px));
+  transition: height 200ms var(--exit);
+}
+
+#card.open #head {
+  transition: height 240ms var(--enter);
+}
+
+#avatar {
+  position: absolute;
+  left: 12px;
+  top: 12px;
+  width: 40px;
+  height: 40px;
   display: flex;
   align-items: center;
-  gap: var(--sp-2);
-  min-height: var(--ctl-s);
-}
-
-/* The whole top row is the way to that agent window. */
-#jump {
-  flex: 1 1 auto;
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-  border: none;
-  background: none;
-  color: inherit;
-  font: inherit;
-  font-weight: var(--w-strong);
-  text-align: left;
-  cursor: pointer;
-}
-
-#jump.plain {
-  cursor: default;
-}
-
-#title {
-  min-width: 0;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--paper-deep);
+  box-shadow: inset 0 0 0 1.2px var(--paper-edge);
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
-#place {
-  flex: 0 0 auto;
-  color: var(--label-2);
-  font-weight: var(--w-body);
-  white-space: nowrap;
+#avatar svg {
+  margin-top: 4px;
 }
 
-#place::before {
-  content: "\00b7";
-  margin-right: 8px;
+#avatar .face {
+  fill: var(--skin);
+  stroke: var(--ink);
+  stroke-width: 1.6;
 }
 
-#place[hidden],
-#keys[hidden],
-#detail[hidden],
-#actions[hidden],
-#rows[hidden],
-#more[hidden] {
+#avatar .hair {
+  fill: var(--hair);
+  stroke: var(--ink);
+  stroke-width: 1.6;
+  stroke-linejoin: round;
+}
+
+#avatar .clip {
+  fill: var(--clip);
+}
+
+#avatar .eye {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 1.7;
+  stroke-linecap: round;
+}
+
+/* Finished (SlateSoft) or needs you (Blush), on the avatar's lower right
+   with a ring of paper. The app's own messages have none. */
+#state {
+  position: absolute;
+  left: 44.5px;
+  top: 44.5px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--slate-soft);
+  box-shadow: 0 0 0 2px var(--paper);
+}
+
+#card[data-kind="needs-you"] #state {
+  background: var(--blush);
+}
+
+#card[data-kind="info"] #state {
   display: none;
 }
 
-/* What the session is: finished, needs you, or the app speaking. */
-.dot {
-  flex: 0 0 auto;
-  width: 8px;
-  height: 8px;
-  border-radius: var(--r-cap);
-  background: var(--accent-bright);
+/* From the avatar's right (66 px in) to the keycaps; agents.js sets
+   `right` when they show. */
+#text {
+  position: absolute;
+  left: 66px;
+  right: 18px;
+  top: 0;
+  bottom: 0;
 }
 
-#card[data-kind="needs-you"] #dot,
+#line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 12px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
+}
+
+#card.one-line #line {
+  top: 22px;
+}
+
+#title {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 13.5px;
+  font-weight: 600;
+  line-height: 20px;
+}
+
+/* "·  VS Code": the app shrinks first, to a stub, before the name does. */
+#place {
+  flex: 0 1000 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-left: 5px;
+  color: var(--slate);
+  font-size: 12.5px;
+  line-height: 20px;
+}
+
+#place::before,
+.host::before {
+  content: "\00b7\00a0\00a0";
+}
+
+/* One line closed, up to eight open; the first line's ellipsis gives way
+   to the rest of it as the card opens. */
+#detail {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 32px;
+  height: calc(18px + var(--grow, 0px));
+  overflow: hidden;
+  color: var(--slate);
+  font-size: 12px;
+  transition: height 200ms var(--exit);
+}
+
+#card.open #detail {
+  transition: height 240ms var(--enter);
+}
+
+#card.one-line #detail {
+  display: none;
+}
+
+#d1 {
+  line-height: 18px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: opacity 200ms var(--exit);
+}
+
+#dn {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 1px;
+  line-height: 16px;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 8;
+  line-clamp: 8;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  opacity: 0;
+  transition: opacity 200ms var(--exit);
+}
+
+#card.open #d1 {
+  opacity: 0;
+  transition: opacity 240ms var(--enter);
+}
+
+#card.open #dn {
+  opacity: 1;
+  transition: opacity 240ms var(--enter);
+}
+
+/* Alt and Tab keycaps, 14 px from the right, in the middle of the 64 px
+   band: only while Alt+Tab would jump somewhere. */
+#keys {
+  position: absolute;
+  right: 14px;
+  top: 22px;
+  display: flex;
+  gap: 4px;
+}
+
+kbd {
+  min-width: 24px;
+  height: 20px;
+  box-sizing: border-box;
+  border-radius: var(--r-key);
+  background: var(--paper-deep);
+  box-shadow: 0 1.5px 0 var(--paper-edge);
+  color: var(--slate);
+  font-family: inherit;
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 21px;
+  text-align: center;
+  padding: 0 var(--key-pad);
+  margin: 0;
+}
+
+/* -------------------------------------------------------------------- list */
+
+/* The other sessions under a hairline: 28 px rows, a session's subagents
+   and child sessions under it on 24 px rows, hung from its dot. */
+#list {
+  position: relative;
+  list-style: none;
+  padding: var(--list-top) 0 8px;
+}
+
+#list::before {
+  content: "";
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  top: 0;
+  height: 1px;
+  background: var(--paper-edge);
+}
+
+.row {
+  position: relative;
+  height: 28px;
+  margin: 0 6px;
+  border-radius: var(--r-row);
+}
+
+.row.child {
+  height: 24px;
+}
+
+.row.hot {
+  background: var(--paper-deep);
+}
+
+.row .dot {
+  position: absolute;
+  left: 22px;
+  top: 10px;
+  width: 8px;
+  height: 8px;
+  box-sizing: border-box;
+  border-radius: 50%;
+  background: var(--slate-soft);
+}
+
 .row.needs-you .dot {
   background: var(--blush);
 }
 
-#card[data-kind="info"] #dot {
-  background: var(--label-2);
-}
-
-.row.done .dot {
-  background: var(--label-3);
-}
-
-/* Working: a ring, not a filled dot. */
 .row.working .dot {
   background: none;
-  box-shadow: inset 0 0 0 1.5px var(--label-2);
+  border: 1.4px solid var(--slate);
 }
 
-#keys {
-  flex: 0 0 auto;
-  padding: 0 var(--sp-2);
-  border-radius: var(--r-key);
-  background: var(--fill-1);
-  box-shadow: var(--chip-rim);
-  color: var(--label-2);
-  font: inherit;
-  font-size: var(--t-meta);
-  line-height: var(--lh-row);
+.row.child .dot {
+  left: 60px;
+  top: 9px;
+  width: 6px;
+  height: 6px;
+  border-width: 1.2px;
 }
 
-#close {
-  flex: 0 0 auto;
-  width: var(--ctl-s);
-  height: var(--ctl-s);
-  margin-right: -4px;
+.row .what {
+  position: absolute;
+  left: 60px;
+  right: 10px;
+  top: 0;
+  bottom: 0;
   display: flex;
   align-items: center;
-  justify-content: center;
-  border: none;
-  border-radius: var(--r-cap);
-  background: none;
-  color: var(--label-2);
-  cursor: pointer;
-  transition: background var(--d-fast) ease, color var(--d-fast) ease;
+  white-space: nowrap;
+  font-size: 11.5px;
+  line-height: 16px;
 }
 
-#close:hover {
-  background: var(--fill-1);
-  color: var(--label);
+.row.child .what {
+  left: 76px;
 }
 
-/* ------------------------------------------------------------------ detail */
-
-/* One line at rest, under the first letter of the title; the pointer
-   resting on the card opens up to eight. */
-#detail {
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 1;
-  line-clamp: 1;
-  overflow: hidden;
-  padding-left: var(--sp-4);
-  padding-right: var(--sp-5);
-  color: var(--label-2);
-  font-size: var(--t-caption);
-  line-height: var(--lh-caption);
-  overflow-wrap: anywhere;
-}
-
-#card.open #detail,
-#card.asks #detail {
-  -webkit-line-clamp: 8;
-  line-clamp: 8;
-  color: var(--label);
-}
-
-/* ----------------------------------------------------------------- actions */
-
-#actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--sp-2);
-  margin-top: 12px;
-}
-
-#actions .act {
-  min-height: var(--ctl);
-  padding: 0 var(--sp-4);
-  border: none;
-  border-radius: var(--r-cap);
-  font: inherit;
-  font-size: var(--t-caption);
-  font-weight: var(--w-strong);
-  color: var(--label);
-  background: var(--fill-1);
-  box-shadow: var(--chip-rim);
-  cursor: pointer;
-  transition: background var(--d-fast) ease;
-}
-
-#actions .act:hover {
-  background: var(--fill-2);
-}
-
-#actions .act.primary {
-  background: var(--accent-glass);
-}
-
-#actions .act.primary:hover {
-  background: var(--accent-glass-hover);
-}
-
-/* -------------------------------------------------------------------- rows */
-
-/* Every other session, quieter than the head: needs you first, then done,
-   then working. What a session started sits one step in under it. */
-#rows {
-  list-style: none;
-  margin-top: 8px;
-}
-
-.row-btn {
-  width: 100%;
-  min-height: var(--ctl-s);
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-  padding: 0;
-  border: none;
-  border-radius: var(--r-row);
-  background: none;
-  color: var(--label);
-  font: inherit;
-  font-size: var(--t-caption);
-  line-height: var(--lh-caption);
-  text-align: left;
-  cursor: pointer;
-  transition: background var(--d-fast) ease;
-}
-
-.row-btn:disabled {
-  cursor: default;
-}
-
-.row-btn:not(:disabled):hover {
-  background: var(--fill-1);
-}
-
-.row.child .row-btn {
-  padding-left: var(--sp-4);
-}
-
-.row-name {
+.name {
+  flex: 0 1 auto;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
-  font-weight: var(--w-strong);
+  font-size: 12.5px;
 }
 
-.row.child .row-name {
-  font-weight: var(--w-body);
+.row.child .name {
+  font-size: 12px;
 }
 
-.row-place {
-  flex: 0 0 auto;
-  color: var(--label-2);
-  white-space: nowrap;
+.host {
+  flex: 0 1000 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-left: 5px;
+  color: var(--slate);
 }
 
-.row-text {
+.status {
   flex: 0 0 auto;
   margin-left: auto;
-  color: var(--label-2);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
+  padding-left: 12px;
+  color: var(--slate);
 }
 
-#more {
-  margin-top: 4px;
-  padding-left: var(--sp-4);
-  color: var(--label-3);
-  font-size: var(--t-meta);
-  line-height: var(--lh-meta);
+.row.needs-you .status {
+  color: var(--ink);
+}
+
+.row.more {
+  height: 28px;
+  display: flex;
+  align-items: center;
+}
+
+.row.more span {
+  margin-left: 60px;
+  color: var(--slate);
+  font-size: 11.5px;
+}
+
+/* The lines from a session's dot to its children's: SlateMist, down from
+   7 px under the dot, an arm out to each child, a rounded elbow on the
+   last. The head's own children hang from under the avatar. */
+.row.parent::after,
+.row.child::before,
+.row.child::after,
+#card.stem #head::after,
+#card.stem #list::after {
+  content: "";
+  position: absolute;
+  width: 1px;
+  background: var(--slate-mist);
+}
+
+.row.parent::after {
+  left: 26px;
+  top: 21px;
+  bottom: 0;
+}
+
+.row.child::before {
+  left: 26px;
+  top: 0;
+  bottom: 0;
+}
+
+.row.child::after {
+  left: 26px;
+  top: 12px;
+  width: 31px;
+  height: 1px;
+}
+
+.row.child.last::before {
+  bottom: auto;
+  width: 31px;
+  height: 13px;
+  box-sizing: border-box;
+  background: none;
+  border-left: 1px solid var(--slate-mist);
+  border-bottom: 1px solid var(--slate-mist);
+  border-bottom-left-radius: var(--r-elbow);
+}
+
+.row.child.last::after {
+  display: none;
+}
+
+#card.stem #head::after {
+  left: 32px;
+  top: 56px;
+  bottom: 0;
+}
+
+#card.stem #list::after {
+  left: 32px;
+  top: 0;
+  height: var(--list-top);
 }

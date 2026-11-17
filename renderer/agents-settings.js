@@ -71,7 +71,7 @@
     else $('watch-agents-summary').textContent = `${connected} of ${found.length} connected`;
     if (p.enabled && !found.length) status('No coding agent was found on this PC. One installed later is picked up within 10 minutes.');
     else if (failedOnes.length) status(`Could not connect ${failedOnes.map((a) => a.name).join(', ')}. The reason is under its name.`, true);
-    else if (p.enabled && snap.aevalsistant) status('Aevalsistant is installed too. Quit it from its tray icon, or each agent will show two cards.');
+    else if (p.enabled && snap.aevalsistant) status('Aevalsistant is installed too. If it is running, quit it from its tray icon: both show the same notification in the same place, one over the other.');
     else status('');
     // Why chat watching stopped by itself, under its switch.
     const chats = p.enabled && p.chats ? snap.chatProblem || '' : '';
