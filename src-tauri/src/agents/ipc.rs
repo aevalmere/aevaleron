@@ -1,20 +1,22 @@
-//! The `agents:*` channels. The card page says when it is ready, how tall
-//! the card is, when the pointer is on it, and what was clicked; Settings
-//! reads and changes the Agents page. `None` for any other channel, which
-//! falls through to the next router.
+//! The `agents:*` channels. The notification page says when it is ready, how
+//! tall the notification is, where the pointer is, and what was clicked;
+//! Settings reads and changes the Agents page. `None` for any other channel,
+//! which falls through to the next router.
 
 use serde_json::{json, Value};
 use tauri::AppHandle;
 
 pub async fn route(app: &AppHandle, channel: &str, p: &Value) -> Option<Result<Value, String>> {
     let out = match channel {
-        // The page loaded (or reloaded): it gets the card that is up.
+        // The page loaded (or reloaded): it gets the notification that is up.
         "agents:ready" => {
-            super::send_card(app, &super::prefs());
+            super::send_card(app, &super::prefs(), true);
             json!({ "ok": true })
         }
         "agents:size" => super::page_size(app, p),
-        // The card has folded away: the window may hide.
+        // The pointer is on the card or off it: clicks off it go through.
+        "agents:pass" => super::page_pass(app, p),
+        // The card has lifted away: the window may hide.
         "agents:hidden" => super::page_hidden(app),
         // The countdown waits while the pointer is on the card.
         "agents:hover" => {
@@ -23,11 +25,11 @@ pub async fn route(app: &AppHandle, channel: &str, p: &Value) -> Option<Result<V
             json!({ "ok": true })
         }
         "agents:open" => super::open(p),
+        // A right click.
         "agents:dismiss" => {
             super::hide_card();
             json!({ "ok": true })
         }
-        "agents:act" => super::act(p),
         "agents:get" => super::snapshot(),
         "agents:set" => {
             let patch = p.clone();

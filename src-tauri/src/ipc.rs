@@ -149,7 +149,7 @@ pub const INVOKE_CHANNELS: &[&str] = &[
     "agents:hover",
     "agents:open",
     "agents:dismiss",
-    "agents:act",
+    "agents:pass",
     "agents:get",
     "agents:set",
     "agents:test",

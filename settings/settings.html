@@ -354,14 +354,14 @@
                     <span>Watch my coding agents</span>
                     <input id="watch-enabled" type="checkbox" role="switch" />
                   </label>
-                  <p class="note">Keeps this PC awake while Claude Code, Codex, Gemini CLI, Copilot CLI, Cursor, Windsurf or OpenCode is working, and shows a card when one finishes or needs you. Turning this on adds a hook to each agent's own settings file, after saving a copy of the file beside it; turning it off takes the hooks out again. Nothing about your sessions leaves this PC.</p>
+                  <p class="note">Keeps this PC awake while Claude Code, Codex, Gemini CLI, Copilot CLI, Cursor, Windsurf or OpenCode is working, and shows a notification at the top of the screen when one finishes or needs you. Turning this on adds a hook to each agent's own settings file, after saving a copy of the file beside it; turning it off takes the hooks out again. Nothing about your sessions leaves this PC.</p>
                   <div id="watch-agent-list" class="watch-nested" role="group" aria-label="Agents on this PC" hidden></div>
                   <p id="watch-status" class="status" role="status" hidden></p>
                   <label class="switch" data-watch-under="enabled">
                     <span>Also watch the Claude and ChatGPT apps</span>
                     <input type="checkbox" role="switch" data-watch="chats" />
                   </label>
-                  <p class="note" data-watch-under="enabled">Shows a card when a reply in the Claude or ChatGPT desktop app finishes while you are in another app, and keeps the PC awake until it does. It looks only for the app's Stop button, and only after you switch away from the app.</p>
+                  <p class="note" data-watch-under="enabled">Shows a notification when a reply in the Claude or ChatGPT desktop app finishes while you are in another app, and keeps the PC awake until it does. It looks only for the app's Stop button, and only after you switch away from the app.</p>
                   <p id="watch-chats-status" class="status error" role="status" hidden></p>
                 </div>
               </div>
@@ -394,14 +394,14 @@
             </section>
             <section class="row" id="sec-watch-cards">
               <div class="row-head">
-                <h2 id="watch-cards-heading">Cards</h2>
+                <h2 id="watch-cards-heading">Notifications</h2>
                 <span id="watch-cards-summary" class="summary">Finished and needs you</span>
                 <button class="edit" type="button" aria-expanded="false" aria-controls="sec-watch-cards-body" aria-labelledby="watch-cards-heading watch-cards-summary"><span class="ico i-chevron" aria-hidden="true"></span></button>
               </div>
               <div class="body" id="sec-watch-cards-body">
                 <div class="body-in">
                   <label class="switch">
-                    <span>Show a card when an agent finishes</span>
+                    <span>Notify me when an agent finishes</span>
                     <input type="checkbox" role="switch" data-watch="notifyDone" />
                   </label>
                   <div class="watch-nested" data-watch-under="notifyDone">
@@ -411,7 +411,7 @@
                     </label>
                   </div>
                   <label class="switch">
-                    <span>Show a card when an agent needs you</span>
+                    <span>Notify me when an agent needs you</span>
                     <input type="checkbox" role="switch" data-watch="notifyNeedsYou" />
                   </label>
                   <div class="watch-nested" data-watch-under="notifyNeedsYou">
@@ -425,26 +425,26 @@
                     <input type="checkbox" role="switch" data-watch="sound" />
                   </label>
                   <label class="switch">
-                    <span>Open the card on hover to read the whole message</span>
+                    <span>Open the notification on hover to read the whole message</span>
                     <input type="checkbox" role="switch" data-watch="expandOnHover" />
                   </label>
                   <label class="switch">
-                    <span>Alt+Tab jumps to the agent while its card is up</span>
+                    <span>Alt+Tab jumps to the agent while its notification is up</span>
                     <input type="checkbox" role="switch" data-watch="altTab" />
                   </label>
                   <label class="switch">
                     <span>List subagents under their session</span>
                     <input type="checkbox" role="switch" data-watch="showChildren" />
                   </label>
-                  <div class="choice" role="radiogroup" aria-label="How long a card stays up" id="watch-time">
+                  <div class="choice" role="radiogroup" aria-label="How long a notification stays up" id="watch-time">
                     <button type="button" class="choice-option" role="radio" data-watch-time="0">Short<span class="choice-note">About 5 seconds.</span></button>
                     <button type="button" class="choice-option" role="radio" data-watch-time="1">Normal<span class="choice-note">About 8 seconds, 10 when an agent needs you.</span></button>
                     <button type="button" class="choice-option" role="radio" data-watch-time="2">Long<span class="choice-note">About 14 seconds.</span></button>
                   </div>
                   <div class="watch-actions">
-                    <button id="watch-test" type="button" class="g-btn">Show a test card</button>
+                    <button id="watch-test" type="button" class="g-btn">Show a test notification</button>
                   </div>
-                  <p class="note">A card counts down only while you are at the keyboard, never takes the keyboard from the app you are in, and stays out of screenshots and screen sharing. Background means subagents, sessions another agent started, and turns an agent takes on its own.</p>
+                  <p class="note">A notification drops from the top of the screen you are on, where Aevalsistant puts its own. It counts down only while you are at the keyboard, never takes the keyboard from the app you are in, and stays out of screenshots and screen sharing. Click it to go to the agent, right-click to put it away. Background means subagents, sessions another agent started, and turns an agent takes on its own.</p>
                 </div>
               </div>
             </section>

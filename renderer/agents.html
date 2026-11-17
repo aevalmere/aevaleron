@@ -9,28 +9,22 @@
   <link rel="stylesheet" href="agents.css" />
 </head>
 <body>
-  <!-- The agents card (src-tauri/src/agents): one glass card that grows out
-       of the bar when a coding agent finishes or needs you. The top row is
-       the session that just changed; under it, every other session with its
-       state. Clicking a row goes to that agent's window. The window never
-       takes the keyboard, so nothing here needs focus: Alt+Tab is the
-       keyboard's way in. -->
+  <!-- The agents notification (src-tauri/src/agents): Aevaleron's glass,
+       dropping from the top of the screen where Aevalsistant puts its own,
+       and behaving like it (its src/Toast.cs). The head is the session that
+       just changed; under it, every session with what it started nested
+       under it, each with its own state and time. A click goes to that
+       agent's window, a right click puts it away. The window never takes
+       the keyboard, so nothing here needs focus: Alt+Tab is the keyboard's
+       way in. -->
   <div id="card" class="glass thin" role="status" aria-live="polite" hidden>
     <div id="head">
-      <button id="jump" type="button">
-        <span id="dot" class="dot" aria-hidden="true"></span>
-        <span id="title"></span>
-        <span id="place"></span>
-      </button>
-      <kbd id="keys" hidden>Alt+Tab</kbd>
-      <button id="close" type="button" aria-label="Dismiss">
-        <span class="ico i-x" aria-hidden="true"></span>
-      </button>
+      <span id="state" aria-hidden="true"></span>
+      <div id="line"><span id="title"></span><span id="place"></span></div>
+      <div id="detail"><p id="d1"></p><p id="dn" aria-hidden="true"></p></div>
+      <span id="keys" hidden><kbd>Alt</kbd><kbd>Tab</kbd></span>
     </div>
-    <p id="detail"></p>
-    <div id="actions" hidden></div>
-    <ul id="rows" hidden></ul>
-    <p id="more" hidden></p>
+    <ul id="list" hidden></ul>
   </div>
   <script src="glass.js"></script>
   <script src="agents.js"></script>
