@@ -1350,7 +1350,10 @@ mod tests {
         for k in FIND_KEYS {
             assert!(!f.contains_key(k), "{k}");
         }
-        assert!(!f["shortcuts"].as_object().unwrap().contains_key("findOnScreen"));
+        assert!(!f["shortcuts"]
+            .as_object()
+            .unwrap()
+            .contains_key("findOnScreen"));
         assert!(f["nativeModels"]["anthropic"].get("find").is_none());
         assert_eq!(f["nativeModels"]["anthropic"]["vision"], "claude-opus-5-5");
     }

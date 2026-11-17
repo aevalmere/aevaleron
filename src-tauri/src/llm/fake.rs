@@ -142,21 +142,6 @@ fn lower(v: Option<&str>) -> String {
     v.unwrap_or_default().to_lowercase().trim().to_string()
 }
 
-fn text_of(content: &Value) -> String {
-    match content {
-        Value::String(s) => s.clone(),
-        Value::Array(parts) => parts
-            .iter()
-            .map(|c| match (c["type"].as_str(), c["text"].as_str()) {
-                (Some("text"), Some(t)) => t,
-                _ => "",
-            })
-            .collect::<Vec<_>>()
-            .join("\n"),
-        _ => String::new(),
-    }
-}
-
 /// JavaScript's `String(value)` for a variable.
 fn js_string(v: &Value) -> String {
     match v {

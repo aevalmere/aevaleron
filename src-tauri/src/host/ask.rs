@@ -964,10 +964,8 @@ pub async fn submit_to(
         .as_ref()
         .map(|e| e.text.encode_utf16().count())
         .unwrap_or(0);
-    let text_only = shot_taken.is_some()
-        && !use_brain
-        && exact_len >= TEXT_ONLY_CHARS
-        && !is_visual(&text);
+    let text_only =
+        shot_taken.is_some() && !use_brain && exact_len >= TEXT_ONLY_CHARS && !is_visual(&text);
     let shot = if text_only { None } else { shot_taken };
     let via_region = shot.as_ref().is_some_and(|s| s.region.is_some());
     let mut provider = act

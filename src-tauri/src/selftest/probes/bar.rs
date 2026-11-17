@@ -554,7 +554,11 @@ fn text_entry(cx: &Cx) {
     }
     type_text(cx, "");
     let ok = started && got.iter().all(|g| g.ends_with("=true"));
-    cx.must("textEntryDecides", ok, format!("{} agentStart={started}", got.join(" ")));
+    cx.must(
+        "textEntryDecides",
+        ok,
+        format!("{} agentStart={started}", got.join(" ")),
+    );
 }
 
 /// barMultiline (B-056): three pasted lines stay three rows, and Enter sends
