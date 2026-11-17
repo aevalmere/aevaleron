@@ -1,16 +1,16 @@
 {
   "workflow": "rust",
   "workflow_name": "rust",
-  "run_id": 44028790881,
+  "run_id": 44028868180,
   "run_attempt": 1,
-  "run_url": "https://github.com/aevalmere/aevaleron/actions/runs/44028790881",
+  "run_url": "https://github.com/aevalmere/aevaleron/actions/runs/44028868180",
   "event": "push",
-  "sha": "09735ee1fe4c2e5d6d30c827cf6597c44196fc0e",
+  "sha": "4d0310d2ebbc29da74df03a741bba9fb27d7837c",
   "ref": "rust/agents-note",
   "ref_dir": "rust-agents-note",
-  "conclusion": "cancelled",
+  "conclusion": "success",
   "failed": [],
-  "finished": "2026-11-17T06:07:21Z",
+  "finished": "2026-11-17T06:31:21Z",
   "error_lines": 0,
   "steps": [
     {
@@ -25,32 +25,32 @@
     },
     {
       "name": "Rust toolchain",
-      "outcome": "cancelled",
+      "outcome": "success",
       "log": ""
     },
     {
       "name": "Voice build flags",
-      "outcome": "skipped",
+      "outcome": "success",
       "log": ""
     },
     {
       "name": "Cache cargo",
-      "outcome": "skipped",
+      "outcome": "success",
       "log": ""
     },
     {
       "name": "Gate helper",
-      "outcome": "skipped",
+      "outcome": "success",
       "log": ""
     },
     {
       "name": "Prebuild desktop helper",
-      "outcome": "skipped",
-      "log": ""
+      "outcome": "success",
+      "log": "prebuild.log"
     },
     {
       "name": "Format",
-      "outcome": "skipped",
+      "outcome": "success",
       "log": ""
     },
     {
@@ -60,52 +60,52 @@
     },
     {
       "name": "Clippy",
-      "outcome": "skipped",
-      "log": ""
+      "outcome": "success",
+      "log": "clippy.log"
     },
     {
       "name": "Unit tests",
-      "outcome": "skipped",
-      "log": ""
+      "outcome": "success",
+      "log": "test.log"
     },
     {
       "name": "Restore NSIS toolset",
-      "outcome": "skipped",
+      "outcome": "success",
       "log": ""
     },
     {
       "name": "Seed NSIS toolset",
-      "outcome": "skipped",
-      "log": ""
+      "outcome": "success",
+      "log": "nsis.log"
     },
     {
       "name": "Save NSIS toolset",
-      "outcome": "skipped",
+      "outcome": "success",
       "log": ""
     },
     {
       "name": "Build installer",
-      "outcome": "skipped",
-      "log": ""
+      "outcome": "success",
+      "log": "build.log"
     },
     {
       "name": "Smoke",
-      "outcome": "skipped",
-      "log": ""
+      "outcome": "success",
+      "log": "smoke.log"
     },
     {
       "name": "Capture check",
-      "outcome": "skipped",
-      "log": ""
+      "outcome": "success",
+      "log": "capture.log"
     },
     {
       "name": "Desktop selfcheck",
-      "outcome": "skipped",
-      "log": ""
+      "outcome": "success",
+      "log": "desktop.log"
     },
     {
       "name": "Upload installer",
-      "outcome": "skipped",
+      "outcome": "success",
       "log": ""
     }
   ]
