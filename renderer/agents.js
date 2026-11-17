@@ -1,7 +1,7 @@
 'use strict';
 
-// The agents notification (src-tauri/src/agents/mod.rs), behaving as
-// Aevalsistant's does (its src/Toast.cs). Rust sends `agents:card` with
+// The agents notification (src-tauri/src/agents/mod.rs): Aevaleron's glass,
+// placed and behaving as Aevalsistant's does (its src/Toast.cs). Rust sends `agents:card` with
 // everything to draw; the page draws it out of sight, tells Rust how tall
 // the window must be with the card open (`agents:size`, which places and
 // shows the window at the top of the screen), and only then drops it in.
@@ -14,9 +14,9 @@
 (() => {
   const card = document.getElementById('card');
   const head = document.getElementById('head');
-  const text = document.getElementById('text');
   const title = document.getElementById('title');
   const place = document.getElementById('place');
+  const detailBox = document.getElementById('detail');
   const d1 = document.getElementById('d1');
   const dn = document.getElementById('dn');
   const keys = document.getElementById('keys');
@@ -25,8 +25,6 @@
   // The card's place in the window, and the room under it for the shadow.
   const TOP = 16;
   const BOTTOM = 22;
-  const HEAD = 64;
-  const LINE = 16;
   // A pointer crossing the card on its way somewhere else does not open it.
   const OPEN_AFTER_MS = 150;
   // The longest exit (agents.css, lift).
@@ -59,8 +57,13 @@
     return e;
   }
 
-  // The frame after next is on screen, or 80 ms where no frames come.
+  // The frame after next is on screen, or 80 ms where no frames come
+  // (glass.js has the same; this stands in if it did not load).
   function painted(fn) {
+    if (window.AevalGlass && window.AevalGlass.painted) {
+      window.AevalGlass.painted(fn);
+      return;
+    }
     let done = false;
     const go = () => {
       if (done) return;
@@ -113,26 +116,36 @@
       list.appendChild(more);
     }
     list.hidden = !list.childElementCount;
-    // The head's own children hang from under the avatar.
+    // The head's own children hang from under its dot.
     card.classList.toggle('stem', rows.length > 0 && rows[0].depth > 0);
 
-    text.style.right = p.altTab ? `${14 + keys.offsetWidth + 12}px` : '18px';
+    // The words keep clear of the keycaps.
+    head.style.paddingRight = p.altTab ? `${16 + keys.offsetWidth + 12}px` : '';
     stub(place);
     for (const h of list.querySelectorAll('.host')) stub(h);
 
     // How much taller the card gets open: every line past the first.
-    const lines = detail && p.expand ? Math.max(1, Math.round(dn.offsetHeight / LINE)) : 1;
-    grow = (lines - 1) * LINE;
+    const line = parseFloat(getComputedStyle(dn).lineHeight) || 18;
+    const lines = detail && p.expand ? Math.max(1, Math.round(dn.offsetHeight / line)) : 1;
+    grow = Math.round((lines - 1) * line);
     if (!grow) close();
     else if (card.classList.contains('open')) card.style.setProperty('--grow', `${grow}px`);
   }
 
   // The card closed, wherever its opening has got to.
-  const closedHeight = () => card.offsetHeight - head.offsetHeight + HEAD;
+  function closedHeight() {
+    if (card.classList.contains('one-line')) return card.offsetHeight;
+    const line = parseFloat(getComputedStyle(detailBox).lineHeight) || 18;
+    return card.offsetHeight - Math.max(0, detailBox.offsetHeight - line);
+  }
 
   // The window is always as tall as the card open, so opening only redraws.
   function size() {
-    return send('agents:size', { height: TOP + closedHeight() + grow + BOTTOM });
+    return send('agents:size', { height: TOP + closedHeight() + grow + BOTTOM }).then((r) => {
+      // The glass follows the window to its new place.
+      if (window.AevalGlass) window.AevalGlass.track(600);
+      return r;
+    });
   }
 
   function open() {
@@ -246,8 +259,10 @@
     draw(p);
     shown = key;
     if (!leaving) {
-      // Already up: the newer one takes its place without moving, as
-      // Aevalsistant's does.
+      // Already up: the newer one (or newer times) takes its place without
+      // moving, as Aevalsistant's does.
+      hot = null;
+      if (pointer && hovering) move(pointer.x, pointer.y);
       size();
       return;
     }

@@ -1,7 +1,7 @@
 // The agents lane's ui-shots scenes, mocks, checks and CSS lint list: the
 // notification that drops from the top of the screen when a coding agent
-// finishes or needs you, drawn like Aevalsistant's, and Settings' Agents
-// page. The shape is documented at the top of tools/ui-shots/shots.mjs.
+// finishes or needs you, placed and behaving like Aevalsistant's on
+// Aevaleron's glass, and Settings' Agents page. The shape is documented at the top of tools/ui-shots/shots.mjs.
 
 const PREFS = {
   enabled: true,
@@ -60,14 +60,17 @@ export const checks = [
     name: 'watchCardNeedsNoFocus',
     run: (ctx) => !/\.focus\(/.test(ctx.read('renderer/agents.js')) || 'agents.js focuses something',
   },
-  // Only what Aevalsistant's notification has: no buttons, no close box,
-  // and none of the bar's glass.
+  // Aevaleron's glass, by the owner's word, with no avatar or drawn face,
+  // and only what Aevalsistant's notification has: no buttons, no close box.
   {
-    name: 'watchNotificationIsAevalsistants',
+    name: 'watchNotificationIsGlass',
     run: (ctx) => {
       const html = ctx.read('renderer/agents.html');
       if (/<button|id="close"|id="actions"/.test(html)) return 'agents.html has buttons';
-      if (/glass\.(css|js)/.test(html)) return 'agents.html loads the glass';
+      if (!/href="glass\.css"/.test(html) || !/src="glass\.js"/.test(html)) return 'agents.html does not load glass.css and glass.js';
+      if (!/id="card" class="glass thin"/.test(html)) return 'the card is not thin glass';
+      if (/avatar|<svg|<img/.test(html)) return 'agents.html has an icon';
+      if (/avatar|createElementNS/.test(ctx.read('renderer/agents.js'))) return 'agents.js draws an icon';
       return true;
     },
   },
@@ -78,6 +81,9 @@ export const checks = [
 // top of the work area. The card sits 16 down inside it.
 const WIN = { x: 568, y: 0, w: 464, h: 300 };
 const CLIP = { x: WIN.x - 20, y: 0, width: WIN.w + 40, height: 280 };
+// Tall enough for a handful of sessions and their subagents.
+const TALL = { ...WIN, h: 520 };
+const TALL_CLIP = { ...CLIP, height: 500 };
 const S = { x: 120, y: 130, w: 960, h: 700 };
 
 const ROWS = [
@@ -85,6 +91,19 @@ const ROWS = [
   { session: 'b', depth: 0, name: 'aevalrena', place: 'VS Code', state: 'done', text: 'done 3m ago' },
   { session: 'c', depth: 0, name: 'rover', place: 'Terminal', state: 'working', text: 'working 12m, 1 subagent' },
   { session: 'c', subagent: 'x1', depth: 1, name: 'Explore', place: '', state: 'working', text: 'running 4m' },
+];
+
+const TREE = [
+  { session: 's1', subagent: 'x1', depth: 1, name: 'Explore', place: '', state: 'done', text: 'done 1m ago' },
+  { session: 's1', subagent: 'x2', depth: 1, name: 'Plan', place: '', state: 'working', text: 'running 6m' },
+  { session: 'a', depth: 0, name: 'site', place: 'Codex · Terminal', state: 'needs-you', text: 'needs you' },
+  { session: 'b', depth: 0, name: 'aevalrena', place: 'VS Code', state: 'done', text: 'done 3m ago' },
+  { session: 'b', subagent: 'y1', depth: 1, name: 'general-purpose', place: '', state: 'done', text: 'done 4m ago' },
+  { session: 'c', depth: 0, name: 'rover', place: 'Terminal', state: 'working', text: 'working 12m, 2 subagents' },
+  { session: 'c', subagent: 'z1', depth: 1, name: 'Explore', place: '', state: 'working', text: 'running 4m' },
+  { session: 'c', subagent: 'z2', depth: 1, name: 'code-review', place: '', state: 'working', text: 'running 2m' },
+  { session: 'd', depth: 0, name: 'notes', place: 'Windows Terminal', state: 'working', text: 'working 41m' },
+  { session: 'e', depth: 0, name: 'tour', place: 'Cursor', state: 'done', text: 'done 18m ago' },
 ];
 
 const DONE = {
@@ -112,11 +131,14 @@ const facts = (f) =>
       keys: !document.getElementById('keys').hidden,
       dot: getComputedStyle(document.getElementById('state')).display !== 'none',
       rows: [...document.querySelectorAll('#list .row[data-i]')].map((r) => r.className),
+      times: [...document.querySelectorAll('#list .row[data-i] .status')].map((n) => n.textContent),
+      glass: card.classList.contains('glass') && !!card.querySelector(':scope > .gl'),
+      icon: document.querySelectorAll('#avatar, svg, img, canvas').length,
+      tone: document.documentElement.dataset.tone || '',
       more: document.querySelector('#list .row.more')?.textContent || '',
       buttons: document.querySelectorAll('button').length,
       at: [Math.round(box.left), Math.round(box.top), Math.round(box.width)],
       radius: style.borderTopLeftRadius,
-      paper: style.backgroundColor,
       font: getComputedStyle(document.getElementById('title')).fontFamily,
       oneLine: document.getElementById('detail').getBoundingClientRect().height <= 20,
       wide: document.documentElement.scrollWidth - document.documentElement.clientWidth,
@@ -124,28 +146,43 @@ const facts = (f) =>
     };
   });
 
-function cardScene(name, payload, expect) {
+function cardScene(name, payload, expect, opts = {}) {
+  const win = opts.win || WIN;
+  const clip = opts.clip || CLIP;
   return {
     name,
-    backdrop: 'wallpaper',
-    windows: [{ name: 'card', src: '/renderer/agents.html', ...WIN, z: 1, fixed: true }],
+    backdrop: opts.backdrop || 'wallpaper',
+    windows: [{ name: 'card', src: '/renderer/agents.html', ...win, z: 1, fixed: true }],
     async run(t) {
       const f = t.frame('card');
       t.check(`${name}.ready`, (await t.calls('card', 'agents:ready')).length === 1, 'agents.js never invoked agents:ready');
       await t.emit('card', 'agents:card', payload);
       await t.settle(900);
+      // Rust repeats the desktop's frame; two running turn the glass light
+      // over a light desktop.
+      if (opts.tone) {
+        for (let i = 0; i < 2; i += 1) {
+          await f.evaluate(({ img }) => window.__emit('glass:frame', { img, display: { x: 0, y: 0, width: 1600, height: 1000 }, tier: 'live', reasons: [] }), { img: t.backdrop.small });
+          await t.settle(200);
+        }
+        await t.settle(450);
+      }
       const c = await facts(f);
       const sized = (await t.calls('card', 'agents:size')).map((x) => x.payload.height);
       // The window is as tall as the card open: 16 above, 22 below.
       t.check(`${name}.sized`, sized.length >= 1 && sized[0] >= c.closed + 38, `agents:size heights ${JSON.stringify(sized)} for a card ${c.closed} tall`);
       t.check(
         `${name}.drawn`,
-        c.shown && c.kind === payload.kind && c.title === payload.title && c.radius === '16px' && c.paper === 'rgb(255, 246, 241)' && c.at.join() === '22,16,420' && /Segoe UI/.test(c.font) && c.wide === 0,
+        c.shown && c.kind === payload.kind && c.title === payload.title && c.glass && c.icon === 0 && c.radius === '28px' && c.at.join() === '22,16,420' && c.wide === 0,
         JSON.stringify(c),
       );
       t.check(`${name}.rows`, c.rows.length === expect.rows && c.more === expect.more, JSON.stringify([c.rows, c.more]));
+      // Each row carries its own state and time, as Rust sent it.
+      const sent = (payload.rows || []).map((r) => r.text);
+      t.check(`${name}.times`, c.times.join('|') === sent.join('|'), JSON.stringify([c.times, sent]));
+      if (opts.tone) t.check(`${name}.tone`, c.tone === opts.tone, `tone ${c.tone}`);
       t.check(`${name}.parts`, c.keys === expect.keys && c.dot === expect.dot && c.buttons === 0, JSON.stringify([c.keys, c.dot, c.buttons]));
-      await t.shot(name, CLIP);
+      await t.shot(name, clip);
       return c;
     },
   };
@@ -219,6 +256,14 @@ export const scenes = [
     'watch-card-needs-you',
     { ...DONE, kind: 'needs-you', title: 'site needs you', place: 'Codex · Terminal', detail: 'Codex wants to use shell', session: 'a', rows: ROWS.slice(1, 4), more: 0, altTab: false },
     { rows: 3, more: '', keys: false, dot: true },
+  ),
+  // A handful of sessions, each with what it started nested under it, each
+  // row with its own state and time, on a white desktop for the light tone.
+  cardScene(
+    'watch-card-tree',
+    { ...DONE, title: 'aevaleron finished', rows: TREE, more: 3, altTab: false },
+    { rows: TREE.length, more: '3 more in the tray menu', keys: false, dot: true },
+    { win: TALL, clip: TALL_CLIP, backdrop: 'white', tone: 'light' },
   ),
   {
     ...offer,

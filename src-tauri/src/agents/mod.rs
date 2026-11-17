@@ -49,8 +49,9 @@ const MIN_CARD_MS: u64 = 5_000;
 const OFFER_MS: u64 = 20_000;
 /// A Stop hook can fire a moment before the reply is on disk.
 const SNIPPET_WAIT_MS: u64 = 300;
-/// Rows under the head; the rest are counted.
-const MAX_ROWS: usize = 6;
+/// Rows under the head, subagents included: a handful of sessions with
+/// what they started. The rest are counted.
+const MAX_ROWS: usize = 12;
 /// Sessions the tray menu lists; the rest are counted.
 const TRAY_ROWS: usize = 8;
 const TAIL_BYTES: u64 = 256 * 1024;
@@ -185,6 +186,9 @@ struct Up {
     placed: bool,
     /// The display it went up on, kept until it goes.
     spot: Option<Spot>,
+    /// What the page was last sent, so an unchanged notification is not
+    /// sent again.
+    sent: String,
 }
 
 /// A display's work area in physical pixels, and its scale.
@@ -716,6 +720,7 @@ fn show_top(restart: bool, p: &Prefs) {
                     total,
                     placed: false,
                     spot: None,
+                    sent: String::new(),
                 });
                 if restart {
                     up.elapsed = 0;
@@ -735,19 +740,29 @@ fn show_top(restart: bool, p: &Prefs) {
     let _ = app.run_on_main_thread(move || {
         let _ = crate::crash::guard("agents-show", || {
             if window(&a).is_some() {
-                send_card(&a, &p);
+                send_card(&a, &p, false);
             }
         });
     });
 }
 
 /// Sends the notification on screen to the page (which answers with its
-/// height).
-fn send_card(app: &AppHandle, p: &Prefs) {
-    let data = payload(&state().lock(), p);
-    if !data.is_null() {
-        crate::windows::emit(app, LABEL, "agents:card", data);
-    }
+/// height), unless the page already has exactly that; `force` sends it
+/// anyway (the page reloaded).
+fn send_card(app: &AppHandle, p: &Prefs, force: bool) {
+    let data = {
+        let mut st = state().lock();
+        let data = payload(&st, p);
+        let text = data.to_string();
+        match st.up.as_mut() {
+            Some(up) if !data.is_null() && (force || up.sent != text) => {
+                up.sent = text;
+                data
+            }
+            _ => return,
+        }
+    };
+    crate::windows::emit(app, LABEL, "agents:card", data);
 }
 
 /// The rows changed under a notification that is up.
@@ -755,7 +770,7 @@ fn refresh_card(p: &Prefs) {
     let Some(app) = APP.get() else { return };
     let placed = state().lock().up.as_ref().is_some_and(|u| u.placed);
     if placed {
-        send_card(app, p);
+        send_card(app, p, false);
     }
 }
 
@@ -986,8 +1001,10 @@ fn tick_loop() {
             if ticks % 20 == 0 {
                 sweep();
                 // The minutes in a row's text move on even when nothing
-                // else does.
+                // else does: the tray, and a notification that is up (sent
+                // only when a row's time reads differently).
                 sync_tray();
+                refresh_card(&prefs());
             }
             // Every 10 minutes: agents installed since, or hooks another
             // tool rewrote.
@@ -1472,12 +1489,12 @@ mod tests {
             host: "VS Code".into(),
             ..HookEvent::default()
         };
-        for i in 0..9 {
+        for i in 0..15 {
             book.apply(&ev("UserPromptSubmit", &format!("s{i}")), 1_000);
         }
         book.apply(&ev("Stop", "s0"), 2_000);
         let (list, more) = rows(&book, Some("s0"), true, 2_000 + 5 * 60_000);
-        assert_eq!((list.len(), more), (6, 2));
+        assert_eq!((list.len(), more), (12, 2));
         assert_eq!(list[0]["state"], "working");
         assert_eq!(list[0]["text"], "working 5m");
         assert_eq!(list[0]["place"], "VS Code");

@@ -1357,7 +1357,7 @@ mod tests {
             // agents lane
             (
                 Caller::Agents,
-                vec![include_str!("../../renderer/agents.js")],
+                vec![glass, include_str!("../../renderer/agents.js")],
             ),
             // region-text lane
             (

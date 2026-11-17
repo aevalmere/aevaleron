@@ -10,7 +10,7 @@ pub async fn route(app: &AppHandle, channel: &str, p: &Value) -> Option<Result<V
     let out = match channel {
         // The page loaded (or reloaded): it gets the notification that is up.
         "agents:ready" => {
-            super::send_card(app, &super::prefs());
+            super::send_card(app, &super::prefs(), true);
             json!({ "ok": true })
         }
         "agents:size" => super::page_size(app, p),
