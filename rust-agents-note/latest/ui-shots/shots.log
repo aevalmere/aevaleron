@@ -218,13 +218,13 @@
 [UI] noDockUi=ok
 [UI] resizeZones=ok
 [UI] globFrameCost=ok
-[UI] globShapeMs=0.020
+[UI] globShapeMs=0.010
 [UI] shot 04a-glob-08.png
 [UI] shot 04b-glob-30.png
 [UI] shot 04c-glob-52.png
 [UI] shot 04d-glob-70.png
 [UI] shot 04e-glob-90.png
-[UI] globOpen ms=515 frames=23 longestFrameMs=33.4
+[UI] globOpen ms=493 frames=30 longestFrameMs=16.8
 [UI] globOpens=ok
 [UI] globSmooth=ok
 [UI] globReducedMotion=ok
@@ -666,6 +666,7 @@
 [UI] watch-card-done.sized=ok
 [UI] watch-card-done.drawn=ok
 [UI] watch-card-done.rows=ok
+[UI] watch-card-done.times=ok
 [UI] watch-card-done.parts=ok
 [UI] shot watch-card-done.png
 [UI] watchDetailOneLineAtRest=ok
@@ -681,13 +682,24 @@
 [UI] watch-card-needs-you.sized=ok
 [UI] watch-card-needs-you.drawn=ok
 [UI] watch-card-needs-you.rows=ok
+[UI] watch-card-needs-you.times=ok
 [UI] watch-card-needs-you.parts=ok
 [UI] shot watch-card-needs-you.png
+[UI] scene watch/watch-card-tree
+[UI] watch-card-tree.ready=ok
+[UI] watch-card-tree.sized=ok
+[UI] watch-card-tree.drawn=ok
+[UI] watch-card-tree.rows=ok
+[UI] watch-card-tree.times=ok
+[UI] watch-card-tree.tone=ok
+[UI] watch-card-tree.parts=ok
+[UI] shot watch-card-tree.png
 [UI] scene watch/watch-card-offer
 [UI] watch-card-offer.ready=ok
 [UI] watch-card-offer.sized=ok
 [UI] watch-card-offer.drawn=ok
 [UI] watch-card-offer.rows=ok
+[UI] watch-card-offer.times=ok
 [UI] watch-card-offer.parts=ok
 [UI] shot watch-card-offer.png
 [UI] watchOfferOpensSettings=ok
@@ -1024,7 +1036,7 @@
 [UI] shot 04c-glob-52-150.png
 [UI] shot 04d-glob-70-150.png
 [UI] shot 04e-glob-90-150.png
-[UI] globOpen-150 ms=520 frames=24 longestFrameMs=33.4
+[UI] globOpen-150 ms=496 frames=30 longestFrameMs=16.8
 [UI] globOpens-150=ok
 [UI] globReducedMotion-150=ok
 [UI] scene sheet/multi-150
@@ -1449,6 +1461,7 @@
 [UI] watch-card-done.sized-150=ok
 [UI] watch-card-done.drawn-150=ok
 [UI] watch-card-done.rows-150=ok
+[UI] watch-card-done.times-150=ok
 [UI] watch-card-done.parts-150=ok
 [UI] shot watch-card-done-150.png
 [UI] watchDetailOneLineAtRest-150=ok
@@ -1464,13 +1477,24 @@
 [UI] watch-card-needs-you.sized-150=ok
 [UI] watch-card-needs-you.drawn-150=ok
 [UI] watch-card-needs-you.rows-150=ok
+[UI] watch-card-needs-you.times-150=ok
 [UI] watch-card-needs-you.parts-150=ok
 [UI] shot watch-card-needs-you-150.png
+[UI] scene watch/watch-card-tree-150
+[UI] watch-card-tree.ready-150=ok
+[UI] watch-card-tree.sized-150=ok
+[UI] watch-card-tree.drawn-150=ok
+[UI] watch-card-tree.rows-150=ok
+[UI] watch-card-tree.times-150=ok
+[UI] watch-card-tree.tone-150=ok
+[UI] watch-card-tree.parts-150=ok
+[UI] shot watch-card-tree-150.png
 [UI] scene watch/watch-card-offer-150
 [UI] watch-card-offer.ready-150=ok
 [UI] watch-card-offer.sized-150=ok
 [UI] watch-card-offer.drawn-150=ok
 [UI] watch-card-offer.rows-150=ok
+[UI] watch-card-offer.times-150=ok
 [UI] watch-card-offer.parts-150=ok
 [UI] shot watch-card-offer-150.png
 [UI] watchOfferOpensSettings-150=ok
@@ -1604,7 +1628,7 @@
 [UI] lane settings sceneRuns=68
 [UI] lane voice sceneRuns=8
 [UI] lane polish sceneRuns=28
-[UI] lane watch sceneRuns=10
+[UI] lane watch sceneRuns=12
 [UI] lane regionText sceneRuns=14
 [UI] lane find-act sceneRuns=8
 [UI] lane private-apps sceneRuns=16
@@ -1616,12 +1640,12 @@
 [UI] iconsFromSprite=ok
 [UI] voicePillOnlyListens=ok
 [UI] watchCardNeedsNoFocus=ok
-[UI] watchNotificationIsAevalsistants=ok
+[UI] watchNotificationIsGlass=ok
 [UI] regionNoteOnlyReports=ok
 [UI] regionNoteKeepsNothing=ok
 [UI] privateLineIsWrittenOnce=ok
-[UI] axe audits=162 ms=22683
+[UI] axe audits=163 ms=13508
 [UI] axeClean=ok
 [UI] axeAllowListFresh=ok
 [UI] noPageErrors=ok
-[UI] done failed=0 shots=488
+[UI] done failed=0 shots=490
