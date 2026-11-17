@@ -1,16 +1,16 @@
 {
   "workflow": "rust",
   "workflow_name": "rust",
-  "run_id": 43784522293,
+  "run_id": 44041820735,
   "run_attempt": 1,
-  "run_url": "https://github.com/aevalmere/aevaleron/actions/runs/43784522293",
+  "run_url": "https://github.com/aevalmere/aevaleron/actions/runs/44041820735",
   "event": "push",
-  "sha": "eb4e2021bd4b04a66f98b78aaab7ce689b653912",
+  "sha": "2c2bb4dd8f669745b8cb1738d1bad6e80cde62df",
   "ref": "rust/next",
   "ref_dir": "rust-next",
   "conclusion": "success",
   "failed": [],
-  "finished": "2026-11-16T01:23:41Z",
+  "finished": "2026-11-17T08:16:05Z",
   "error_lines": 0,
   "steps": [
     {
@@ -80,7 +80,7 @@
     },
     {
       "name": "Save NSIS toolset",
-      "outcome": "skipped",
+      "outcome": "success",
       "log": ""
     },
     {
