@@ -1,0 +1,38 @@
+Diff in \\?\D:\a\aevaleron\aevaleron\src-tauri\src\host\ask.rs:964:
+         .as_ref()
+         .map(|e| e.text.encode_utf16().count())
+         .unwrap_or(0);
+-    let text_only = shot_taken.is_some()
+-        && !use_brain
+-        && exact_len >= TEXT_ONLY_CHARS
+-        && !is_visual(&text);
++    let text_only =
++        shot_taken.is_some() && !use_brain && exact_len >= TEXT_ONLY_CHARS && !is_visual(&text);
+     let shot = if text_only { None } else { shot_taken };
+     let via_region = shot.as_ref().is_some_and(|s| s.region.is_some());
+     let mut provider = act
+Diff in \\?\D:\a\aevaleron\aevaleron\src-tauri\src\selftest\probes\bar.rs:554:
+     }
+     type_text(cx, "");
+     let ok = started && got.iter().all(|g| g.ends_with("=true"));
+-    cx.must("textEntryDecides", ok, format!("{} agentStart={started}", got.join(" ")));
++    cx.must(
++        "textEntryDecides",
++        ok,
++        format!("{} agentStart={started}", got.join(" ")),
++    );
+ }
+ 
+ /// barMultiline (B-056): three pasted lines stay three rows, and Enter sends
+Diff in \\?\D:\a\aevaleron\aevaleron\src-tauri\src\store\mod.rs:1350:
+         for k in FIND_KEYS {
+             assert!(!f.contains_key(k), "{k}");
+         }
+-        assert!(!f["shortcuts"].as_object().unwrap().contains_key("findOnScreen"));
++        assert!(!f["shortcuts"]
++            .as_object()
++            .unwrap()
++            .contains_key("findOnScreen"));
+         assert!(f["nativeModels"]["anthropic"].get("find").is_none());
+         assert_eq!(f["nativeModels"]["anthropic"]["vision"], "claude-opus-5-5");
+     }
