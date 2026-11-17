@@ -1,5 +1,0 @@
-== shots.log ==
-[UI] tokenMenuIsGMenu=FAIL:menu=2
-[UI] tokenMenuIsGMenu-ts200=FAIL:menu=2
-[UI] tokenMenuIsGMenu-150=FAIL:menu=2
-[UI] tokenMenuIsGMenu-150-ts200=FAIL:menu=2
