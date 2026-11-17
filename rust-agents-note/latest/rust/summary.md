@@ -1,11 +1,11 @@
 # rust: success
 
 - Workflow: rust
-- Run: [44028868180](https://github.com/aevalmere/aevaleron/actions/runs/44028868180), attempt 1, on push
-- Commit: 4d0310d2ebbc29da74df03a741bba9fb27d7837c
+- Run: [44034328490](https://github.com/aevalmere/aevaleron/actions/runs/44034328490), attempt 1, on push
+- Commit: 76eeff287a08e27e6c65dad0388373907029f611
 - Ref: rust/agents-note
 - Conclusion: **success**
-- Finished: 2026-11-17T06:31:21Z
+- Finished: 2026-11-17T07:06:24Z
 
 | Step | Outcome | Log |
 |---|---|---|
@@ -22,7 +22,7 @@
 | Unit tests | success | [test.log](test.log) |
 | Restore NSIS toolset | success |  |
 | Seed NSIS toolset | success | [nsis.log](nsis.log) |
-| Save NSIS toolset | success |  |
+| Save NSIS toolset | skipped |  |
 | Build installer | success | [build.log](build.log) |
 | Smoke | success | [smoke.log](smoke.log) |
 | Capture check | success | [capture.log](capture.log) |
