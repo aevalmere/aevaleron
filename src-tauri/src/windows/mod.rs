@@ -476,11 +476,9 @@ pub fn overlay_state(app: &AppHandle, for_label: Option<&str>) -> Value {
         "chatMax": chat_max,
         "region": region,
         "busy": s.busy,
-        "barMode": s.bar_mode,
         "agent": agent,
         "pillError": s.pill_error,
         "offline": offline,
-        "findOpen": s.find_open,
         "shortcuts": shortcuts,
         "hotkeyFailed": if hotkey_failed { main_chord } else { String::new() },
         "glassIntensity": glass,
@@ -771,10 +769,6 @@ pub fn collapse_panel(app: &AppHandle) {
     let Some(h) = flags::hwnd_of(&w) else {
         return;
     };
-    let find_open = shared(app).lock().find_open;
-    if find_open {
-        shared(app).call(app, |k| k.close_find.as_ref());
-    }
     // From the open bar or the layout editor: either leaves something on
     // the window that the page has to take away first.
     let was_open = {
@@ -885,29 +879,14 @@ pub fn trigger_capture(app: &AppHandle) {
     outputs::show_with_chat(app);
 }
 
-pub fn set_bar_mode(app: &AppHandle, mode: &str) {
-    if !shared(app).call_str(app, mode, |h| h.set_bar_mode.as_ref()) {
-        let next = if mode == "find" || mode == "agent" {
-            mode
-        } else {
-            "ask"
-        };
-        shared(app).lock().bar_mode = next.to_string();
-        send_overlay_state(app);
-        hotkeys::apply(app);
-    }
-}
-
-/// main.js openBar(mode, { prefill }): `None` opens the one inferring input;
-/// a mode locks the bar to it.
+/// main.js openBar(mode, { prefill }): `None` opens the one deciding
+/// input; `ask` or `agent` locks the bar to that.
 pub fn open_bar(app: &AppHandle, mode: Option<&str>, prefill: Option<String>) {
     if window(app, OVERLAY).is_none() || shared(app).lock().mode == Mode::Hud {
         return;
     }
-    let lock = mode.filter(|m| matches!(*m, "ask" | "find" | "agent"));
+    let lock = mode.filter(|m| matches!(*m, "ask" | "agent"));
     shared(app).lock().pill_error = false;
-    set_bar_mode(app, if lock == Some("find") { "find" } else { "ask" });
-    bar_mark("mode");
     emit(app, OVERLAY, "bar:open", json!({ "lock": lock }));
     trigger_capture(app);
     shared(app).call(app, |h| h.prefetch_bar_context.as_ref());
@@ -920,6 +899,23 @@ pub fn open_bar(app: &AppHandle, mode: Option<&str>, prefill: Option<String>) {
             json!({ "text": text, "mode": m }),
         );
     }
+}
+
+/// Runs one line as if the person typed it into the bar and pressed Enter:
+/// the bar opens and decides it the way it decides typing, so a clear task
+/// goes through `agent:start` exactly as a leading `>` does, a question is
+/// asked, a leading `?` or `>` is honoured, and a task waiting on an answer
+/// gets it. This is the way in for anything that hears or reads a line on
+/// the person's behalf (the wake word). False when the bar cannot open.
+pub fn submit_text(app: &AppHandle, text: &str) -> bool {
+    let text = text.trim();
+    let hud = shared(app).lock().mode == Mode::Hud;
+    if text.is_empty() || hud || window(app, OVERLAY).is_none() {
+        return false;
+    }
+    open_bar(app, None, None);
+    emit(app, OVERLAY, "bar:submit", json!({ "text": text }));
+    true
 }
 
 /// The pill and the tray: the trail while the agent works, else the bar.
@@ -985,14 +981,13 @@ pub fn escape_clears_bar(agent_state: &str, dirty: bool, bar_focused: bool) -> b
 /// answer or hides an output window (D-01).
 pub fn on_escape(app: &AppHandle) {
     crate::state::refresh(app);
-    let (agent, agent_state, dirty, find, region, buddy, mode) = {
+    let (agent, agent_state, dirty, region, buddy, mode) = {
         let st = shared(app);
         let s = st.lock();
         (
             s.agent.running,
             s.agent.state.clone(),
             s.bar_dirty,
-            s.find_open,
             s.region_active,
             s.buddy_active,
             s.mode,
@@ -1007,9 +1002,6 @@ pub fn on_escape(app: &AppHandle) {
         return;
     }
     if agent && st.call(app, |h| h.stop_agent.as_ref()) {
-        return;
-    }
-    if find && st.call(app, |h| h.close_find.as_ref()) {
         return;
     }
     if region && st.call(app, |h| h.cancel_region.as_ref()) {
@@ -1042,10 +1034,6 @@ pub fn on_hotkey(app: &AppHandle, action: &str) {
         "captureQuery" => {
             mark_bar_requested();
             open_bar(app, None, None);
-        }
-        "findOnScreen" => {
-            mark_bar_requested();
-            open_bar(app, Some("find"), None);
         }
         "agentTask" => {
             if shared(app).lock().agent.running {
@@ -1774,7 +1762,6 @@ mod tests {
             let mut o = Output {
                 label: label.into(),
                 active,
-                view: "chat".into(),
                 ..Output::default()
             };
             o.chat
@@ -1895,7 +1882,7 @@ mod tests {
     /// Tauri additions, then the ones an output window alone gets.
     #[test]
     fn overlay_state_field_set() {
-        const ELECTRON: [&str; 21] = [
+        const ELECTRON: [&str; 19] = [
             "mode",
             "orbAt",
             "reducedMotion",
@@ -1910,11 +1897,9 @@ mod tests {
             "chatMax",
             "region",
             "busy",
-            "barMode",
             "agent",
             "pillError",
             "offline",
-            "findOpen",
             "shortcuts",
             "hotkeyFailed",
         ];

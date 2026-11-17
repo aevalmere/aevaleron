@@ -2,8 +2,7 @@
 
 // An output window renders one conversation as a transcript: the question
 // as a quiet chip, the answer as a document with streamed markdown, inline
-// error rows that offer the fix, and (trail.js) Find results and task
-// trails. Each output window is its own floating window with a title bar it
+// error rows that offer the fix, and (trail.js) task trails. Each output window is its own floating window with a title bar it
 // is moved by (REQUESTS.md 11); there is no input here, the bar is the only
 // one (REQUESTS.md 9). The sheet grows in the page and Rust follows it; the
 // transcript scrolls inside, so streaming never jitters the window edge.
@@ -176,8 +175,7 @@ document.addEventListener('keydown', (e) => {
   const target = e.target;
   // Never steal a key from a control that wants it.
   if (target && target.closest && target.closest('input, textarea, button, [role="option"], .retry-menu')) return;
-  const box = chatEl.hidden ? document.getElementById('find-view') : chatEl;
-  if (!box) return;
+  const box = chatEl;
   const by = step(box.clientHeight);
   if (by === Infinity) box.scrollTop = box.scrollHeight;
   else if (by === -Infinity) box.scrollTop = 0;
@@ -197,8 +195,8 @@ function icon(name, cls) {
   return el;
 }
 
-// The kind is the bar token's glyph, the word in aria-label: Ask, Find, Do.
-const KIND_GLYPH = { answer: 'bubble', find: 'viewfinder', task: 'pointer' };
+// The kind is the bar token's glyph, the word in aria-label: Ask, Do.
+const KIND_GLYPH = { answer: 'bubble', task: 'pointer' };
 
 // The title bar names the conversation by its first question, the way a
 // document is named by its first line; a run is named by its task.
@@ -238,7 +236,7 @@ function answerCount() {
 }
 
 function syncCopyAll() {
-  copyAllBtn.hidden = document.body.dataset.view === 'find' || answerCount() <= 1;
+  copyAllBtn.hidden = answerCount() <= 1;
 }
 window.syncCopyAll = syncCopyAll;
 
@@ -1160,7 +1158,7 @@ function announceDone(raw) {
 }
 
 listen('query:done', (p) => {
-  const { gen, usage, inferred, question, sent } = p || {};
+  const { gen, usage, offerDo, question, sent } = p || {};
   if (gen < lastGen) return;
   clearInterval(waitTimer);
   stopCountdown();
@@ -1192,11 +1190,21 @@ listen('query:done', (p) => {
       }
       if (sent && typeof sent === 'object') addSentDisclosure(done, sent, (p && p.msgId) || sent.msgId || gen);
       placeAnswerRetry(done);
-      // The guess sent this as a question. A short one may have been a word
-      // to find; one click says so, without retyping.
-      if (inferred && question && question.trim().split(/\s+/).length <= 6) {
-        const f = button('copy-msg', 'Find this on screen instead');
-        f.addEventListener('click', () => send('find:open', { prefill: question }));
+      // The bar could not tell whether this was a question or a task, and
+      // asked. One press runs it as a task instead, through the same
+      // agent:start a > in the bar sends, without retyping. An answer that
+      // reads as steps already has Do it, which runs the same words with
+      // the answer as context.
+      if (offerDo && question && (!done.doIt || done.doIt.hidden)) {
+        const f = button('copy-msg', 'Do this instead');
+        f.addEventListener('click', () => {
+          if (f.disabled) return;
+          f.disabled = true;
+          send('agent:start', { task: question }).then((r) => {
+            if (r && (r.status === 'started' || r.status === 'consent')) f.remove();
+            else f.disabled = false;
+          });
+        });
         done.meta.insertBefore(f, done.meta.querySelector('.sent-btn, .usage'));
       }
       announceDone(done.raw);

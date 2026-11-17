@@ -283,7 +283,7 @@ export const scenes = [
         const m = document.getElementById('intent-menu');
         return !m.hidden && m.classList.contains('g-menu') && m.querySelectorAll('[role="option"]').length;
       });
-      t.check('tokenMenuIsGMenu', menu === 3, `menu=${menu}`);
+      t.check('tokenMenuIsGMenu', menu === 2, `menu=${menu}`);
       await t.shot('bar-menu', TALL_CLIP);
       // Closed with its menu open (the minimize button, the shortcut), the
       // bar comes back without it and with the field focused.
@@ -532,9 +532,9 @@ export const scenes = [
       await setField(f, 'LNK1104');
       await press(f, { key: '2', ctrlKey: true });
       await t.settle(320);
-      const find = await tokenState(f);
-      t.check('tokenShowsChoice', find.intent === 'find' && find.locked === 'true' && find.rest === 'false', JSON.stringify(find));
-      await t.shot('bar-token-find', BAR_CLIP);
+      const chosen = await tokenState(f);
+      t.check('tokenShowsChoice', chosen.intent === 'do' && chosen.locked === 'true' && chosen.rest === 'false', JSON.stringify(chosen));
+      await t.shot('bar-token-do', BAR_CLIP);
       await setField(f, '');
       await press(f, { key: 'Backspace' });
 
@@ -560,58 +560,71 @@ export const scenes = [
     },
   },
 
-  // Find starts when asked for, from real key presses: a plain word is never
-  // taken for a search, a leading / and Ctrl+2 both are.
+  // Ask or do, from real key presses: a clear task runs on Enter through
+  // agent:start, as > does; a question asks; a line that could be either is
+  // asked with offerDo, and Alt+Enter does the other one.
   {
-    name: 'bar-find-keys',
+    name: 'bar-ask-or-do',
     backdrop: 'wallpaper',
-    windows: [overlay],
+    windows: [{ ...overlay, responses: { 'agent:start': { status: 'started' }, 'query:submit': { status: 'ok' } } }],
     async run(t) {
       const f = t.frame('overlay');
       const focus = () => f.evaluate(() => document.getElementById('query-input').focus());
-      const value = () => f.evaluate(() => document.getElementById('query-input').value);
-      const modes = async () => (await t.calls('overlay', 'bar:mode')).map((c) => c.payload.mode);
+      const starts = async () => (await t.calls('overlay', 'agent:start')).map((c) => c.payload.task);
+      const asks = async () => (await t.calls('overlay', 'query:submit')).map((c) => c.payload);
       await seenBefore(f);
       await openBar(f);
       await t.settle();
-      // The word is on the screen the bar was told about, which used to be
-      // enough for the guess to become Find.
-      await f.evaluate(() => window.__emit('bar:context', { screen: 'Invoice 2291 total due', process: 'chrome', title: 'Bill' }));
+
       await focus();
-      await t.page.keyboard.type('invoice');
-      await t.settle(400);
-      const plain = await tokenState(f);
-      const plainModes = await modes();
-      t.check('plainWordIsNotFind', plain.intent !== 'find' && !plainModes.includes('find'), JSON.stringify({ plain, plainModes }));
+      await t.page.keyboard.type('open notepad and write a haiku');
+      await t.settle(200);
+      const guessed = await tokenState(f);
+      t.check('clearTaskShowsDo', guessed.intent === 'do' && guessed.locked === 'false' && guessed.rest === 'false', JSON.stringify(guessed));
+      await t.shot('bar-guess-do', BAR_CLIP);
+      await t.page.keyboard.press('Enter');
+      await t.settle(100);
+      const ran = await starts();
+      t.check('clearTaskRunsOnEnter', ran.includes('open notepad and write a haiku') && (await asks()).length === 0, JSON.stringify(ran));
+
+      await setField(f, '');
+      await focus();
+      await t.page.keyboard.type('why is the build red');
+      await t.page.keyboard.press('Enter');
+      await t.settle(100);
+      const q = (await asks()).pop() || {};
+      t.check('questionAsks', q.question === 'why is the build red' && q.offerDo === false && (await starts()).length === 1, JSON.stringify(q));
+
+      await setField(f, '');
+      await focus();
+      await t.page.keyboard.type('save');
+      await t.settle(200);
+      const unsure = await tokenState(f);
+      await t.page.keyboard.press('Enter');
+      await t.settle(100);
+      const middle = (await asks()).pop() || {};
+      t.check('middleAsksAndOffersDo', unsure.intent === 'ask' && middle.question === 'save' && middle.offerDo === true, JSON.stringify({ unsure, middle }));
+
+      await setField(f, '');
+      await focus();
+      await t.page.keyboard.type('what does this button do');
+      await t.page.keyboard.press('Alt+Enter');
+      await t.settle(100);
+      const flipped = await starts();
+      t.check('altEnterDoesTheOther', flipped.includes('what does this button do'), JSON.stringify(flipped));
 
       await setField(f, '');
       await focus();
       await t.page.keyboard.type('/inv');
-      await t.settle(400);
+      await t.settle(200);
       const slash = await tokenState(f);
-      const slashText = await value();
-      const slashModes = await modes();
-      const slashOk = slash.intent === 'find' && slash.locked === 'true' && slashText === 'inv' && slashModes.includes('find');
-      t.check('slashStartsFind', slashOk, JSON.stringify({ slash, slashText, slashModes }));
-      await t.shot('bar-find-keys', BAR_CLIP);
-
+      const slashText = await fieldValue(f);
+      t.check('slashIsText', slash.locked === 'false' && slashText === '/inv', JSON.stringify({ slash, slashText }));
       await setField(f, '');
-      await press(f, { key: 'Backspace' });
-      await focus();
-      await t.page.keyboard.type('total');
-      await t.page.keyboard.press('Control+2');
-      await t.settle(400);
-      const chord = await tokenState(f);
-      const chordText = await value();
-      const queries = (await t.calls('overlay', 'find:query')).map((c) => c.payload.query);
-      const chordOk = chord.intent === 'find' && chord.locked === 'true' && chordText === 'total' && queries.includes('total');
-      t.check('ctrl2StartsFind', chordOk, JSON.stringify({ chord, chordText, queries }));
-      await setField(f, '');
-      await press(f, { key: 'Backspace' });
     },
   },
 
-  // B-155, B-156: what the bar says with no provider, or a taken hotkey.
+  // B-155, B-156: what the bar says with no provider, or a taken hotkey.  // B-155, B-156: what the bar says with no provider, or a taken hotkey.
   {
     name: 'bar-notices',
     backdrop: 'wallpaper',
@@ -628,7 +641,7 @@ export const scenes = [
       });
       t.check('noOpenRouterInBarCopy', !/openrouter/i.test(copy), 'a bar string names OpenRouter');
       const notice = await f.evaluate(() => document.getElementById('notice-text').textContent);
-      t.check('noticeNamesTheNeed', notice === 'Answers need an AI provider. Finding words on screen works without one.', notice);
+      t.check('noticeNamesTheNeed', notice === 'Answers need an AI provider.', notice);
 
       await f.focus('#query-input');
       await setField(f, 'why is the build red');
@@ -819,15 +832,15 @@ export const scenes = [
       const sent = picked.shown && picked.text === 'Sonnet 5.5' && picked.label === label && left === '' && last.provider === 'anthropic' && last.model === 'claude-sonnet-5-5' && !gone.shown;
       t.check('modelPinSentWithSubmit', sent, JSON.stringify({ picked, left, last, gone }));
 
-      // Find uses its own model, and Backspace gives back the chip first.
+      // Backspace gives back the chip first, then the lock.
       await setField(f, '@hai');
       await press(f, { key: 'Enter' });
       await press(f, { key: '2', ctrlKey: true });
-      const find = await modelChip(f);
+      const chip = await modelChip(f);
       await press(f, { key: 'Backspace' });
       const back = await modelChip(f);
       const lock = await tokenState(f);
-      t.check('modelChipUnderFind', find.title === 'Find uses the Find model' && !back.shown && lock.locked === 'true', JSON.stringify({ find, back, lock }));
+      t.check('backspaceTakesChipFirst', chip.shown && !back.shown && lock.locked === 'true', JSON.stringify({ chip, back, lock }));
     },
   },
 

@@ -460,6 +460,14 @@ All strings verbatim (they are UI). Verify: UNIT table test against `friendlyErr
 
 ## 14. Find (FIND)
 
+**2026-11-17: Find was removed from the app on the owner's word.** The owner asked for the main line to
+be just Ask and Do, with the bar deciding between them from what is typed. Every FIND item below, and
+the Find parts of KEY, TRAY, STORE, LENS and the smoke labels, no longer applies to `rust-rewrite`. The
+full Find port lives on, unchanged, on branch `rust/find`. Settings stored by an older install for Find
+(`findModel`, `findScope`, `findRelated*`, `findOcr`, `lastMode`, `shortcuts.findOnScreen`,
+`nativeModels.*.find`) are read without error and dropped on load. Lane note:
+`.claude/rust-rewrite/lanes/ask-do.md`.
+
 Port of lib/find.js. Verify by DIFF on recorded snapshots plus the listed smoke lines.
 
 | ID | What | Source | Verify |
@@ -757,6 +765,7 @@ gets a DESIGN.md entry (agent d), as the DESIGN.md rule requires, citing REQUEST
 | STORE-13 `outputPos.docked` | read for migration only; floating windows ignore it; the key is preserved on write for rollback |
 | SMOKE hudDockedDefault, hudDockToggle, storedOutputPos | replaced by outputFloating, outputMulti, noOutputLayout |
 | POS-13 `overlay:state.outputPos` | field kept for compatibility; no longer drives layout |
+| FIND-01..09, the lens's hits and loupe, the Find shortcut, tray item, settings and results view (2026-11-17) | removed on the owner's word; kept on `rust/find`. The bar now decides Ask or Do (`renderer/intent.js`); see section 14's note |
 
 Requests 2-6 and 12 in REQUESTS.md (more providers, one-time suggestions, full-screen layout, a glass
 slider independent of the Windows transparency setting, de-duplicated hints, polish loops) are also

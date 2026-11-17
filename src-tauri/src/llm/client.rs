@@ -688,7 +688,7 @@ impl Llm {
         Self::read_sse(reply, dialect, on_delta, false, meter, cancel, idle).await
     }
 
-    /// A streamed text-only completion, for Find's two stages. Returns the
+    /// A streamed text-only completion (the voice cleanup). Returns the
     /// whole text; `on_delta` sees it as it arrives.
     #[allow(clippy::too_many_arguments)]
     pub async fn stream_text(
@@ -1254,9 +1254,9 @@ Aevaleron is skipping Google Gemini until you replace it.";
         assert!(canned.sent.lock()[0]
             .url
             .starts_with(wire::ANTHROPIC_MODELS));
-        let healed = llm.known_native(Provider::Anthropic, Kind::Find, "claude-3-retired");
-        assert_eq!(healed, Provider::Anthropic.default_model(Kind::Find));
-        let kept = llm.known_native(Provider::Anthropic, Kind::Find, "claude-opus-5-5");
+        let healed = llm.known_native(Provider::Anthropic, Kind::Text, "claude-3-retired");
+        assert_eq!(healed, Provider::Anthropic.default_model(Kind::Text));
+        let kept = llm.known_native(Provider::Anthropic, Kind::Text, "claude-opus-5-5");
         assert_eq!(kept, "claude-opus-5-5");
         let list = block(llm.list_models(Provider::Anthropic, Kind::Vision, false));
         assert_eq!(list["live"], true);

@@ -1,10 +1,12 @@
 'use strict';
 
-// The single input. One field takes a question, a word to find, or a task,
-// and the token at its left says which one Enter will do. The guess comes
-// from renderer/intent.js; a prefix (/ ? > //), Ctrl+1/2/3 or the token's menu
-// (Alt+Down) settles it outright. A guessed task never runs on Enter: it
-// shows a card, and running it takes a click or Alt+Enter.
+// The single input. One field takes a question or a task, and the token at
+// its left says which one Enter will do. The guess comes from
+// renderer/intent.js as the person types; a prefix (? or >), Ctrl+1 or
+// Ctrl+2, or the token's menu (Alt+Down) settles it outright, and Alt+Enter
+// does the other one. A clear task runs on Enter through the same
+// agent:start a > sends; a line that is not clearly either is asked, and the
+// answer offers to do it instead.
 //
 // Loaded after overlay.js, which owns the window state, the notice and the
 // resize; both are classic scripts sharing one global scope.
@@ -18,11 +20,6 @@ const token = document.getElementById('intent');
 const tokenName = token.querySelector('.intent-name');
 const intentDesc = document.getElementById('intent-desc');
 const intentMenu = document.getElementById('intent-menu');
-const guess = document.getElementById('guess');
-const guessText = document.getElementById('guess-text');
-const guessAnswer = document.getElementById('guess-answer');
-const guessRun = document.getElementById('guess-run');
-const guessFind = document.getElementById('guess-find');
 const examplesEl = document.getElementById('examples');
 const announcer = document.getElementById('announce');
 const targetChip = document.getElementById('target-chip');
@@ -34,30 +31,24 @@ const modelChipName = document.getElementById('model-chip-name');
 const modelMenu = document.getElementById('model-menu');
 const modelList = document.getElementById('model-list');
 
-const PREFIX = { find: '/', ask: '?', do: '>' };
+const PREFIX = { ask: '?', do: '>' };
 const ENTER_SAYS = {
   ask: 'Enter asks',
-  find: 'Enter acts on the selected match, and the up and down arrows move between matches',
-  do: 'Enter starts the task',
+  do: 'Enter does it on your computer',
 };
+const KEYS_SAY = 'Ctrl+1 asks, Ctrl+2 does it as a task, Alt+Enter does the other one.';
 // Short enough to sit beside the sigil legend in a 420px capsule at 18px;
 // the field's accessible name keeps the full sentence.
-const PLACEHOLDER = 'Ask, find, or do';
+const PLACEHOLDER = 'Ask or do';
 
 // lock: null while guessing, else the intent the person chose.
-// literal: // was typed, so Find stays on exact words.
 const bar = {
   lock: null,
-  literal: false,
-  guess: Intent.classify('', {}),
-  screen: '',
-  screenFolded: '',
+  guess: Intent.classify(''),
   history: [],
   recall: -1,
   draft: '',
   announced: '',
-  findOn: false,
-  findSwitch: null,
   announceTimer: null,
   // The target's label as last shown, and whether Ctrl+Tab is moving it.
   targetLabel: '',
@@ -72,10 +63,6 @@ const bar = {
   // Esc closed the list for this @, so the rest is plain text.
   modelDismissed: false,
 };
-let findState = null;
-// The list of matches on show ({ gen, hits, current }), so Enter can say
-// which row it meant.
-let findHits = null;
 let barHint = '';
 
 // ------------------------------------------------------------------- rows
@@ -149,7 +136,7 @@ function barIntent() {
 }
 
 function classifyNow() {
-  bar.guess = Intent.score(input.value, { screenFolded: bar.screenFolded });
+  bar.guess = Intent.score(input.value);
   renderToken();
 }
 
@@ -193,7 +180,7 @@ function renderToken() {
   const name = waiting ? WAIT_NAME[waiting] : Intent.NAME[now];
   const locked = !!bar.lock || !!waiting;
   // At rest the token is only its glyph: nothing is chosen, and Ask, the
-  // default, needs no word. Find, Do, a choice or a reply shows the word.
+  // default, needs no word. Do, a choice or a reply shows the word.
   const rest = locked || now !== 'ask' ? 'false' : 'true';
   const wasLocked = token.dataset.locked === 'true';
   if (tokenName.textContent !== name || token.dataset.intent !== now || token.dataset.rest !== rest) {
@@ -205,17 +192,21 @@ function renderToken() {
     replayAnim(token, 'swap');
   }
   token.dataset.locked = locked ? 'true' : 'false';
-  token.dataset.confidence = locked || bar.guess.margin >= 0.25 ? 'high' : 'low';
+  // Low when the line could be either: it is asked, and the answer offers
+  // to do it instead.
+  const unsure = !locked && bar.guess.offerDo && !!input.value.trim();
+  token.dataset.confidence = unsure ? 'low' : 'high';
   if (locked && !wasLocked) replayAnim(token, 'lock');
   if (waiting) {
     token.setAttribute('aria-label', `${name}. Enter sends this to the running task.`);
     token.setAttribute('aria-disabled', 'true');
-    intentDesc.textContent = 'Enter sends this to the running task. Ctrl+1 asks, Ctrl+2 or Ctrl+F finds, Ctrl+3 does it as a task.';
+    intentDesc.textContent = `Enter sends this to the running task. ${KEYS_SAY}`;
   } else {
     const how = bar.lock ? 'chosen' : 'guessed';
     token.setAttribute('aria-label', `${Intent.NAME[now]}, ${how}. Choose what Enter does.`);
     token.removeAttribute('aria-disabled');
-    intentDesc.textContent = `${ENTER_SAYS[now]}${bar.literal ? ', exact words only' : ''}. Ctrl+1 asks, Ctrl+2 or Ctrl+F finds, Ctrl+3 does it as a task.`;
+    const offer = unsure ? ', and the answer offers to do it instead' : '';
+    intentDesc.textContent = `${ENTER_SAYS[now]}${offer}. ${KEYS_SAY}`;
   }
   // Said once the typing settles, and only when it changed; announcing every
   // keystroke's guess would talk over the person typing.
@@ -228,8 +219,6 @@ function renderToken() {
       announce(say);
     }
   }, 700);
-  renderGuess();
-  syncFind();
   renderStatus();
   renderNotice();
   renderTarget();
@@ -286,12 +275,11 @@ listenSoft('bar:note', (p) => showNote(p && p.text));
 
 // With two or more answer windows open, the bar says which one the next
 // question continues (overlay:state.target and visibleOutputs, from Rust).
-// Find never goes to a window, so the chip steps aside while Find is what
-// Enter does. One window, or none: no chip.
+// One window, or none: no chip.
 function renderTarget() {
   const t = state.target;
   const title = t && t.title ? String(t.title) : '';
-  const show = !!title && Number(state.visibleOutputs || 0) >= 2 && barIntent() !== 'find' && !replyState();
+  const show = !!title && Number(state.visibleOutputs || 0) >= 2 && !replyState();
   const label = show ? String(t.label || title) : '';
   if (show) {
     const short = title.length > 28 ? `${title.slice(0, 27).trimEnd()}…` : title;
@@ -477,12 +465,8 @@ function clearPin(say) {
 function renderPin() {
   const p = bar.pin;
   if (p) {
-    const find = barIntent() === 'find';
     modelChipName.textContent = p.name;
     modelChip.setAttribute('aria-label', `Model for this question: ${p.name} via ${p.providerName}. Press to remove.`);
-    modelChip.dataset.ignored = find ? 'true' : 'false';
-    if (find) modelChip.title = 'Find uses the Find model';
-    else modelChip.removeAttribute('title');
   }
   if (modelChip.hidden === !p) return;
   modelChip.hidden = !p;
@@ -524,36 +508,20 @@ modelChip.addEventListener('click', () => {
 function setLock(next, opts) {
   const o = opts || {};
   bar.lock = next && Intent.INTENTS.includes(next) ? next : null;
-  bar.literal = bar.lock === 'find' && !!o.literal;
   renderToken();
   if (o.say) announce(bar.lock ? `${Intent.NAME[bar.lock]}, chosen` : 'Guessing again');
 }
 
 // A prefix typed at the start becomes the lock and leaves the text.
-// "/etc/hosts" is a path, not a Find: a / whose first word has another /
-// in it stays text, and a lock taken too early is handed back.
 function takePrefix() {
-  const v = input.value;
-  if (bar.lock === 'find' && bar.prefixed === '/' && /^\S*\//.test(v)) {
-    const at = input.selectionStart;
-    input.value = `/${v}`;
-    input.setSelectionRange(at + 1, at + 1);
-    bar.prefixed = '';
-    setLock(null);
-    return;
-  }
   if (bar.lock) return;
-  let p = null;
-  if (v.startsWith('//')) p = { lock: 'find', literal: true, n: 2 };
-  else if (/^\/[^/]/.test(v) && Intent.parse(v).lock === 'find') p = { lock: 'find', n: 1 };
-  else if (v.startsWith('?')) p = { lock: 'ask', n: 1 };
-  else if (v.startsWith('>')) p = { lock: 'do', n: 1 };
-  if (!p) return;
-  const at = Math.max(0, input.selectionStart - p.n);
-  input.value = v.slice(p.n).replace(/^\s/, '');
+  const v = input.value;
+  const lock = Intent.parse(v).lock;
+  if (!lock) return;
+  const at = Math.max(0, input.selectionStart - 1);
+  input.value = v.slice(1).replace(/^\s/, '');
   input.setSelectionRange(at, at);
-  bar.prefixed = p.n === 2 ? '//' : v[0];
-  setLock(p.lock, { literal: p.literal, say: true });
+  setLock(lock, { say: true });
 }
 
 // ------------------------------------------------------------- the menu
@@ -562,7 +530,7 @@ function takePrefix() {
 const menuOpen = () => !intentMenu.hidden && !intentMenu.classList.contains('closing');
 
 function openMenu() {
-  // Enter belongs to the running task; Ctrl+1/2/3 or a prefix still choose.
+  // Enter belongs to the running task; Ctrl+1, Ctrl+2 or a prefix still choose.
   if (replyState()) return;
   window.AevalGlass.menuIn(intentMenu);
   intentMenu.hidden = false;
@@ -655,144 +623,18 @@ intentMenu.addEventListener('keydown', (e) => {
   }
 });
 
-// ------------------------------------------------------------ guess card
+// ----------------------------------------------------------------- status
 
-// A task that was only guessed. Enter answers it as a question; doing it on
-// the computer is a click, or Alt+Enter while the card is showing.
-function renderGuess() {
-  const show = !bar.lock && !replyState() && bar.guess.intent === 'do' && !!input.value.trim();
-  if (guess.hidden === !show) return;
-  guess.hidden = !show;
-  if (show) {
-    guessText.textContent = 'This sounds like a task. Enter just answers it; Aevaleron can also do it on your computer.';
-    announce('This sounds like a task. Enter answers it. Alt+Enter does it for you.');
-  }
-  requestResize();
-}
-
-guessAnswer.addEventListener('click', () => send('ask'));
-guessRun.addEventListener('click', () => send('do'));
-guessFind.addEventListener('click', () => {
-  setLock('find', { say: true });
-  input.focus();
-});
-
-// ------------------------------------------------------------ live Find
-
-// Find runs while Find is what Enter will do: every keystroke for exact
-// words, and the model stages after a pause (or after a yes, by setting).
-// A guess that flickers between Find and Ask while typing waits a moment
-// before the lens is opened or closed, so it does not blink.
-function syncFind() {
-  const want = barIntent() === 'find' && !!input.value.trim() && !replyState();
-  clearTimeout(bar.findSwitch);
-  if (want === bar.findOn) {
-    if (want) queryFind();
-    return;
-  }
-  const go = () => {
-    bar.findOn = want;
-    window.aeval.invoke('bar:mode', { mode: want ? 'find' : 'ask' });
-    if (want) queryFind();
-  };
-  if (bar.lock) go();
-  else bar.findSwitch = setTimeout(go, 250);
-}
-
-function queryFind() {
-  window.aeval.invoke('find:query', { query: input.value, literal: bar.literal });
-}
-
-// One line under the bar: Find's count and what it is doing, or a hint.
+// One line under the bar: a note from Rust, or why Enter did nothing.
 function renderStatus() {
   let text = '';
-  let action = null;
-  if (bar.findOn && barIntent() === 'find' && findState && findState.open) {
-    // Where the ring is among the matches, as a browser's find says it.
-    let head = findState.status;
-    if (findState.total > 0 && findState.current >= 0) {
-      const c = findState.counts || {};
-      const st = findState.stage || {};
-      head = `${findState.current + 1} of ${findState.total}${findState.more ? '+' : ''}`;
-      if (c.related) head += ` · ${c.related} related`;
-      if (c.menu) head += ` · ${c.menu} in menus`;
-      if (st.related === 'running' || st.concept === 'running') head += ' · looking…';
-    }
-    text = [head, ...(findState.lines || [])].filter(Boolean).join('\n');
-    if (findState.action === 'related') {
-      action = { label: 'Look for related', run: () => window.aeval.invoke('find:related') };
-    } else if (findState.action === 'ask' || (findState.hits === 0 && input.value.trim())) {
-      action = { label: 'Ask instead', run: () => send('ask') };
-    }
-    findScopeBtn.hidden = false;
-    findScopeBtn.textContent = findState.scope === 'screen' ? 'Whole screen' : 'This window';
-  } else {
-    findScopeBtn.hidden = true;
-  }
   if (barNote) text = barNote;
   if (barHint) text = barHint;
   if (barStatusText.textContent !== text && text) announceSoon(text);
   barStatusText.textContent = text;
-  barStatusAction.hidden = !action;
-  if (action) {
-    barStatusAction.textContent = action.label;
-    barStatusAction.onclick = action.run;
-  }
-  const show = !!text || !findScopeBtn.hidden;
+  const show = !!text;
   if (barStatus.hidden === show) barStatus.hidden = !show;
   requestResize();
-}
-
-findScopeBtn.addEventListener('click', () => window.aeval.invoke('find:scope', {}));
-
-window.aeval.on('find:state', (s) => {
-  // hits: how many there are once Find has read the window and every stage
-  // has settled; -1 while that is still unknown.
-  const c = (s && s.counts) || { exact: 0, related: 0 };
-  const busy = !s || s.reading || (s.stage && (s.stage.related === 'running' || s.stage.concept === 'running'));
-  findState = s && s.open ? { ...s, hits: c.exact + c.related + (c.menu || 0) || (busy ? -1 : 0) } : s;
-  if (s && s.open === false) {
-    bar.findOn = false;
-    findHits = null;
-  }
-  renderStatus();
-});
-
-listenSoft('find:hits', (h) => {
-  findHits = h && Array.isArray(h.hits) ? h : null;
-});
-
-// The last step asked of Rust, so Enter can wait for it to land.
-let findStepped = Promise.resolve();
-function stepFind(by) {
-  findStepped = Promise.resolve(window.aeval.invoke('find:step', { by })).catch(() => null);
-}
-
-// Find has matches to walk: the arrows and F3 move between them. A recall
-// of earlier entries that is under way keeps the arrows.
-function findStepping() {
-  return barIntent() === 'find' && bar.findOn && bar.recall < 0 && !!findState && findState.open && findState.total > 0;
-}
-
-// Enter in Find acts on the selected match: Rust presses, focuses, selects
-// or clicks it once the bar has folded away. What is sent names the list
-// and the row on show, so a list that changed under the key is left alone.
-// When nothing was done, the status row says why.
-function actOnHit() {
-  // After a step that is still on its way: Down then Enter means the row
-  // the arrow went to.
-  findStepped.then(() => {
-    const h = findHits && findHits.current >= 0 ? findHits.hits[findHits.current] : null;
-    if (!h) {
-      // Nothing is selected yet: the first match, if there is one.
-      if (findState && findState.total > 0) stepFind(1);
-      return;
-    }
-    const failed = () => showNote("Couldn't do that. Press Enter to try again.");
-    window.aeval.invoke('find:act', { gen: findHits.gen, index: findHits.current, match: h.match }).then((r) => {
-      if (r && r.message) showNote(r.message);
-    }, failed);
-  });
 }
 
 // --------------------------------------------------------------- examples
@@ -807,14 +649,8 @@ function renderExamples(list) {
     b.className = 'example-chip glass thin interactive';
     b.textContent = ex;
     b.addEventListener('click', () => {
-      const m = /^Find "(.+)"$/.exec(ex);
-      if (m) {
-        input.value = m[1];
-        setLock('find');
-      } else {
-        input.value = ex;
-        setLock(null);
-      }
+      input.value = ex;
+      setLock(null);
       input.focus();
       onInput();
     });
@@ -857,10 +693,7 @@ function renderExamplesShown() {
 }
 
 window.aeval.on('bar:context', (c) => {
-  bar.screen = String((c && c.screen) || '');
-  bar.screenFolded = Intent.fold(bar.screen);
   if (!sentBefore()) renderExamples(Intent.examples(c && c.process, c && c.title));
-  if (input.value.trim()) classifyNow();
 });
 
 // ---------------------------------------------------------------- sending
@@ -876,27 +709,21 @@ function pushHistory(text) {
 
 function clearField() {
   input.value = '';
-  bar.prefixed = '';
   bar.pin = null;
   setLock(null);
   renderExamplesShown();
 }
 
-// what: the intent to send as. A guessed task sent with plain Enter goes
-// as a question.
-function send(what) {
+// what: the intent to send as. A question the bar was unsure of carries
+// offerDo, so its answer offers to do it instead.
+function send(what, offerDo) {
   const text = input.value;
   const body = text.trim();
   // Read before clearField, which gives the choice back.
   const pin = bar.pin ? { provider: bar.pin.provider, model: bar.pin.model } : {};
   barHint = '';
   if (body) markSent();
-  const recallAs = bar.lock && PREFIX[bar.lock] ? `${bar.literal ? '//' : PREFIX[bar.lock]}${body}` : body;
-  if (what === 'find') {
-    actOnHit();
-    pushHistory(recallAs);
-    return;
-  }
+  const recallAs = bar.lock ? `${PREFIX[bar.lock]}${body}` : body;
   if (what === 'do') {
     if (!body) {
       barHint = 'Say what to do, for example "rename these files by date".';
@@ -920,7 +747,6 @@ function send(what) {
     return;
   }
   pushHistory(recallAs);
-  const inferred = !bar.lock;
   // Cleared at once, like a messaging app; the transcript echoes it. With
   // no key the text stays so nothing typed is lost.
   if (state.hasKey) clearField();
@@ -930,7 +756,7 @@ function send(what) {
     barHint = "Couldn't send that. Press Enter to try again.";
     renderStatus();
   };
-  window.aeval.invoke('query:submit', { question: body, inferred, ...pin }).then((result) => {
+  window.aeval.invoke('query:submit', { question: body, offerDo: !!offerDo, ...pin }).then((result) => {
     if (result && result.status === 'walkthrough') clearField();
     else if (result && result.status === 'needs-key') needsKey('ask');
     else if (result && result.status === 'error') unsent();
@@ -967,7 +793,7 @@ function syncBarFromState() {
   const w = agentWaiting();
   const was = document.body.dataset.waiting || '';
   input.placeholder = WAITING_PLACEHOLDER[w] || PLACEHOLDER;
-  input.setAttribute('aria-label', WAITING_PLACEHOLDER[w] || 'Ask, find, or tell me what to do');
+  input.setAttribute('aria-label', WAITING_PLACEHOLDER[w] || 'Ask, or tell me what to do');
   document.body.dataset.waiting = w || '';
   // A task that starts asking while someone is in the bar: say where the
   // answer goes, at once. Elsewhere the trail says it, so only here.
@@ -983,7 +809,7 @@ function syncBarFromState() {
 
 function onEnter(e) {
   // A task waiting on the person gets Enter, unless they chose an intent
-  // outright (a prefix, Ctrl+1/2/3, the menu), which is honoured.
+  // outright (a prefix, Ctrl+1 or Ctrl+2, the menu), which is honoured.
   const waiting = replyState();
   const typed = input.value.trim();
   if (waiting === 'asking') {
@@ -998,29 +824,17 @@ function onEnter(e) {
     return;
   }
   const now = barIntent();
-  if (now === 'find') {
-    if (e.ctrlKey) {
-      window.aeval.invoke('find:to-ask', {});
-      return;
-    }
-    // A guessed Find with nothing on screen was a question after all.
-    if (!bar.lock && findState && findState.open && findState.hits === 0) {
-      send('ask');
-      return;
-    }
-    if (e.shiftKey) window.aeval.invoke('find:step', { by: -1 });
-    else send('find');
+  // Alt+Enter does the other one: a question the bar would ask runs as a
+  // task, a task is only answered.
+  if (e.altKey) {
+    send(now === 'do' ? 'ask' : 'do');
     return;
   }
-  if (now === 'do' && bar.lock) {
+  if (now === 'do') {
     send('do');
     return;
   }
-  if (now === 'do' && e.altKey && !guess.hidden) {
-    send('do');
-    return;
-  }
-  send('ask');
+  send('ask', !bar.lock && bar.guess.offerDo);
 }
 
 // ---------------------------------------------------------------- keyboard
@@ -1038,15 +852,13 @@ function onInput() {
 input.placeholder = PLACEHOLDER;
 input.addEventListener('input', onInput);
 
-// Ctrl+1, 2, 3 choose what Enter does, and Ctrl+F chooses Find as it does
-// everywhere else. Read from the physical key as well as the character, so
-// a layout that puts something else on the digit row still works.
+// Ctrl+1 chooses Ask and Ctrl+2 Do. Read from the physical key as well as
+// the character, so a layout that puts something else on the digit row
+// still works.
 function chordLock(e) {
   if (!e.ctrlKey || e.altKey || e.shiftKey || e.metaKey) return false;
-  const digit = /^(Digit|Numpad)[123]$/.test(e.code || '') ? e.code.slice(-1) : e.key;
-  let lock = null;
-  if (['1', '2', '3'].includes(digit)) lock = Intent.INTENTS[Number(digit) - 1];
-  else if (e.code === 'KeyF' || e.key === 'f' || e.key === 'F') lock = 'find';
+  const digit = /^(Digit|Numpad)[12]$/.test(e.code || '') ? e.code.slice(-1) : e.key;
+  const lock = digit === '1' || digit === '2' ? Intent.INTENTS[Number(digit) - 1] : null;
   if (!lock) return false;
   e.preventDefault();
   setLock(lock, { say: true });
@@ -1084,7 +896,6 @@ input.addEventListener('keydown', (e) => {
   }
   if (e.key === 'Backspace' && bar.lock && input.selectionStart === 0 && input.selectionEnd === 0) {
     e.preventDefault();
-    bar.prefixed = '';
     setLock(null, { say: true });
     return;
   }
@@ -1101,19 +912,7 @@ input.addEventListener('keydown', (e) => {
   }
   if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && !e.altKey && !e.shiftKey && !e.ctrlKey) {
     const dir = e.key === 'ArrowUp' ? -1 : 1;
-    // A Find is one line, so the arrows have no line to move to: they walk
-    // the matches, which Enter did before it acted on one.
-    if (findStepping()) {
-      e.preventDefault();
-      stepFind(dir);
-      return;
-    }
     if (caretAtEdge(dir) && recallKey(dir)) e.preventDefault();
-    return;
-  }
-  if (e.key === 'F3' && !e.altKey && !e.ctrlKey && findStepping()) {
-    e.preventDefault();
-    stepFind(e.shiftKey ? -1 : 1);
     return;
   }
   if (e.key === 'Escape') {
@@ -1129,10 +928,8 @@ input.addEventListener('keydown', (e) => {
     return;
   }
   if (e.key !== 'Enter') return;
-  // Shift+Enter starts a new line, except while Find is running, where it
-  // has always gone to the previous match (a Find is one line). Plain Enter
-  // in Find acts on the selected match.
-  if (e.shiftKey && !e.ctrlKey && !e.altKey && !(barIntent() === 'find' && bar.findOn)) return;
+  // Shift+Enter starts a new line.
+  if (e.shiftKey && !e.ctrlKey && !e.altKey) return;
   e.preventDefault();
   onEnter(e);
 });
@@ -1244,7 +1041,7 @@ window.addEventListener('keydown', (e) => {
 
 // ------------------------------------------------------------- announcer
 
-// One voice for the bar: notices, Find counts and the guess all speak
+// One voice for the bar: notices, status notes and the guess all speak
 // through AevalA11y (glass.js), which uses this window's live regions while
 // it has focus and asks Rust to say it elsewhere when it does not. Errors
 // and a task's question are assertive; everything else is polite.
@@ -1270,17 +1067,26 @@ function announceSoon(text) {
 
 // The bar opens unlocked, guessing, unless a flow asked for one action.
 window.aeval.on('bar:open', ({ lock }) => {
-  const l = lock === 'agent' ? 'do' : lock;
-  bar.prefixed = '';
-  setLock(l || null);
+  setLock(lock === 'agent' ? 'do' : lock || null);
 });
 
 window.aeval.on('bar:prefill', ({ text, mode }) => {
   input.value = text || '';
-  bar.prefixed = '';
-  setLock(mode === 'agent' ? 'do' : mode === 'find' ? 'find' : mode === 'ask' ? null : bar.lock);
+  setLock(mode === 'agent' ? 'do' : mode === 'ask' ? null : bar.lock);
   input.focus();
   renderExamplesShown();
+});
+
+// A line from Rust run as if typed here and Entered (windows::submit_text):
+// the same prefixes, the same guess, the same Enter.
+window.aeval.on('bar:submit', ({ text }) => {
+  input.value = String(text || '');
+  bar.recall = -1;
+  setLock(null);
+  takePrefix();
+  classifyNow();
+  renderExamplesShown();
+  onEnter({ altKey: false });
 });
 
 // A task that started from the bar leaves it; one waiting on consent keeps
@@ -1291,8 +1097,6 @@ window.aeval.on('agent:begin', ({ task }) => {
 
 function barOpened() {
   bar.recall = -1;
-  // Closing the bar closed Find with it.
-  bar.findOn = false;
   // A key added since the last time shows up in the @ list.
   bar.models = null;
   window.aeval.invoke('bar:history').then((h) => {

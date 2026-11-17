@@ -25,7 +25,6 @@
         <button type="button" data-page="pg-providers">Providers</button>
         <button type="button" data-page="pg-models">Models</button>
         <button type="button" data-page="pg-answers">Answers</button>
-        <button type="button" data-page="pg-find">Find</button>
         <button type="button" data-page="pg-agent">Tasks</button>
         <button type="button" data-page="pg-voice">Voice</button> <!-- voice lane -->
         <button type="button" data-page="pg-watch">Agents</button> <!-- agents lane -->
@@ -132,29 +131,6 @@
                 </div>
               </section>
 
-              <section class="row" id="sec-find-model">
-                <div class="row-head">
-                  <h2 id="find-model-heading">Find model</h2>
-                  <span id="find-model-summary" class="summary">Loading…</span>
-                  <button class="edit" type="button" aria-expanded="false" aria-controls="sec-find-model-body" aria-labelledby="find-model-heading find-model-summary"><span class="ico i-chevron" aria-hidden="true"></span></button>
-                </div>
-                <div class="body" id="sec-find-model-body">
-                  <div class="body-in">
-                    <p class="note">Finds related words and matches by meaning. Text only, so a fast model is the right one.</p>
-                    <div class="combo" id="find-combo">
-                      <button id="find-combo-btn" type="button" aria-haspopup="listbox" aria-expanded="false" aria-controls="find-combo-list" aria-labelledby="find-model-heading find-combo-label">
-                        <span class="combo-lines">
-                          <span id="find-combo-label">Loading…</span>
-                          <span id="find-combo-detail" class="combo-detail"></span>
-                        </span>
-                      </button>
-                      <div id="find-combo-list" class="g-menu solid" role="listbox" aria-label="Find models" hidden></div>
-                    </div>
-                    <p id="find-model-note" class="note"></p>
-                  </div>
-                </div>
-              </section>
-
               <section class="row" id="sec-agent-model">
                 <div class="row-head">
                   <h2 id="agent-model-heading">Task model</h2>
@@ -208,38 +184,6 @@
                     <span class="note">Add a .md file to make your own style.</span>
                   </div>
                   <p id="skills-status" class="status" role="status" hidden></p>
-                </div>
-              </div>
-            </section>
-          </div>
-        </div>
-
-        <div class="page" id="pg-find">
-          <h1 tabindex="-1">Find</h1>
-          <div class="group">
-            <section class="row" id="sec-find">
-              <div class="row-head">
-                <h2 id="find-heading">Find on screen</h2>
-                <span id="find-summary" class="summary">This window</span>
-                <button class="edit" type="button" aria-expanded="false" aria-controls="sec-find-body" aria-labelledby="find-heading find-summary"><span class="ico i-chevron" aria-hidden="true"></span></button>
-              </div>
-              <div class="body" id="sec-find-body">
-                <div class="body-in">
-                  <div class="choice" role="radiogroup" aria-label="Where Find looks">
-                    <button type="button" class="choice-option" role="radio" data-find-scope="window">This window</button>
-                    <button type="button" class="choice-option" role="radio" data-find-scope="screen">Whole screen</button>
-                  </div>
-                  <p class="note" id="find-related-label">Related matches: words that mean the same thing, found by the Find model. They send this window's text to it.</p>
-                  <div class="choice" role="radiogroup" aria-labelledby="find-related-label">
-                    <button type="button" class="choice-option" role="radio" data-find-related="ask">Ask each time</button>
-                    <button type="button" class="choice-option" role="radio" data-find-related="auto">Automatic</button>
-                    <button type="button" class="choice-option" role="radio" data-find-related="off">Off</button>
-                  </div>
-                  <label class="switch">
-                    <span>Read text from pixels when an app shares none</span>
-                    <input id="find-ocr" type="checkbox" role="switch" />
-                  </label>
-                  <p class="note">Exact matches never leave this computer and work offline.</p>
                 </div>
               </div>
             </section>
@@ -592,7 +536,7 @@
                 <div class="body-in">
                   <ul id="shortcut-list">
                     <li class="sc-row" data-action="captureQuery">
-                      <span class="sc-label" id="sc-captureQuery">Ask, find, or do</span>
+                      <span class="sc-label" id="sc-captureQuery">Ask or do</span>
                       <kbd class="sc-current"></kbd>
                       <button class="sc-change g-btn" type="button" aria-describedby="sc-captureQuery">Change</button>
                       <div class="sc-warn" hidden></div>
@@ -607,12 +551,6 @@
                       <span class="sc-label" id="sc-copyRegionText">Copy text from screen</span>
                       <kbd class="sc-current"></kbd>
                       <button class="sc-change g-btn" type="button" aria-describedby="sc-copyRegionText">Change</button>
-                      <div class="sc-warn" hidden></div>
-                    </li>
-                    <li class="sc-row" data-action="findOnScreen">
-                      <span class="sc-label" id="sc-findOnScreen">Find on screen</span>
-                      <kbd class="sc-current"></kbd>
-                      <button class="sc-change g-btn" type="button" aria-describedby="sc-findOnScreen">Change</button>
                       <div class="sc-warn" hidden></div>
                     </li>
                     <li class="sc-row" data-action="agentTask">

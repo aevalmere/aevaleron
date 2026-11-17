@@ -33,7 +33,6 @@ use crypto::OsCrypt;
 
 pub const DEFAULT_MODEL: &str = "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free";
 pub const DEFAULT_BRAIN: &str = "nvidia/nemotron-3.5-super-vl:free";
-pub const DEFAULT_FIND: &str = "nvidia/nemotron-3.5-lightning:free";
 pub const DEFAULT_AGENT: &str = "nvidia/nemotron-3.5-super-vl:free";
 
 /// Providers a key can be saved for (REQUESTS.md 2).
@@ -73,13 +72,26 @@ const SHORTCUTS_VERSION: i64 = 2;
 const API_KEYS_VERSION: i64 = 1;
 const INPUT_HISTORY_MAX: usize = 50;
 
+/// What an older install stored for Find, which left the app on 2026-11-17
+/// (it lives on branch `rust/find`). Dropped from the file when it loads.
+const FIND_KEYS: [&str; 7] = [
+    "findModel",
+    "findModelChosen",
+    "findScope",
+    "findRelatedMode",
+    "findRelated",
+    "findOcr",
+    "lastMode",
+];
+/// Find's shortcut, dropped from `shortcuts` the same way.
+const FIND_ACTION: &str = "findOnScreen";
+
 /// Action ids in the order Settings lists them.
-pub const ACTIONS: [&str; 6] = [
+pub const ACTIONS: [&str; 5] = [
     "captureQuery",
     "captureRegion",
     // region-text lane: unset by default, like every chord but the first.
     "copyRegionText",
-    "findOnScreen",
     "agentTask",
     "toggleVisibility",
 ];
@@ -97,7 +109,6 @@ fn old_default(action: &str) -> &'static str {
     match action {
         "captureQuery" => "Ctrl+Shift+Space",
         "captureRegion" => "Ctrl+Shift+A",
-        "findOnScreen" => "Ctrl+Shift+G",
         "agentTask" => "Ctrl+Shift+U",
         // region-text lane: newer than v1, so it never had an old default.
         "copyRegionText" => "",
@@ -136,13 +147,8 @@ pub fn defaults() -> Map<String, Value> {
         "walkthroughAutoShown": false,
         "shortcutsVersion": 0,
         "inputHistory": [],
-        "findModel": DEFAULT_FIND,
-        "findModelChosen": false,
         "agentModel": DEFAULT_AGENT,
         "agentModelChosen": false,
-        "findScope": "window",
-        "findRelatedMode": "ask",
-        "findOcr": true,
         "agentPermission": "auto",
         // Which default the profile has been offered: one from before
         // automatic mode existed holds "risky" without anyone choosing it.
@@ -567,12 +573,21 @@ impl Store {
             }
             let mut d = self.data.lock();
             d.insert("shortcuts".into(), Value::Object(saved));
-            if d.get("findRelated") == Some(&Value::Bool(false)) {
-                d.insert("findRelatedMode".into(), json!("off"));
-            }
-            d.shift_remove("findRelated");
-            d.shift_remove("lastMode");
             d.insert("shortcutsVersion".into(), json!(SHORTCUTS_VERSION));
+        }
+        {
+            let mut d = self.data.lock();
+            for k in FIND_KEYS {
+                d.shift_remove(k);
+            }
+            if let Some(Value::Object(sc)) = d.get_mut("shortcuts") {
+                sc.shift_remove(FIND_ACTION);
+            }
+            if let Some(Value::Object(native)) = d.get_mut("nativeModels") {
+                for picks in native.values_mut().filter_map(Value::as_object_mut) {
+                    picks.shift_remove("find");
+                }
+            }
         }
         if js_number(self.raw("apiKeysVersion").as_ref()) < API_KEYS_VERSION as f64 {
             let enc = self.str_of("apiKeyEncrypted");
@@ -795,15 +810,6 @@ impl Store {
     pub fn heal_brain(&self, id: &str) -> String {
         self.heal("brain", id, DEFAULT_BRAIN)
     }
-    pub fn get_find_model(&self) -> String {
-        self.chosen("findModel", DEFAULT_FIND)
-    }
-    pub fn set_find_model(&self, m: &str) -> String {
-        self.choose("findModel", m, DEFAULT_FIND)
-    }
-    pub fn heal_find_model(&self, id: &str) {
-        self.heal("findModel", id, DEFAULT_FIND);
-    }
     pub fn get_agent_model(&self) -> String {
         self.chosen("agentModel", DEFAULT_AGENT)
     }
@@ -861,7 +867,9 @@ impl Store {
         let mut m = default_shortcuts();
         if let Some(Value::Object(saved)) = self.raw("shortcuts") {
             for (k, v) in saved {
-                m.insert(k, v);
+                if k != FIND_ACTION {
+                    m.insert(k, v);
+                }
             }
         }
         m
@@ -1137,50 +1145,7 @@ impl Store {
         self.set("inputHistory", json!([]));
     }
 
-    // --------------------------------------------------------- find, agent
-
-    pub fn get_find_settings(&self) -> Value {
-        let related = match self.str_of("findRelatedMode").as_str() {
-            m @ ("ask" | "auto" | "off") => m.to_string(),
-            _ => "ask".into(),
-        };
-        json!({
-            "scope": if self.str_of("findScope") == "screen" { "screen" } else { "window" },
-            "related": related,
-            "ocr": self.raw("findOcr") != Some(Value::Bool(false)),
-        })
-    }
-
-    pub fn set_find_settings(&self, p: &Value) -> Value {
-        {
-            let mut d = self.data.lock();
-            if let Some(s) = p.get("scope") {
-                let v = if s.as_str() == Some("screen") {
-                    "screen"
-                } else {
-                    "window"
-                };
-                d.insert("findScope".into(), json!(v));
-            }
-            if let Some(r) = p.get("related") {
-                let m = match r {
-                    Value::Bool(true) => "auto".to_string(),
-                    Value::Bool(false) => "off".to_string(),
-                    other => js_string(Some(other)),
-                };
-                let ok = matches!(m.as_str(), "ask" | "auto" | "off");
-                d.insert(
-                    "findRelatedMode".into(),
-                    json!(if ok { m } else { "ask".into() }),
-                );
-            }
-            if let Some(o) = p.get("ocr") {
-                d.insert("findOcr".into(), json!(truthy(Some(o))));
-            }
-        }
-        self.save();
-        self.get_find_settings()
-    }
+    // ------------------------------------------------------------- agent
 
     pub fn get_agent_settings(&self) -> Value {
         let steps = js_round(js_number(self.raw("agentMaxSteps").as_ref()));
@@ -1360,13 +1325,37 @@ mod tests {
         let s = open(&dir);
         assert_eq!(s.shortcut("captureQuery"), "Ctrl+Alt+Space");
         assert_eq!(s.shortcut("captureRegion"), "Ctrl+Alt+R");
-        assert_eq!(s.shortcut("findOnScreen"), "");
         assert_eq!(s.shortcut("agentTask"), "");
         let f = file(&dir);
-        assert_eq!(f["findRelatedMode"], "off");
         assert!(!f.contains_key("findRelated"));
         assert!(!f.contains_key("lastMode"));
         assert_eq!(f["shortcutsVersion"], 2);
+    }
+
+    /// Find left the app: what an older install stored for it reads without
+    /// error, is ignored, and leaves the file.
+    #[test]
+    fn find_settings_from_an_older_install_go() {
+        let dir = temp("findgone");
+        fs::write(
+            dir.join("aevaleron.json"),
+            r#"{"shortcutsVersion":2,"shortcuts":{"captureQuery":"Ctrl+Alt+Space","findOnScreen":"Ctrl+Shift+F"},"findModel":"a/b","findModelChosen":true,"findScope":"screen","findRelatedMode":"auto","findOcr":false,"lastMode":"find","inputWidth":700,"nativeModels":{"anthropic":{"find":"claude-haiku-5-5","vision":"claude-opus-5-5"}}}"#,
+        )
+        .unwrap();
+        let s = open(&dir);
+        assert_eq!(s.get_input_width(), 700);
+        assert!(!s.get_shortcuts().contains_key("findOnScreen"));
+        assert_eq!(s.shortcut("captureQuery"), "Ctrl+Alt+Space");
+        let f = file(&dir);
+        for k in FIND_KEYS {
+            assert!(!f.contains_key(k), "{k}");
+        }
+        assert!(!f["shortcuts"]
+            .as_object()
+            .unwrap()
+            .contains_key("findOnScreen"));
+        assert!(f["nativeModels"]["anthropic"].get("find").is_none());
+        assert_eq!(f["nativeModels"]["anthropic"]["vision"], "claude-opus-5-5");
     }
 
     #[test]
@@ -1379,7 +1368,6 @@ mod tests {
         assert_eq!(s.heal_model("c/d"), "c/d");
         assert!(!s.get_brain_enabled());
         assert!(s.set_brain_enabled(true));
-        assert_eq!(s.set_find_model("f/m"), "f/m");
         assert_eq!(s.get_agent_model(), DEFAULT_AGENT);
     }
 
@@ -1403,25 +1391,9 @@ mod tests {
     }
 
     #[test]
-    fn find_and_agent_settings() {
-        let dir = temp("findagent");
+    fn agent_settings() {
+        let dir = temp("agent");
         let s = open(&dir);
-        assert_eq!(
-            s.set_find_settings(&json!({"related": true}))["related"],
-            "auto"
-        );
-        assert_eq!(
-            s.set_find_settings(&json!({"related": false}))["related"],
-            "off"
-        );
-        assert_eq!(
-            s.set_find_settings(&json!({"related": "x"}))["related"],
-            "ask"
-        );
-        assert_eq!(
-            s.set_find_settings(&json!({"scope": "screen"}))["scope"],
-            "screen"
-        );
         assert_eq!(
             s.set_agent_settings(&json!({"maxSteps": 99}))["maxSteps"],
             50

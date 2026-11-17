@@ -63,7 +63,6 @@ impl LlmSettings for StoreSettings {
         match kind {
             Kind::Vision => s.get_model(),
             Kind::Text => s.get_brain(),
-            Kind::Find => s.get_find_model(),
             Kind::Agent => s.get_agent_model(),
         }
     }
@@ -80,7 +79,6 @@ impl LlmSettings for StoreSettings {
             Kind::Text => {
                 s.heal_brain(id);
             }
-            Kind::Find => s.heal_find_model(id),
             Kind::Agent => s.heal_agent_model(id),
         }
     }
@@ -410,7 +408,6 @@ fn clear_key(app: &AppHandle, p: &Value) -> Value {
 fn kind_of_channel(channel: &str) -> Kind {
     match channel {
         "settings:save-brain" => Kind::Text,
-        "settings:save-find-model" => Kind::Find,
         "settings:save-agent-model" => Kind::Agent,
         _ => Kind::Vision,
     }
@@ -440,7 +437,7 @@ fn with_native_pick(current: Option<Value>, provider: Provider, kind: Kind, mode
     Value::Object(all)
 }
 
-/// The four model pickers. With a native `provider` the pick goes under
+/// The three model pickers. With a native `provider` the pick goes under
 /// `nativeModels` and never near the OpenRouter choice or its healing.
 fn save_model(app: &AppHandle, channel: &str, p: &Value) -> Value {
     let s = store::get();
@@ -457,7 +454,6 @@ fn save_model(app: &AppHandle, channel: &str, p: &Value) -> Value {
     }
     match channel {
         "settings:save-brain" => json!({ "ok": true, "brain": s.set_brain(&model) }),
-        "settings:save-find-model" => json!({ "ok": true, "model": s.set_find_model(&model) }),
         "settings:save-agent-model" => json!({ "ok": true, "model": s.set_agent_model(&model) }),
         _ => json!({ "ok": true, "model": s.set_model(&model) }),
     }
@@ -622,10 +618,9 @@ pub async fn route(
     let out = match channel {
         "settings:save-key" => save_key(app, p).await,
         "settings:clear-key" => clear_key(app, p),
-        "settings:save-model"
-        | "settings:save-brain"
-        | "settings:save-find-model"
-        | "settings:save-agent-model" => save_model(app, channel, p),
+        "settings:save-model" | "settings:save-brain" | "settings:save-agent-model" => {
+            save_model(app, channel, p)
+        }
         "settings:clip-key" => clip_key(app),
         "settings:use-clip-key" => use_clip_key(app).await,
         "settings:test-key" => test_key(app, p).await,
@@ -775,19 +770,19 @@ when you're online.";
     fn native_pick_is_saved_per_provider_and_not_healed() {
         let a = Provider::Anthropic;
         let v = with_native_pick(None, a, Kind::Vision, "claude-opus-5-5");
-        let v = with_native_pick(Some(v), a, Kind::Find, "claude-haiku-5-5");
+        let v = with_native_pick(Some(v), a, Kind::Text, "claude-haiku-5-5");
         let v = with_native_pick(Some(v), Provider::Gemini, Kind::Vision, " gemini-4-argon ");
         assert_eq!(v["anthropic"]["vision"], "claude-opus-5-5");
-        assert_eq!(v["anthropic"]["find"], "claude-haiku-5-5");
+        assert_eq!(v["anthropic"]["text"], "claude-haiku-5-5");
         assert_eq!(v["gemini"]["vision"], "gemini-4-argon");
         // Empty goes back to the provider's default.
         let v = with_native_pick(Some(v), a, Kind::Vision, "");
         assert!(v["anthropic"].get("vision").is_none());
-        assert_eq!(v["anthropic"]["find"], "claude-haiku-5-5");
+        assert_eq!(v["anthropic"]["text"], "claude-haiku-5-5");
         // The healer takes OpenRouter ids and nothing else.
         assert!(is_openrouter_id("google/gemma-4-26b-a4b-it:free"));
         assert!(!is_openrouter_id("claude-opus-5-5"));
-        assert_eq!(kind_of_channel("settings:save-find-model"), Kind::Find);
+        assert_eq!(kind_of_channel("settings:save-agent-model"), Kind::Agent);
         assert_eq!(kind_of_channel("settings:save-model"), Kind::Vision);
     }
 

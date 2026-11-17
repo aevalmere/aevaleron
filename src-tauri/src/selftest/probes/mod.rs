@@ -6,8 +6,6 @@
 pub mod agent;
 pub mod bar;
 pub mod capture;
-// find-act lane
-pub mod find_act;
 pub mod harness;
 pub mod llm;
 pub mod platform;
@@ -34,7 +32,7 @@ pub type Probe = fn(&mut Cx);
 /// Every lane's probe, in the order they run: the harness first (it checks
 /// the API the others use, then runs the desktop selfcheck), the `v2desktop`
 /// lanes last.
-pub const LANES: [(&str, Probe); 14] = [
+pub const LANES: [(&str, Probe); 13] = [
     ("harness", harness::run),
     ("platform", platform::run),
     ("windows", windows::run),
@@ -48,9 +46,6 @@ pub const LANES: [(&str, Probe); 14] = [
     ("llm", llm::run),
     // region-text lane: copies from the smoke's Notepad and leaves it as it was.
     ("region-text", region_text::run),
-    // find-act lane: Enter on a Find hit, in the smoke's Notepad. Before
-    // voice, which types into the file.
-    ("find-act", find_act::run),
     // voice lane: works in the smoke's Notepad, so it runs last.
     ("voice", voice::run),
     // private apps lane: lists the smoke's Notepad for a moment, so it
@@ -72,8 +67,8 @@ pub const BLOCKS: [(&str, &[&str]); 4] = [
 ];
 
 /// The `v2desktop` block: the lanes that work in the smoke's Notepad.
-// voice lane, region-text lane, find-act lane, private apps lane
-const NOTEPAD_LANES: &[&str] = &["llm", "region-text", "find-act", "voice", "private-apps"];
+// voice lane, region-text lane, private apps lane
+const NOTEPAD_LANES: &[&str] = &["llm", "region-text", "voice", "private-apps"];
 
 /// The Notepad half of the smoke runs on CI, or when asked (main.js:3837).
 pub fn notepad_enabled() -> bool {
@@ -122,7 +117,7 @@ mod tests {
         let mut sorted = lanes.clone();
         sorted.sort_unstable();
         sorted.dedup();
-        assert_eq!(sorted.len(), 14); // voice, polish, region-text, find-act and private apps lanes
+        assert_eq!(sorted.len(), 13); // voice, polish, region-text and private apps lanes
         assert_eq!(lanes[0], "harness");
         let grouped: Vec<&str> = BLOCKS.iter().flat_map(|b| b.1.iter().copied()).collect();
         for lane in &lanes[1..] {

@@ -146,8 +146,6 @@ pub struct Output {
     pub user_height: f64,
     /// Where it last was, glass DIPs.
     pub rect: Option<Rect>,
-    /// `chat` or `find` (`view:set`).
-    pub view: String,
     /// When it last had focus or opened, for "most recently focused".
     pub touched: u64,
     /// The visible sheet inside the glass (`output:glass`): its top and
@@ -172,7 +170,6 @@ pub struct AppState {
     /// Hidden with the toggleVisibility chord.
     pub hidden: bool,
     pub input_height: f64,
-    pub bar_mode: String,
     pub pill_error: bool,
     /// An answer is streaming somewhere (main.js `queryBusy`): "any entry in
     /// `queries`" once the Ask reports per window (K-03).
@@ -183,7 +180,6 @@ pub struct AppState {
     /// The bar holds text the person typed (`bar:dirty`).
     pub bar_dirty: bool,
     pub capture_ok: bool,
-    pub find_open: bool,
     pub agent: AgentStatus,
     /// The tour or the pointer is showing (cursorBuddy.isActive).
     pub buddy_active: bool,
@@ -211,14 +207,12 @@ impl Default for AppState {
             mode: Mode::Pill,
             hidden: false,
             input_height: crate::windows::layout::DEFAULT_INPUT_HEIGHT,
-            bar_mode: "ask".into(),
             pill_error: false,
             busy: false,
             query_gen: 0,
             queries: BTreeMap::new(),
             bar_dirty: false,
             capture_ok: true,
-            find_open: false,
             agent: AgentStatus::default(),
             buddy_active: false,
             region_active: false,
@@ -279,8 +273,6 @@ pub type ValueHook = Box<dyn Fn(&AppHandle) -> Value + Send + Sync>;
 pub struct Hooks {
     /// agent.stop() (Escape, tray Stop agent).
     pub stop_agent: Option<Hook>,
-    /// closeFind().
-    pub close_find: Option<Hook>,
     /// region.cancel().
     pub cancel_region: Option<Hook>,
     /// cursorBuddy.cancel().
@@ -302,8 +294,6 @@ pub struct Hooks {
     pub show_trail: Option<Hook>,
     /// cursorBuddy.notify(event): settings-opened, settings-closed, key-saved.
     pub tour_notify: Option<StrHook>,
-    /// setBarMode(mode): opens or closes Find as the mode changes.
-    pub set_bar_mode: Option<StrHook>,
     /// A key was saved (arg: provider). Unset: the tour hears `key-saved`.
     /// Agent b/c replace it with main.js's test-then-advance logic.
     pub key_saved: Option<StrHook>,
@@ -314,8 +304,8 @@ pub struct Hooks {
     /// merged over the core's. Called before the state lock is taken, so
     /// it may read the state itself.
     pub overlay_extra: Option<ValueHook>,
-    /// Copies the live buddy, region, Find and agent state into `AppState`
-    /// (`find_open`, `buddy_active`, `region_active`, `agent`). The core
+    /// Copies the live buddy, region and agent state into `AppState`
+    /// (`buddy_active`, `region_active`, `agent`). The core
     /// calls it through `refresh` before it reads those flags.
     pub refresh_flags: Option<Hook>,
 }

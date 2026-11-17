@@ -3,9 +3,9 @@
 // are in tools/ui-shots/kit.mjs.
 //
 // The answer window: the glob out of the bar, answers set as a document,
-// streaming, the usage line, errors with their fixes, Start over, the Find
-// view, the agent trail and its confirm card (lanes/sheet.md, design-visual
-// §4 states 14-40).
+// streaming, the usage line, errors with their fixes, Start over, the agent
+// trail and its confirm card (lanes/sheet.md, design-visual §4 states
+// 14-40).
 import vm from 'node:vm';
 import { ANSWER, BAR, OUT1, W, H, barRect, bottomOf, openBar, streamAnswer } from '../kit.mjs';
 
@@ -314,7 +314,7 @@ function lintSheetCss(text) {
   const at = (name) => lines.findIndex((l) => l.startsWith('/* ------') && new RegExp(`-+ ${name}(\\W|$)`).test(l));
   const regions = [
     [at('answer sheet'), at('layout editor')],
-    [at('find'), at('reduced motion')],
+    [at('agent trail'), at('reduced motion')],
   ];
   if (regions.flat().some((n) => n < 0)) return ['a region banner in overlay.css has moved'];
   const bad = [];
@@ -513,23 +513,7 @@ export const scenes = [
       await bar.evaluate(() => localStorage.setItem('aeval.hasSentFirstRequest', '1'));
       await openBar(bar, { pillState: 'agent', agent: { running: true, step: 3, state: 'asking' } });
       await streamAnswer(t.frame('o1'), 'Why does the build fail?', ANSWER);
-      await t.frame('o2').evaluate(() => {
-        window.__emit('overlay:state', { mode: 'panel', chatMax: 520 });
-        window.__emit('view:set', { view: 'find' });
-        window.__emit('find:state', { gen: 1, open: true, status: '3 exact · 2 related', lines: [] });
-        window.__emit('find:hits', {
-          gen: 1,
-          query: 'invoice total',
-          current: 0,
-          hits: [
-            { i: 0, kind: 'literal', text: 'Invoice total: €1,240.00', match: 'Invoice total' },
-            { i: 1, kind: 'literal', text: 'Invoice total (incl. VAT)', match: 'Invoice total' },
-            { i: 2, kind: 'literal', text: 'See invoice total on page 2', match: 'invoice total' },
-            { i: 3, kind: 'related', text: 'Amount due: €1,240.00', why: 'The same figure, named as the amount due' },
-            { i: 4, kind: 'related', text: 'Balance €1,240.00', why: 'The outstanding balance matches the total' },
-          ],
-        });
-      });
+      await streamAnswer(t.frame('o2'), 'What is the invoice total?', 'The invoice total is **€1,240.00**, VAT included.');
       await t.frame('o3').evaluate(() => {
         window.__emit('overlay:state', { mode: 'panel', chatMax: 520 });
         window.__emit('agent:begin', { task: 'Rename the screenshots in Downloads by date' });
@@ -1328,92 +1312,43 @@ export const scenes = [
     },
   },
 
-  // ----------------------------------------------------------------- find
-
-  // B-169 (§4 state 24): nothing found offers the next step.
-  {
-    name: 'find-empty',
-    backdrop: 'wallpaper',
-    windows: [outWin('out1', OUT1)],
-    async run(t) {
-      const f = t.frame('out1');
-      await emitAll(f, [
-        ['overlay:state', { mode: 'panel', chatMax: 520 }],
-        ['view:set', { view: 'find' }],
-        ['find:hits', { gen: 1, query: 'quarterly revenue', hits: [], current: -1 }],
-        ['find:state', { gen: 1, open: true, scope: 'window', status: 'Nothing on screen matches "quarterly revenue".', lines: ['No related matches either.'], counts: { exact: 0, related: 0 } }],
-      ]);
-      await t.settle(500);
-      await t.shot('find-empty', await clipOf(t, 'out1'));
-      // With nothing found the view is a sentence and buttons, not a list.
-      const emptyRole = await f.evaluate(() => document.getElementById('find-view').getAttribute('role'));
-      t.check('findEmptyIsNotAList', emptyRole === 'group', emptyRole);
-      const labels = await f.evaluate(() => [...document.querySelectorAll('.find-next button')].map((b) => b.textContent));
-      const keys = await f.evaluate(() => /Ctrl|Enter|Tab|Esc/.test(document.getElementById('find-view').innerText));
-      await f.evaluate(() => [...document.querySelectorAll('.find-next button')].find((b) => b.textContent === 'Look on the whole screen').click());
-      await t.respond('out1', 'find:to-ask', { status: 'no-hit' });
-      await f.evaluate(() => document.querySelector('.find-next button').click());
-      await t.settle(100);
-      const scope = payloadOf(await t.calls('out1', 'find:scope'));
-      const toAsk = (await t.calls('out1', 'find:to-ask')).length;
-      const submit = payloadOf(await t.calls('out1', 'query:submit'));
-      t.check(
-        'findEmptyOffersNextSteps',
-        labels.join('|') === 'Ask about "quarterly revenue"|Look on the whole screen' && !keys && !!scope && scope.scope === 'screen' && toAsk === 1 && !!submit && submit.question === 'quarterly revenue',
-        JSON.stringify({ labels, keys, scope, toAsk, submit })
-      );
-    },
-  },
-
-  // B-169 (§4 state 25): the results list works from the keyboard.
-  {
-    name: 'find-results',
-    backdrop: 'wallpaper',
-    windows: [outWin('out1', OUT1)],
-    async run(t) {
-      const f = t.frame('out1');
-      await emitAll(f, [
-        ['overlay:state', { mode: 'panel', chatMax: 520 }],
-        ['view:set', { view: 'find' }],
-        ['find:state', { gen: 1, open: true, scope: 'window', status: '3 exact · 2 related', lines: [], counts: { exact: 3, related: 2 } }],
-        [
-          'find:hits',
-          {
-            gen: 1,
-            query: 'invoice total',
-            current: 0,
-            hits: [
-              { i: 0, kind: 'literal', text: 'Invoice total: €1,240.00', match: 'Invoice total' },
-              { i: 1, kind: 'literal', text: 'Invoice total (incl. VAT)', match: 'Invoice total' },
-              { i: 2, kind: 'literal', text: 'See invoice total on page 2', match: 'invoice total' },
-              { i: 3, kind: 'related', text: 'Amount due: €1,240.00', why: 'The same figure, named as the amount due' },
-              { i: 4, kind: 'related', text: 'Balance €1,240.00', why: 'The outstanding balance matches the total' },
-            ],
-          },
-        ],
-      ]);
-      await t.settle(500);
-      await t.shot('find-results', await clipOf(t, 'out1'));
-      await f.focus('.find-row.current');
-      const steps = [];
-      for (const k of ['ArrowDown', 'ArrowDown', 'End', 'Home', 'ArrowUp']) {
-        await t.page.keyboard.press(k);
-        await t.settle(60);
-        steps.push(
-          await f.evaluate(() => ({
-            focus: document.activeElement && document.activeElement.dataset.i,
-            tabs: [...document.querySelectorAll('.find-row')].map((r) => r.tabIndex).join(''),
-          }))
-        );
-      }
-      const sent = (await t.calls('out1', 'find:step')).map((c) => c.payload && c.payload.by && c.payload.by.index);
-      const roles = await f.evaluate(() => document.getElementById('find-view').getAttribute('role') === 'listbox' && [...document.querySelectorAll('.find-row')].every((r) => r.getAttribute('role') === 'option'));
-      const focus = steps.map((s) => s.focus).join(',');
-      t.check('findListboxArrows', roles && focus === '1,2,4,0,0' && steps[2].tabs === '-1-1-1-10' && sent.join(',') === '1,2,4,0', JSON.stringify({ steps, sent, roles }));
-    },
-  },
-
   // ------------------------------------------------------------ the trail
+
+  // A task that has not acted yet offers "Just answer": one press stops it
+  // and asks the same words. The first act takes the offer away.
+  {
+    name: 'sheet-task-just-answer',
+    backdrop: 'wallpaper',
+    windows: [outWin('out1', OUT1, { max: 900 })],
+    async run(t) {
+      const f = t.frame('out1');
+      const offered = () => f.evaluate(() => [...document.querySelectorAll('.trail-meta .copy-msg')].some((b) => b.textContent === 'Just answer'));
+      await emitAll(f, [
+        ['overlay:state', { mode: 'panel', chatMax: 640 }],
+        ['agent:begin', { task: 'what does this button do' }],
+        ['agent:step', { id: 1, kind: 'plan', text: 'Plan', state: 'done', steps: PLAN }],
+        ['agent:state', { state: 'running', step: 1 }],
+      ]);
+      await t.settle(400);
+      const before = await offered();
+      await t.shot('sheet-task-just-answer', await clipOf(t, 'out1'));
+      await emitAll(f, [['agent:step', { id: 2, kind: 'action', state: 'running', text: 'Opening File Explorer', planIndex: 0 }]]);
+      await t.settle(200);
+      const afterAct = await offered();
+      await emitAll(f, [
+        ['chat:reset', {}],
+        ['agent:begin', { task: 'what does this button do' }],
+        ['agent:state', { state: 'planning', step: 0 }],
+      ]);
+      await t.settle(200);
+      await f.evaluate(() => [...document.querySelectorAll('.trail-meta .copy-msg')].find((b) => b.textContent === 'Just answer').click());
+      await t.settle(100);
+      const stopped = (await t.calls('out1', 'agent:stop')).length;
+      const asked = payloadOf(await t.calls('out1', 'query:submit'));
+      const ok = before && !afterAct && stopped === 1 && !!asked && asked.question === 'what does this button do';
+      t.check('justAnswerBeforeActing', ok, JSON.stringify({ before, afterAct, stopped, asked }));
+    },
+  },
 
   // B-165 (§4 state 29): a run in progress, the plan as the checklist.
   {
@@ -1787,12 +1722,7 @@ export const scenes = [
       await ask(a, { gen: 2, q: 'What is in the box?', a: 'In the box:\n\n1. The headphones.\n2. A USB-C cable.\n3. A carrying case.' });
       const plain = await a.evaluate(() => document.querySelectorAll('.msg.assistant .do-it')[1].hidden);
       t.check('doItOnlyForSteps', !!steps && plain, JSON.stringify({ steps, plain }));
-      await emitAll(t.frame('o2'), [
-        ['overlay:state', { mode: 'panel', chatMax: 520 }],
-        ['view:set', { view: 'find' }],
-        ['find:state', { gen: 1, open: true, scope: 'window', status: '1 exact', lines: [], counts: { exact: 1, related: 0 } }],
-        ['find:hits', { gen: 1, query: 'invoice', current: 0, hits: [{ i: 0, kind: 'literal', text: 'Invoice total: €1,240.00', match: 'Invoice' }] }],
-      ]);
+      await ask(t.frame('o2'), { q: 'What is the invoice total?', a: 'The invoice total is €1,240.00, VAT included.' });
       await emitAll(t.frame('o3'), [
         ['overlay:state', { mode: 'panel', chatMax: 640 }],
         ['agent:begin', { task: 'Rename the screenshots' }],
@@ -1812,7 +1742,7 @@ export const scenes = [
         }, sel);
       const got = {
         answer: await inset(a, '.msg.assistant .md-p'),
-        find: await inset(t.frame('o2'), '.find-row .find-snippet'),
+        second: await inset(t.frame('o2'), '.msg.assistant .md-p'),
         plan: await inset(t.frame('o3'), '.plan-item .plan-text'),
         status: await inset(t.frame('o3'), '.trail-status'),
       };
@@ -1873,27 +1803,30 @@ export const scenes = [
     },
   },
 
-  // State 16: Copy pressed, Do it shown, and a guessed question that may
-  // have been a word to find.
+  // State 16: Copy pressed and Do it shown; a question the bar was unsure of
+  // offers "Do this instead" when the answer has no steps to do.
   {
     name: 'sheet-done-actions',
     backdrop: 'wallpaper',
     windows: [outWin('out1', OUT1, { max: 900 })],
     async run(t) {
       const f = t.frame('out1');
-      await ask(f, { q: 'pair my headphones', a: 'Pair them in Settings:\n\n1. Open Settings.\n2. Click Bluetooth & devices.\n3. Press Add device.', done: { inferred: true } });
+      await ask(f, { q: 'pair my headphones', a: 'Pair them in Settings:\n\n1. Open Settings.\n2. Click Bluetooth & devices.\n3. Press Add device.', done: { offerDo: true } });
       await t.settle(600);
       await f.evaluate(() => document.querySelector('.msg.assistant .copy-msg').click());
       await t.settle(200);
       await t.shot('sheet-done-copied', await clipOf(t, 'out1'));
-      const s = await f.evaluate(() => {
-        const b = [...document.querySelectorAll('.msg.assistant .copy-msg')];
-        return { copy: b[0].textContent, doIt: !document.querySelector('.msg.assistant .do-it').hidden, find: b.some((x) => x.textContent === 'Find this on screen instead') };
-      });
-      await f.evaluate(() => [...document.querySelectorAll('.msg.assistant .copy-msg')].find((b) => b.textContent === 'Find this on screen instead').click());
+      const labels = (n) => f.evaluate((i) => [...document.querySelectorAll('.msg.assistant')[i].querySelectorAll('.copy-msg')].filter((b) => !b.hidden).map((b) => b.textContent), n);
+      const steps = await labels(0);
+      await ask(f, { gen: 2, q: 'save', a: 'Press Ctrl+S to save the file you have open.', done: { offerDo: true } });
+      await t.settle(400);
+      const plain = await labels(1);
+      await t.shot('sheet-done-do-instead', await clipOf(t, 'out1'));
+      await f.evaluate(() => [...document.querySelectorAll('.msg.assistant .copy-msg')].find((b) => b.textContent === 'Do this instead').click());
       await t.settle(60);
-      const open = payloadOf(await t.calls('out1', 'find:open'));
-      t.check('doneOffersNextActions', s.copy === 'Copied' && s.doIt && s.find && !!open && open.prefill === 'pair my headphones', JSON.stringify({ s, open }));
+      const start = payloadOf(await t.calls('out1', 'agent:start'));
+      const ok = steps[0] === 'Copied' && steps.includes('Do it') && !steps.includes('Do this instead') && plain.includes('Do this instead') && !!start && start.task === 'save';
+      t.check('doneOffersNextActions', ok, JSON.stringify({ steps, plain, start }));
     },
   },
 
@@ -1934,7 +1867,7 @@ export const scenes = [
     async run(t) {
       const f = t.frame('out1');
       const short = 'Install the **Visual C++ 2015-2022 Redistributable (x64)**, then run the build again.';
-      await ask(f, { done: { inferred: true, sent: { model: 'google/gemma-3-27b-it:free', screenshot: true } } });
+      await ask(f, { done: { offerDo: true, sent: { model: 'google/gemma-3-27b-it:free', screenshot: true } } });
       await ask(f, { gen: 2, q: 'And on Linux, where the same build stops at the link step with a long error about a missing shared object?', a: short, done: { sent: { model: 'google/gemma-3-27b-it:free', screenshot: true } } });
       await emitAll(f, [
         ['overlay:state', { mode: 'panel', chatMax: 1200 }],
@@ -2033,77 +1966,6 @@ export const scenes = [
       });
       const resizes = (await t.calls('out1', 'output:resize')).length;
       t.check('fixedHeightStopsFollowing', s.fixed === '1' && s.scrolls && resizes === 0, JSON.stringify({ s, resizes }));
-    },
-  },
-
-  // State 23: Find still reading offers nothing yet.
-  {
-    name: 'find-reading',
-    backdrop: 'wallpaper',
-    windows: [outWin('out1', OUT1)],
-    async run(t) {
-      const f = t.frame('out1');
-      await emitAll(f, [
-        ['overlay:state', { mode: 'panel', chatMax: 520 }],
-        ['view:set', { view: 'find' }],
-        ['find:hits', { gen: 1, query: 'invoice', hits: [], current: -1 }],
-        ['find:state', { gen: 1, open: true, reading: true, scope: 'window', status: 'Looking…', lines: [], counts: { exact: 0, related: 0 } }],
-      ]);
-      await t.settle(500);
-      await t.shot('find-reading', await clipOf(t, 'out1'));
-      const next = await f.evaluate(() => document.querySelectorAll('.find-next button').length);
-      t.check('findReadingOffersNothingYet', next === 0, `${next} buttons`);
-    },
-  },
-
-  // State 24: offscreen rows, while related matching runs.
-  {
-    name: 'find-results-related',
-    backdrop: 'wallpaper',
-    windows: [outWin('out1', OUT1)],
-    async run(t) {
-      const f = t.frame('out1');
-      await emitAll(f, [
-        ['overlay:state', { mode: 'panel', chatMax: 520 }],
-        ['view:set', { view: 'find' }],
-        ['find:state', { gen: 1, open: true, scope: 'window', stage: 'related', status: '2 exact · looking for related matches', lines: [], counts: { exact: 2, related: 0 } }],
-        [
-          'find:hits',
-          {
-            gen: 1,
-            query: 'invoice total',
-            current: 0,
-            hits: [
-              { i: 0, kind: 'literal', text: 'Invoice total: €1,240.00', match: 'Invoice total' },
-              { i: 1, kind: 'literal', text: 'See invoice total on page 2', match: 'invoice total', offscreen: true },
-            ],
-          },
-        ],
-      ]);
-      await t.settle(500);
-      await t.shot('find-results-related', await clipOf(t, 'out1'));
-      const off = await f.evaluate(() => document.querySelectorAll('.find-row.offscreen').length);
-      t.check('findMarksOffscreenRows', off === 1, `${off} offscreen rows`);
-    },
-  },
-
-  // State 26: offline, nothing to ask with.
-  {
-    name: 'find-offline',
-    backdrop: 'wallpaper',
-    windows: [outWin('out1', OUT1)],
-    async run(t) {
-      const f = t.frame('out1');
-      await emitAll(f, [
-        ['overlay:state', { mode: 'panel', chatMax: 520 }],
-        ['view:set', { view: 'find' }],
-        ['find:hits', { gen: 1, query: 'invoice', hits: [], current: -1 }],
-        ['find:state', { gen: 1, open: true, scope: 'window', stage: 'offline', status: 'Nothing on screen matches "invoice".', lines: ['Related matches need a connection.'], counts: { exact: 0, related: 0 } }],
-      ]);
-      await t.settle(500);
-      await t.shot('find-offline', await clipOf(t, 'out1'));
-      const labels = await f.evaluate(() => [...document.querySelectorAll('.find-next button')].map((b) => b.textContent));
-      t.check('findOfflineOffersNoAsk', labels.join('|') === 'Look on the whole screen', labels.join('|'));
     },
   },
 

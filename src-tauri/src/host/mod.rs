@@ -1,16 +1,15 @@
 //! The glue between the four splits (ARCHITECTURE.md sections 10 to 12):
-//! the long-lived services split (b) built (the model client, skills, Find,
-//! the agent) wired onto split (a)'s store, windows and hooks and split (c)'s
+//! the long-lived services split (b) built (the model client, skills, the
+//! agent) wired onto split (a)'s store, windows and hooks and split (c)'s
 //! desktop helper, buddy, lens and region.
 //!
 //! Nothing here owns behaviour of its own: each function is the Rust form of
 //! one piece of main.js that sat between modules (handleQuerySubmit,
-//! startAgentRun, findEmit, contextMenu, the `init({...})` blocks).
+//! startAgentRun, contextMenu, the `init({...})` blocks).
 
 pub mod agent;
 pub mod ask;
 pub mod desktop_ops;
-pub mod find;
 pub mod menu;
 pub mod settings;
 
@@ -21,7 +20,6 @@ use serde_json::{json, Value};
 use tauri::AppHandle;
 
 use crate::agent::run::Agent;
-use crate::find::Find;
 use crate::llm::catalogue::Kind;
 use crate::llm::client::{KeyCheck, Llm};
 use crate::llm::settings::LlmSettings;
@@ -40,7 +38,6 @@ pub struct Services {
     pub skills: Skills,
     pub settings: Arc<StoreSettings>,
     pub desktop: Arc<DesktopAdapter>,
-    pub find: Find,
     pub agent: Agent,
 }
 
@@ -101,27 +98,25 @@ pub fn remember_chat(app: &AppHandle, label: &str, model: &str) {
 }
 
 /// Copies the state other modules own into `AppState` so the core reads the
-/// truth (buddy, region, Find, agent).
+/// truth (buddy, region, agent).
 pub fn refresh_flags(app: &AppHandle) {
     let buddy = buddy::is_active();
     let region = region::is_active(app);
-    let (find, agent, step, state) = match try_services() {
+    let (agent, step, state) = match try_services() {
         Some(s) => {
             let cur = s.agent.current();
             (
-                s.find.is_open(),
                 s.agent.is_running(),
                 cur.as_ref().map(|c| c.0 as u64).unwrap_or(0),
                 cur.map(|c| c.1).unwrap_or_default(),
             )
         }
-        None => (false, false, 0, String::new()),
+        None => (false, 0, String::new()),
     };
     let st = shared(app);
     let mut s = st.lock();
     s.buddy_active = buddy;
     s.region_active = region;
-    s.find_open = find;
     s.agent.running = agent;
     if agent {
         s.agent.step = step;
@@ -146,14 +141,9 @@ pub fn start_walkthrough(app: &AppHandle) {
         return;
     }
     let s = store::get();
-    let (cq, fs, at) = (
-        s.shortcut("captureQuery"),
-        s.shortcut("findOnScreen"),
-        s.shortcut("agentTask"),
-    );
+    let (cq, at) = (s.shortcut("captureQuery"), s.shortcut("agentTask"));
     let chords = buddy::Chords {
         capture_query: &cq,
-        find_on_screen: &fs,
         agent_task: &at,
     };
     buddy::start(buddy::walkthrough(&chords));
@@ -230,7 +220,6 @@ fn settings_extra(_app: &AppHandle) -> Value {
         "recipients": recipients,
         "model": model,
         "brain": brain,
-        "findModel": llm.resolve_known(Kind::Find, &s.get_find_model()),
         "agentModel": llm.resolve_known(Kind::Agent, &s.get_agent_model()),
         "skills": sv.skills.list(),
         "skill": s.get_skill_id(skill_exists),
@@ -269,14 +258,9 @@ fn tour_key_tested(t: &KeyCheck) {
     } else if t.status == Status::Unchecked {
         buddy::notify("key-saved");
         let s = store::get();
-        let (cq, fs, at) = (
-            s.shortcut("captureQuery"),
-            s.shortcut("findOnScreen"),
-            s.shortcut("agentTask"),
-        );
+        let (cq, at) = (s.shortcut("captureQuery"), s.shortcut("agentTask"));
         let chords = buddy::Chords {
             capture_query: &cq,
-            find_on_screen: &fs,
             agent_task: &at,
         };
         let next = buddy::walkthrough(&chords)
@@ -316,8 +300,6 @@ pub fn setup(app: &AppHandle) {
     let desktop = Arc::new(DesktopAdapter::new(crate::desktop::client().clone()));
     let rt = tokio::runtime::Handle::try_current()
         .unwrap_or_else(|_| tauri::async_runtime::handle().inner().clone());
-    let find_host = Arc::new(find::Host::new(app.clone(), llm.clone()));
-    let find = Find::new(desktop.clone(), llm.clone(), find_host, rt.clone());
     let agent_host = Arc::new(agent::Host::new(app.clone(), llm.clone()));
     let agent = Agent::new(desktop.clone(), llm.clone(), agent_host, rt);
     let _ = SERVICES.set(Services {
@@ -325,7 +307,6 @@ pub fn setup(app: &AppHandle) {
         skills,
         settings,
         desktop,
-        find,
         agent,
     });
 
@@ -384,7 +365,6 @@ pub fn setup(app: &AppHandle) {
         h.stop_agent = Some(Box::new(|_| {
             services().agent.stop(None);
         }));
-        h.close_find = Some(Box::new(|app| find::close_find(app, false)));
         h.refresh_flags = Some(Box::new(refresh_flags));
         h.cancel_region = Some(Box::new(region::cancel));
         h.cancel_tour = Some(Box::new(|_| buddy::cancel()));
@@ -407,7 +387,6 @@ pub fn setup(app: &AppHandle) {
         }));
         h.show_trail = Some(Box::new(|app| agent::show_trail(app, false)));
         h.tour_notify = Some(Box::new(|_, ev| buddy::notify(ev)));
-        h.set_bar_mode = Some(Box::new(find::set_bar_mode));
         h.key_saved = Some(Box::new(key_saved));
         h.settings_extra = Some(Box::new(settings_extra));
         h.overlay_extra = Some(Box::new(overlay_extra));
@@ -457,8 +436,8 @@ fn on_region_change(app: &AppHandle, last: &Mutex<Option<Rect>>) {
     let a = app.clone();
     tauri::async_runtime::spawn(async move {
         if picked {
-            // A drawn area arrives with its shot; one set by Find's "Ask
-            // about this" has none and is captured when the question goes.
+            // A drawn area arrives with its shot; one set any other way has
+            // none and is captured when the question goes.
             if let Some(shot) = region::take_pending_shot() {
                 shared(&a).lock().capture_ok = true;
                 ask::set_pending_shot(Some(shot));

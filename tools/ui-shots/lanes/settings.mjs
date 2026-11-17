@@ -115,7 +115,7 @@ export const scenes = [
       }
       const saved = await st.evaluate(() => new Promise((r) => setTimeout(() => r(window.__calls.filter((c) => c.channel === 'settings:set-glass').map((c) => c.payload.glassIntensity)), 300)));
       t.check('glassSaved', saved.length > 0 && saved[saved.length - 1] === 1, JSON.stringify(saved));
-      t.check('noDuplicateHintInSettings', await st.evaluate(() => !/Ctrl\+1\/2\/3/.test(document.body.textContent)), 'Settings repeats the Ask/Find/Do hint');
+      t.check('noDuplicateHintInSettings', await st.evaluate(() => !/Ctrl\+1|Ctrl\+2/.test(document.body.textContent)), 'Settings repeats the Ask/Do hint');
       t.check('settingsResizeZones', await st.evaluate(() => document.querySelectorAll('.frame-handle').length === 8), 'no resize zones');
       t.check('settingsDrag', await st.evaluate(() => document.getElementById('titlebar').dataset.drag === 'max'), 'title bar is not a drag region');
     },
@@ -352,7 +352,7 @@ scenes.push(
     async run(t) {
       const f = t.frame('settings');
       await t.settle(500);
-      for (const p of ['providers', 'models', 'answers', 'find', 'agent', 'privacy', 'shortcuts', 'general']) {
+      for (const p of ['providers', 'models', 'answers', 'agent', 'privacy', 'shortcuts', 'general']) {
         await jump(t, `pg-${p}`);
         await t.settle(250);
         await t.shot(`settings-page-${p}`);
@@ -566,26 +566,26 @@ scenes.push(
 
   // Choice groups are one tab stop, and the arrows move and choose.
   {
-    name: 'settings-find-choices',
+    name: 'settings-permission-choices',
     backdrop: 'wallpaper',
     windows: [settingsWin(SW)],
     async run(t) {
       const f = t.frame('settings');
-      await open(t, 'pg-find', 'sec-find');
+      await open(t, 'pg-agent', 'sec-agent');
       await t.settle(450);
-      await f.focus('[data-find-scope="window"]');
+      await f.focus('[data-permission="auto"]');
       await t.page.keyboard.press('ArrowDown');
       await t.settle(150);
       const st = await f.evaluate(() => {
-        const g = document.querySelector('[data-find-scope]').closest('[role="radiogroup"]');
+        const g = document.querySelector('[data-permission]').closest('[role="radiogroup"]');
         const radios = [...g.querySelectorAll('[role="radio"]')];
         return {
-          focused: document.activeElement.dataset.findScope,
-          tabbable: radios.filter((r) => r.tabIndex === 0).map((r) => r.dataset.findScope),
+          focused: document.activeElement.dataset.permission,
+          tabbable: radios.filter((r) => r.tabIndex === 0).map((r) => r.dataset.permission),
         };
       });
-      const sent = (await t.calls('settings', 'settings:set-find')).map((c) => c.payload.scope).filter(Boolean);
-      t.check('radiosRoveWithArrows', st.focused === 'screen' && sent.includes('screen'), JSON.stringify({ st, sent }));
+      const sent = (await t.calls('settings', 'settings:set-agent')).map((c) => c.payload.permission).filter(Boolean);
+      t.check('radiosRoveWithArrows', st.focused === 'risky' && sent.includes('risky'), JSON.stringify({ st, sent }));
       t.check('radiosOneTabStop', st.tabbable.length === 1, JSON.stringify(st.tabbable));
       await t.shot();
     },

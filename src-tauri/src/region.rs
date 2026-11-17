@@ -320,16 +320,8 @@ fn store_active(rect: Option<Rect>, device: Option<String>) {
     }
 }
 
-/// Sets the area outright (Find's "Ask about this" looks at the hit with
-/// room around it), as main.js assigned `activeRegion`. The display is the
-/// one the rect matches.
-pub fn set_active(rect: Option<Rect>) {
-    store_active(rect, None);
-}
-
 /// K-12: sets the area on a known display (`Display::device`), for callers
 /// that start from physical pixels, where the display is unambiguous.
-// host/find.rs (llm lane) moves to this from `set_active`.
 #[allow(dead_code)]
 pub fn set_active_on(rect: Rect, device: &str) {
     store_active(Some(rect), Some(device.to_string()));
@@ -413,7 +405,7 @@ mod tests {
         // Only the conversation's own area carries it.
         assert_eq!(device_for(&Rect::new(0.0, 0.0, 10.0, 10.0)), None);
         // An area set without a display leaves matching to the capture.
-        set_active(Some(r));
+        store_active(Some(r), None);
         assert_eq!(device_for(&r), None);
         set_active_on(r, r"\\.\DISPLAY2");
         clear_active();

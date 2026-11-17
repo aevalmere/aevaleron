@@ -2,7 +2,7 @@
 // or hold it and let go; Esc stops without keeping anything. The recording
 // and the transcription happen in Rust (src-tauri/src/voice); the words land
 // in the field at the caret, and the field's own input handling then guesses
-// Ask, Find or Do as if they had been typed.
+// Ask or Do as if they had been typed.
 (() => {
   const btn = document.getElementById('mic-btn');
   const field = document.getElementById('query-input');

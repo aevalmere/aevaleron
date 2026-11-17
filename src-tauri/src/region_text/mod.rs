@@ -5,11 +5,11 @@
 //! Exact text is preferred. When the rectangle lies over one window and UI
 //! Automation gives text for the lines or elements inside it, that text is
 //! used, in reading order. Otherwise the rectangle is read with Windows'
-//! own OCR, the engine Find uses. Both run in the desktop helper on this PC.
+//! own OCR. Both run in the desktop helper on this PC.
 //!
 //! Nothing is sent to a model and nothing is written to disk: the text goes
 //! from the helper to the clipboard and is forgotten. This module calls no
-//! model, question, Find or task code, and a test below holds it to that.
+//! model, question or task code, and a test below holds it to that.
 //!
 //! - `assemble.rs`: the pieces read, to the text copied (pure, unit-tested).
 //! - `note.rs`: the confirmation beside the rectangle.

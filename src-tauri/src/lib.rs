@@ -16,7 +16,6 @@ mod buddy;
 mod capture;
 pub mod crash;
 mod desktop;
-mod find;
 pub mod history;
 mod host;
 pub mod hotkeys;
@@ -100,7 +99,7 @@ fn presence_toast(app: &tauri::AppHandle) {
     } else {
         (
             "Aevaleron is running".to_string(),
-            format!("Press {chord} anywhere to ask, find, or do. It starts with Windows; turn that off in Settings."),
+            format!("Press {chord} anywhere to ask or do. It starts with Windows; turn that off in Settings."),
         )
     };
     let a = app.clone();
@@ -154,7 +153,6 @@ pub(crate) fn stop_for_exit() -> bool {
 /// way out.
 fn on_exit(app: &tauri::AppHandle) {
     stop_for_exit();
-    state::shared(app).call(app, |k| k.close_find.as_ref());
     use tauri_plugin_global_shortcut::GlobalShortcutExt;
     let _ = app.global_shortcut().unregister_all();
     history::get().flush_now();
@@ -202,7 +200,7 @@ pub fn run() {
         .manage(ipc::Seen::default())
         .manage(state::Shared::default())
         .invoke_handler(tauri::generate_handler![ipc::aeval_invoke])
-        // Glass frames and the lens loupe, served from memory (agent c, D4).
+        // Glass frames, served from memory (agent c, D4).
         .register_uri_scheme_protocol(backdrop::SCHEME, |_ctx, request| {
             backdrop::serve_request(&request)
         })
@@ -233,7 +231,7 @@ pub fn run() {
             windows::boot(&handle)?;
             // Desktop helper client, glass backdrop, CI checks (split c).
             desktop::setup(&handle);
-            // Ask, Find, the agent and the hooks between the splits.
+            // Ask, the agent and the hooks between the splits.
             host::setup(&handle);
             // voice lane: the dictation chord and its pill.
             voice::setup(&handle);

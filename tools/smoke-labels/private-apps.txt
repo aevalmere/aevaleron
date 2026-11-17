@@ -5,8 +5,6 @@
 # one to get green.
 # With Notepad on the private apps list and in front: no screenshot.
 privateAppsCapture
-# Find reads nothing and its status line says why.
-privateAppsFind
 # Ask's window text is not read; the desktop helper is not asked.
 privateAppsAsk
 # The bar's notice says which app is private.

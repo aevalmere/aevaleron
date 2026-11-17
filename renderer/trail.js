@@ -1,63 +1,12 @@
 'use strict';
 
-// The answer window's two v2 views, loaded after output.js and sharing its
+// The answer window's agent trail, loaded after output.js and sharing its
 // globals (chatEl, opanel, listen, send, say, showSheet, requestResize,
 // scrollToBottom, syncOrbit).
 //
-//   Find view   the results list: each hit's snippet, for related hits
-//               why, and at the end of the row the one word for what Enter
-//               will do (Press, Focus, Select, Click). A listbox: the arrows
-//               move through it and the ring follows, Enter acts on the row.
-//               Nothing found offers the next step.
-//   Agent trail inside the transcript, one block per run: the plan as the
-//               checklist with each act under the item it serves, a confirm
-//               card when a step needs a yes, and the outcome. One
-//               conversation, three verbs.
-
-const findView = document.getElementById('find-view');
-
-// ------------------------------------------------------------------- views
-
-let view = 'chat';
-let findHits = [];
-let findCurrent = -1;
-let findStatus = null;
-let findQuery = '';
-// The list's generation, sent back with Enter so Rust knows which list
-// the row was in.
-let findGen = 0;
-
-function setView(next) {
-  view = next === 'find' ? 'find' : 'chat';
-  document.body.dataset.view = view;
-  findView.hidden = view !== 'find';
-  chatEl.hidden = view === 'find';
-  // Copying the conversation means nothing over a list of matches.
-  window.syncCopyAll();
-  // Hits that arrived while the chat was showing were stored, not drawn.
-  if (view === 'find') {
-    renderFind();
-    window.setSheetTitle('Find', findQuery, true);
-    showSheet();
-  }
-  if (view === 'chat' && !chatEl.childElementCount) opanel.hidden = true;
-  requestResize();
-}
-
-listen('view:set', ({ view: v }) => setView(v));
-
-// A conversation arriving in this window is what the window shows: an
-// answer is never left hidden behind a list of matches from an earlier Find.
-for (const channel of ['chat:sync', 'chat:user', 'query:start']) {
-  listen(channel, () => {
-    if (view !== 'find') return;
-    setView('chat');
-    // output.js scrolled before the chat was back on show.
-    scrollToBottom(true);
-  });
-}
-
-// -------------------------------------------------------------------- find
+// The trail sits inside the transcript, one block per run: the plan as the
+// checklist with each act under the item it serves, a confirm card when a
+// step needs a yes, and the outcome.
 
 function el(tag, cls, text) {
   const e = document.createElement(tag);
@@ -75,202 +24,6 @@ function once(btn, channel, payload) {
     btn.disabled = false;
   });
 }
-
-function kindMark(kind) {
-  const m = el('span', `kind-mark ${kind}`);
-  m.setAttribute('aria-hidden', 'true');
-  return m;
-}
-
-// The search ran and found nothing, exact or related.
-function findCameUpEmpty() {
-  const s = findStatus || {};
-  if (findHits.length || !findQuery || s.reading || s.open === false) return false;
-  const c = s.counts || {};
-  return !c.exact && !c.related;
-}
-
-// Nothing found: what was said, then what to do next (U24). Actions only,
-// no keys and no how-to: how to search is the bar's to say.
-function renderEmpty() {
-  const s = findStatus || {};
-  const wrap = el('div', 'find-empty-wrap');
-  const p = el('p', 'find-empty', [s.status, ...(s.lines || [])].filter(Boolean).join('\n') || 'Looking…');
-  wrap.appendChild(p);
-  if (findCameUpEmpty()) {
-    const next = el('div', 'find-next');
-    // Offline there is no one to ask.
-    if (s.stage !== 'offline') {
-      const ask = el('button', 'retry-btn', `Ask about "${findQuery}"`);
-      ask.type = 'button';
-      ask.title = `Ask about "${findQuery}"`;
-      ask.addEventListener('click', askAboutQuery);
-      next.appendChild(ask);
-    }
-    if (s.scope !== 'screen') {
-      const wide = el('button', 'retry-btn', 'Look on the whole screen');
-      wide.type = 'button';
-      wide.addEventListener('click', () => send('find:scope', { scope: 'screen' }));
-      next.appendChild(wide);
-    }
-    wrap.appendChild(next);
-  }
-  findView.appendChild(wrap);
-}
-
-// With no hit to explain, the words themselves become the question.
-function askAboutQuery() {
-  const q = findQuery;
-  let asked;
-  try {
-    asked = window.aeval.invoke('find:to-ask', {});
-  } catch (err) {
-    asked = Promise.reject(err);
-  }
-  Promise.resolve(asked)
-    .then((r) => {
-      if (r && r.status === 'no-hit') {
-        send('find:close');
-        send('query:submit', { question: q });
-      }
-    })
-    .catch(() => send('query:submit', { question: q }));
-}
-
-function findRow(h) {
-  const row = el('button', 'find-row');
-  row.type = 'button';
-  row.setAttribute('role', 'option');
-  const on = h.i === findCurrent;
-  row.setAttribute('aria-selected', String(on));
-  // Roving focus: one row in the tab order, the current one.
-  row.tabIndex = on ? 0 : -1;
-  row.dataset.i = String(h.i);
-  if (on) row.classList.add('current');
-  if (h.offscreen) row.classList.add('offscreen');
-  row.appendChild(kindMark(h.kind));
-  const body = el('span', 'find-body');
-  const snip = el('span', 'find-snippet');
-  // The match itself in the snippet is set apart by weight, not colour.
-  const text = String(h.text || '');
-  const at = h.match ? text.toLowerCase().indexOf(String(h.match).toLowerCase()) : -1;
-  if (at >= 0) {
-    snip.append(text.slice(0, at));
-    snip.appendChild(el('b', '', text.slice(at, at + h.match.length)));
-    snip.append(text.slice(at + h.match.length));
-  } else {
-    snip.textContent = text;
-  }
-  body.appendChild(snip);
-  if (h.why) body.appendChild(el('span', 'find-why', h.why));
-  row.appendChild(body);
-  // What Enter will do, in one word. A row Enter can do nothing with has
-  // none.
-  if (h.act) row.appendChild(el('span', 'find-act', h.act));
-  row.addEventListener('click', () => goTo(h.i, false));
-  row.addEventListener('contextmenu', (e) => {
-    e.preventDefault();
-    send('ui:context-menu', { kind: 'hit', index: h.i, text: h.match || h.text });
-  });
-  return row;
-}
-
-// What the list last followed: the row is brought into view when the query
-// or the current match changes, never because the same list came again.
-let findFollowed = '';
-
-function renderFind() {
-  const hadFocus = findView.contains(document.activeElement);
-  const top = findView.scrollTop;
-  findView.innerHTML = '';
-  findView.setAttribute('aria-label', findQuery ? `Matches for ${findQuery}` : 'Matches');
-  // A listbox with no options is announced as a broken list. With nothing
-  // found the view holds a sentence and two buttons, so it is a group.
-  findView.setAttribute('role', findHits.length ? 'listbox' : 'group');
-  if (!findHits.length) renderEmpty();
-  for (const h of findHits) findView.appendChild(findRow(h));
-  const cur = findView.querySelector('.find-row.current') || findView.querySelector('.find-row');
-  findView.scrollTop = top;
-  if (cur) {
-    cur.tabIndex = 0;
-    const follow = `${findQuery}
-${findCurrent}`;
-    if (follow !== findFollowed) cur.scrollIntoView({ block: 'nearest' });
-    findFollowed = follow;
-    if (hadFocus) cur.focus({ preventScroll: true });
-  }
-  requestResize();
-}
-
-// The ring follows the row: focus moves at once, Rust moves the ring.
-function goTo(i, focus) {
-  findCurrent = i;
-  for (const r of findView.querySelectorAll('.find-row')) {
-    const on = Number(r.dataset.i) === i;
-    r.classList.toggle('current', on);
-    r.setAttribute('aria-selected', String(on));
-    r.tabIndex = on ? 0 : -1;
-    if (on && focus) {
-      r.focus();
-      r.scrollIntoView({ block: 'nearest' });
-    }
-  }
-  findStepped = send('find:step', { by: { index: i } });
-}
-
-// The last step asked of Rust, so Enter can wait for it to land.
-let findStepped = Promise.resolve();
-
-// Enter on a row acts on that match, as Enter in the bar does. The row is
-// the current one first, and the step that made it so has landed, so what
-// is sent is what Rust has marked.
-function actOn(i) {
-  const h = findHits.find((x) => x.i === i);
-  if (!h) return;
-  if (i !== findCurrent) goTo(i, false);
-  findStepped.then(() => send('find:act', { gen: findGen, index: i, match: h.match }));
-}
-
-findView.addEventListener('keydown', (e) => {
-  if (!e.target.classList || !e.target.classList.contains('find-row') || e.ctrlKey || e.altKey || e.metaKey) return;
-  if (e.key === 'Enter' && !e.shiftKey) {
-    e.preventDefault();
-    e.stopPropagation();
-    actOn(Number(e.target.dataset.i));
-    return;
-  }
-  const rows = [...findView.querySelectorAll('.find-row')];
-  const at = rows.indexOf(e.target);
-  let to = -1;
-  if (e.key === 'ArrowDown') to = Math.min(rows.length - 1, at + 1);
-  else if (e.key === 'ArrowUp') to = Math.max(0, at - 1);
-  else if (e.key === 'Home') to = 0;
-  else if (e.key === 'End') to = rows.length - 1;
-  else return;
-  e.preventDefault();
-  e.stopPropagation();
-  if (to >= 0 && to !== at) goTo(Number(rows[to].dataset.i), true);
-});
-
-let findDrawn = '';
-
-listen('find:hits', ({ hits, current, query, gen }) => {
-  findGen = gen;
-  // The same list again (a re-read that changed nothing) is not redrawn.
-  const same = JSON.stringify([hits, current, query]);
-  if (same === findDrawn && view === 'find') return;
-  findDrawn = same;
-  findQuery = String(query || findQuery || '');
-  if (view === 'find' && query) window.setSheetTitle('Find', query, true);
-  findHits = hits || [];
-  findCurrent = typeof current === 'number' ? current : -1;
-  if (view === 'find') renderFind();
-});
-
-listen('find:state', (s) => {
-  findStatus = s;
-  if (view === 'find' && !findHits.length) renderFind();
-});
 
 // ------------------------------------------------------------------- trail
 
@@ -307,6 +60,20 @@ function newBlock(task) {
   const list = el('ol', 'trail-rows');
   wrap.appendChild(list);
   const meta = el('div', 'msg-meta trail-meta');
+  // Until the task has done anything, one press stops it and answers the
+  // same words as a question instead.
+  const answer = task ? el('button', 'copy-msg', 'Just answer') : null;
+  if (answer) {
+    answer.type = 'button';
+    answer.title = 'Stop the task and answer it as a question';
+    answer.addEventListener('click', () => {
+      if (answer.disabled) return;
+      answer.disabled = true;
+      send('agent:stop').then(() => send('query:submit', { question: task }));
+      dropAnswer();
+    });
+    meta.appendChild(answer);
+  }
   const stop = el('button', 'stop-btn', 'Stop');
   stop.type = 'button';
   stop.title = 'Stop (Esc)';
@@ -321,12 +88,20 @@ function newBlock(task) {
   showSheet();
   chatEl.appendChild(wrap);
   wrap.dataset.state = 'planning';
-  block = { el: wrap, list, plan: null, rows: new Map(), meta, stop, status, toggle, task, ended: false, card: null, steps: 0, said: new Set() };
+  block = { el: wrap, list, plan: null, rows: new Map(), meta, stop, answer, status, toggle, task, ended: false, card: null, steps: 0, said: new Set() };
   syncOrbit();
   window.syncCopyAll();
   scrollToBottom(true);
   requestResize();
   return block;
+}
+
+// "Just answer" goes once the task has acted, or ended.
+function dropAnswer() {
+  if (!block || !block.answer) return;
+  block.answer.remove();
+  block.answer = null;
+  requestResize();
 }
 
 const STATE_MARK = { skipped: 'Skipped', failed: 'Failed' };
@@ -517,6 +292,7 @@ function putRow(r) {
       x.li = li;
     }
   } else {
+    if (isAct(r)) dropAnswer();
     const into = isAct(r) ? underPlan(r) : null;
     const li = into ? actEl(r) : rowEl(r);
     if (old && old.li.parentElement === (into || block.list)) old.li.replaceWith(li);
@@ -787,6 +563,7 @@ listen('agent:done', ({ state, text, usage }) => {
   syncPlan();
   block.status.textContent = state === 'done' ? 'Done' : state === 'stopped' ? 'Stopped' : 'Did not finish';
   block.stop.hidden = true;
+  dropAnswer();
   clearTimeout(stepTimer);
   stepTimer = null;
   pendingStep = null;

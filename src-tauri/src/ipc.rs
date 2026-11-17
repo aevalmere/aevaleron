@@ -5,7 +5,7 @@
 //! that object on top of Tauri. ARCHITECTURE.md section 4 is the contract.
 //!
 //! Split (c)'s rows are asked first (`desktop::channels`), then the glue in
-//! `host/` (Ask, Find, Agent, context menus), then the core rows here. Every
+//! `host/` (Ask, Agent, context menus), then the core rows here. Every
 //! allowlisted invoke channel has a row (`every_invoke_channel_has_a_route`).
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -74,14 +74,6 @@ pub const INVOKE_CHANNELS: &[&str] = &[
     "buddy:advance",
     "buddy:set-ignore",
     "app:quit",
-    "bar:mode",
-    "find:open",
-    "find:query",
-    "find:step",
-    "find:act",
-    "find:scope",
-    "find:to-ask",
-    "find:close",
     "agent:start",
     "agent:stop",
     "agent:confirm",
@@ -89,14 +81,11 @@ pub const INVOKE_CHANNELS: &[&str] = &[
     "agent:consent",
     "agent:do-it",
     "ui:context-menu",
-    "settings:save-find-model",
     "settings:save-agent-model",
-    "settings:set-find",
     "settings:set-agent",
     "tour:replay",
     "buddy:card",
     "buddy:skip",
-    "find:related",
     "bar:history",
     "bar:history-push",
     "ui:focus-answer",
@@ -194,8 +183,6 @@ pub const LISTEN_CHANNELS: &[&str] = &[
     "buddy:hide",
     "buddy:done",
     "update:state",
-    "find:hits",
-    "find:state",
     "agent:begin",
     "agent:step",
     "agent:state",
@@ -203,14 +190,13 @@ pub const LISTEN_CHANNELS: &[&str] = &[
     "agent:done",
     "agent:consent-request",
     "lens:draw",
-    "view:set",
     "bar:prefill",
     "settings:section",
     "bar:open",
     "bar:context",
+    "bar:submit",
     "glass:frame",
     "glass:tier",
-    "lens:loupe",
     // ---- lane: windows (do not edit outside your lane) ----
     "output:meta",
     "output:away",
@@ -371,8 +357,8 @@ const EXCEPTIONS: &[(&str, &[Caller])] = &[
 /// B-089: the windows that may call `channel`; None for a channel with no
 /// rule (refused). Agent, settings, shortcut, update and quit channels come
 /// from the bar and Settings (History for its own); an output gets its own
-/// channels, the Ask's, the agent's run controls its trail shows, Find's
-/// step, and the harmless page ones; buddy, lens and the area picker get
+/// channels, the Ask's, the agent's run controls its trail shows, and the
+/// harmless page ones; buddy, lens and the area picker get
 /// their own and `glass:*`. A new channel falls under its prefix's row.
 pub fn rule(channel: &str) -> Option<&'static [Caller]> {
     EXCEPTIONS
@@ -387,7 +373,7 @@ fn family(channel: &str) -> Option<&'static [Caller]> {
     Some(match prefix {
         "settings" | "shortcuts" | "update" | "tour" | "models" | "app" | "hud" => APP,
         "history" => APP_HISTORY,
-        "query" | "chat" | "output" | "ui" | "find" | "agent" => ASK,
+        "query" | "chat" | "output" | "ui" | "agent" => ASK,
         "buddy" => BUDDY,
         "lens" => LENS,
         "region" => REGION,
@@ -410,13 +396,14 @@ pub fn permitted(caller: Caller, channel: &str) -> bool {
 }
 
 /// Whether `task` is a question this transcript already holds (the trail's
-/// Retry).
+/// Retry, an answer's "Do this instead").
 pub fn asks_for(messages: &[Value], task: &str) -> bool {
     let asked = |m: &Value| m["role"] == "user" && m["text"].as_str() == Some(task);
     !task.trim().is_empty() && messages.iter().any(asked)
 }
 
-/// The one call an output makes outside its rows: its trail's Retry. A
+/// The one call an output makes outside its rows: its trail's Retry and an
+/// answer's "Do this instead", both for words its own transcript holds. A
 /// const, so the route scan never takes this comparison for a route.
 const RETRY: &str = "agent:start";
 
@@ -444,8 +431,6 @@ pub fn first_request(channel: &str, p: &Value) -> bool {
     match channel {
         "query:submit" => !p_str(p, "question").trim().is_empty(),
         "agent:start" => !p_str(p, "task").trim().is_empty(),
-        // Enter in Find acts on the hit; it was the step before.
-        "find:step" | "find:act" => true,
         _ => false,
     }
 }
@@ -541,9 +526,6 @@ async fn dispatch(window: &WebviewWindow, channel: &str, payload: Value) -> Resu
     if let Some(r) = crate::host::ask::route(&app, &label, channel, &payload).await {
         return r;
     }
-    if let Some(r) = crate::host::find::route(&app, channel, &payload).await {
-        return r;
-    }
     if let Some(r) = crate::host::agent::route(&app, channel, &payload).await {
         return r;
     }
@@ -632,11 +614,8 @@ fn glass_tier(app: &AppHandle) -> Value {
 pub fn settings_data(app: &AppHandle) -> Value {
     let s = store::get();
     let mut v = json!({
-        "findModel": s.get_find_model(),
-        "defaultFindModel": store::DEFAULT_FIND,
         "agentModel": s.get_agent_model(),
         "defaultAgentModel": store::DEFAULT_AGENT,
-        "find": s.get_find_settings(),
         "agent": s.get_agent_settings(),
         "winBuild": windows::flags::win_build(),
         "hasKey": s.has_api_key(),
@@ -911,9 +890,6 @@ async fn route(
             let skill = s.set_skill_id(&p_str(&p, "skill"), crate::host::skill_exists);
             return Ok(json!({ "ok": true, "skill": skill }));
         }
-        "settings:set-find" => {
-            return Ok(json!({ "ok": true, "find": s.set_find_settings(&p) }));
-        }
         "settings:set-agent" => {
             return Ok(json!({ "ok": true, "agent": s.set_agent_settings(&p) }));
         }
@@ -1029,7 +1005,6 @@ mod tests {
             include_str!("ipc.rs"),
             include_str!("desktop/channels.rs"),
             include_str!("host/ask.rs"),
-            include_str!("host/find.rs"),
             include_str!("host/agent.rs"),
             include_str!("host/settings.rs"),
             include_str!("voice/ipc.rs"),  // voice lane
@@ -1142,17 +1117,14 @@ mod tests {
         assert_eq!(rust[7], "// ---- end: agent ----");
     }
 
-    /// B-096: `settings:get` carries main.js's 28 keys (main.js:2525-2562)
-    /// and the documented Tauri additions. The `settings_extra` hook adds
+    /// B-096: `settings:get` carries main.js's keys (main.js:2525-2562)
+    /// but Find's (Find left the app), and the documented Tauri additions. The `settings_extra` hook adds
     /// its own over them; none of those is a core key.
     #[test]
     fn settings_get_key_set() {
-        const ELECTRON: [&str; 28] = [
-            "findModel",
-            "defaultFindModel",
+        const ELECTRON: [&str; 25] = [
             "agentModel",
             "defaultAgentModel",
-            "find",
             "agent",
             "winBuild",
             "hasKey",
@@ -1232,7 +1204,6 @@ mod tests {
             "agent:confirm",
             "query:submit",
             "output:close",
-            "find:step",
         ];
         for c in own_controls {
             assert!(permitted(Caller::Output, c), "{c}");
@@ -1369,7 +1340,7 @@ mod tests {
         for (caller, scripts) in &pages {
             for js in scripts {
                 for c in invoked(js) {
-                    // The trail's Retry: allowed for the window's own task.
+                    // Retry and Do this instead: allowed for the window's own words.
                     let retry = *caller == Caller::Output && c == RETRY;
                     if allowed(c) && !permitted(*caller, c) && !retry {
                         refused.push(format!("{caller:?} {c}"));
@@ -1448,8 +1419,7 @@ mod tests {
             &json!({ "task": "open notepad" })
         ));
         assert!(!first_request("agent:start", &json!({})));
-        assert!(first_request("find:step", &json!({ "by": 1 })));
-        assert!(!first_request("bar:mode", &json!({ "mode": "ask" })));
+        assert!(!first_request("bar:history", &json!({})));
     }
 
     #[test]
@@ -1488,7 +1458,7 @@ mod tests {
         let invoke = js_list(INVOKE_CHANNELS);
         let listen = js_list(LISTEN_CHANNELS);
         assert!(s.contains(&format!("aevalBridge({invoke}, {listen});")));
-        assert!(listen.contains("\"lens:loupe\""));
+        assert!(listen.contains("\"lens:draw\""));
         assert!(invoke.contains("\"settings:set-glass\""));
     }
 }

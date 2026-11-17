@@ -8,8 +8,8 @@
 //! no page load.
 //!
 //! The bar's follow-ups go to the target (the focused output); the bar's
-//! `chat:new` detaches it so the next question opens a new window. Find
-//! results and task trails open a window of their own (`fresh`). Each
+//! `chat:new` detaches it so the next question opens a new window. Task
+//! trails open a window of their own (`fresh`). Each
 //! window owns its Ask: closing or resetting one stops only its own
 //! (`AppState::queries`, K-03). ARCHITECTURE.md sections 9 and 10.
 
@@ -99,7 +99,6 @@ pub fn create(app: &AppHandle) -> tauri::Result<String> {
             Output {
                 label: label.clone(),
                 chat: Chat::fresh(),
-                view: "chat".into(),
                 content_height: layout::DEFAULT_OUTPUT_HEIGHT,
                 ..Output::default()
             },
@@ -188,7 +187,7 @@ pub fn target(app: &AppHandle) -> Option<String> {
     open_spare(app, None)
 }
 
-/// K-04: a window for a Find result or a task trail. Always a spare or a
+/// K-04: a window for a task trail. Always a spare or a
 /// new window, never the conversation the bar is continuing. It becomes
 /// the target, so follow-ups typed while it is in front go to it.
 pub fn fresh(app: &AppHandle) -> Option<String> {
@@ -782,12 +781,10 @@ pub fn cycle_target(app: &AppHandle, dir: i64) -> Option<String> {
     Some(next)
 }
 
-/// `chat`, `find` or `trail`.
+/// `chat` or `trail`.
 pub fn kind_of(o: &Output) -> &'static str {
     if o.kind == OutputKind::Trail {
         "trail"
-    } else if o.view == "find" {
-        "find"
     } else {
         "chat"
     }
@@ -796,7 +793,6 @@ pub fn kind_of(o: &Output) -> &'static str {
 /// What a window with no question yet is called.
 fn untitled(kind: &str) -> &'static str {
     match kind {
-        "find" => "Find",
         "trail" => "Task",
         _ => "New conversation",
     }
@@ -946,7 +942,6 @@ pub fn on_loaded(app: &AppHandle, label: &str) {
     }) else {
         return;
     };
-    send_now(app, label, "view:set", json!({ "view": o.view }));
     send_now(app, label, "chat:sync", chat_payload(&o));
     send_now(app, label, "overlay:state", overlay_state(app, Some(label)));
     sent_meta().lock().remove(label);
@@ -974,11 +969,10 @@ pub fn on_hello(app: &AppHandle, label: &str) {
 /// ended with `query:done` is in the transcript too, so all of its events
 /// go; one that failed keeps its start and its error.
 pub fn replayable(events: Vec<(String, Value)>) -> Vec<(String, Value)> {
-    const RESENT: [&str; 7] = [
+    const RESENT: [&str; 6] = [
         "chat:sync",
         "chat:reset",
         "chat:user",
-        "view:set",
         "overlay:state",
         "output:meta",
         "ui:text-scale",
@@ -1161,7 +1155,6 @@ mod tests {
             label: label.into(),
             active,
             touched,
-            view: "chat".into(),
             ..Output::default()
         }
     }
@@ -1280,8 +1273,6 @@ mod tests {
     fn titles_and_kinds() {
         let mut o = out("output-1", true, 1);
         assert_eq!(title_of(&o), "New conversation");
-        o.view = "find".into();
-        assert_eq!((kind_of(&o), title_of(&o).as_str()), ("find", "Find"));
         o.kind = OutputKind::Trail;
         assert_eq!((kind_of(&o), title_of(&o).as_str()), ("trail", "Task"));
         let o = with_chat(out("output-2", true, 1), "  open   notepad ");

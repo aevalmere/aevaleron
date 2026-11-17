@@ -80,13 +80,10 @@ impl Provider {
         match (self, kind) {
             (Provider::OpenRouter, k) => super::catalogue::default_for(k),
             (Provider::Anthropic, Kind::Vision) => "claude-sonnet-5-5",
-            (Provider::Anthropic, Kind::Find) => "claude-haiku-5-5",
             (Provider::Anthropic, _) => "claude-opus-5-5",
             (Provider::OpenAi, Kind::Vision) => "gpt-6.1-terra",
-            (Provider::OpenAi, Kind::Find) => "gpt-6-luna",
             (Provider::OpenAi, _) => "gpt-6.1-sol",
             (Provider::Gemini, Kind::Vision) => "gemini-3.8-flash",
-            (Provider::Gemini, Kind::Find) => "gemini-3.5-flash-lite",
             (Provider::Gemini, Kind::Agent) => "gemini-3.8-flash",
             (Provider::Gemini, Kind::Text) => "gemini-4-argon",
         }
@@ -116,7 +113,7 @@ const ANTHROPIC: [Curated; 3] = [
     Curated {
         id: "claude-haiku-5-5",
         tier: Tier::Paid,
-        note: "The quickest and cheapest Claude. The default for Find.",
+        note: "The quickest and cheapest Claude.",
     },
 ];
 
@@ -135,7 +132,7 @@ const OPENAI: [Curated; 3] = [
     Curated {
         id: "gpt-6-luna",
         tier: Tier::Paid,
-        note: "The fast, low-cost GPT-6. The default for Find.",
+        note: "The fast, low-cost GPT-6.",
     },
 ];
 
@@ -154,7 +151,7 @@ const GEMINI: [Curated; 3] = [
     Curated {
         id: "gemini-3.5-flash-lite",
         tier: Tier::Paid,
-        note: "The lightest Gemini. The default for Find.",
+        note: "The lightest and cheapest Gemini.",
     },
 ];
 
@@ -187,13 +184,12 @@ mod tests {
         assert_eq!(a.default_model(Kind::Text), "claude-opus-5-5");
         assert_eq!(a.default_model(Kind::Agent), "claude-opus-5-5");
         assert_eq!(a.default_model(Kind::Vision), "claude-sonnet-5-5");
-        assert_eq!(a.default_model(Kind::Find), "claude-haiku-5-5");
     }
 
     #[test]
     fn every_default_is_in_its_own_list() {
         for p in Provider::ALL {
-            for k in [Kind::Vision, Kind::Text, Kind::Find, Kind::Agent] {
+            for k in [Kind::Vision, Kind::Text, Kind::Agent] {
                 let d = p.default_model(k);
                 let pool = if p == Provider::OpenRouter {
                     super::super::catalogue::pool_for(Kind::Agent)

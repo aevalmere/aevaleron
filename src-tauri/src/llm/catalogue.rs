@@ -21,22 +21,20 @@ impl Tier {
 }
 
 /// What a model is for. Vision answers from the screen; text is the brain,
-/// which never sees an image; find and agent are their own pickers.
+/// which never sees an image; agent is its own picker.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Kind {
     Vision,
     Text,
-    Find,
     Agent,
 }
 
 impl Kind {
-    /// `models:list` and `listModels`: text, find and agent by name, anything
-    /// else is vision.
+    /// `models:list` and `listModels`: text and agent by name, anything else
+    /// is vision.
     pub fn from_list_kind(k: Option<&str>) -> Kind {
         match k {
             Some("text") => Kind::Text,
-            Some("find") => Kind::Find,
             Some("agent") => Kind::Agent,
             _ => Kind::Vision,
         }
@@ -46,7 +44,6 @@ impl Kind {
         match self {
             Kind::Vision => "vision",
             Kind::Text => "text",
-            Kind::Find => "find",
             Kind::Agent => "agent",
         }
     }
@@ -81,7 +78,6 @@ const fn paid(id: &'static str, note: &'static str) -> Curated {
 // CURATED entry takes image input.
 pub const DEFAULT_MODEL: &str = "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free";
 pub const DEFAULT_BRAIN: &str = "nvidia/nemotron-3.5-super-vl:free";
-pub const DEFAULT_FIND: &str = "nvidia/nemotron-3.5-lightning:free";
 pub const DEFAULT_AGENT: &str = "nvidia/nemotron-3.5-super-vl:free";
 
 #[rustfmt::skip]
@@ -165,7 +161,7 @@ pub fn tier_label(tier: Tier) -> &'static str {
 }
 
 /// The curated pool a kind picks from: vision is CURATED, agent is brains
-/// then curated (deduplicated), text and find are the brains.
+/// then curated (deduplicated), text is the brains.
 pub fn pool_for(kind: Kind) -> Vec<&'static Curated> {
     match kind {
         Kind::Vision => CURATED.iter().collect(),
@@ -178,7 +174,7 @@ pub fn pool_for(kind: Kind) -> Vec<&'static Curated> {
             }
             out
         }
-        Kind::Text | Kind::Find => BRAINS.iter().collect(),
+        Kind::Text => BRAINS.iter().collect(),
     }
 }
 
@@ -186,7 +182,6 @@ pub fn default_for(kind: Kind) -> &'static str {
     match kind {
         Kind::Vision => DEFAULT_MODEL,
         Kind::Text => DEFAULT_BRAIN,
-        Kind::Find => DEFAULT_FIND,
         Kind::Agent => DEFAULT_AGENT,
     }
 }
@@ -444,8 +439,9 @@ pub fn pick_live(kind: Kind, id: &str, all: Option<&[Value]>) -> String {
     let Some(all) = all.filter(|a| !a.is_empty()) else {
         return id.to_string();
     };
-    // Only the screen model has to take images. Find answers in text and the
-    // agent falls back to JSON turns, so for those any listed model will do.
+    // Only the screen model has to take images. The brain answers in text and
+    // the agent falls back to JSON turns, so for those any listed model will
+    // do.
     let usable = |mid: &str| usable_for(kind, all, mid);
     if usable(id) {
         return id.to_string();
@@ -465,12 +461,12 @@ fn usable_for(kind: Kind, all: &[Value], id: &str) -> bool {
 }
 
 /// The next free model to try after one has failed: the first untried free
-/// one in the kind's pool (find uses the brains). Once the catalogue is
+/// one in the kind's pool. Once the catalogue is
 /// known, only a stand-in that is listed and can do the job: a screen model
 /// that takes images, an agent model with tool calls (it keeps its tool
 /// dialect). A cold cache means curated order (B-042).
 pub fn next_free_model(kind: Kind, tried: &[String], all: Option<&[Value]>) -> Option<String> {
-    let pool = pool_for(if kind == Kind::Find { Kind::Text } else { kind });
+    let pool = pool_for(kind);
     let live = all.filter(|a| !a.is_empty());
     let fits = |id: &str| match (kind, live) {
         (_, None) => true,
@@ -627,14 +623,13 @@ mod tests {
         let agent = pool_for(Kind::Agent);
         assert_eq!(agent.len(), 14);
         assert_eq!(ids(&agent[..3]), ids(&pool_for(Kind::Text)[..3]));
-        assert_eq!(ids(&pool_for(Kind::Find)), ids(&pool_for(Kind::Text)));
     }
 
     #[test]
     fn defaults_are_live_in_the_recorded_catalogue() {
         // Recorded from https://openrouter.ai/api/v1/models on 2026-11-07.
         let all = catalogue();
-        for id in [DEFAULT_MODEL, DEFAULT_BRAIN, DEFAULT_FIND, DEFAULT_AGENT] {
+        for id in [DEFAULT_MODEL, DEFAULT_BRAIN, DEFAULT_AGENT] {
             assert!(find(&all, id).is_some(), "{id} missing");
         }
         assert!(accepts_images(find(&all, DEFAULT_MODEL).unwrap()));
@@ -682,9 +677,10 @@ mod tests {
         assert_eq!(pick_live(Kind::Vision, "gone/model:free", a), DEFAULT_MODEL);
         let gone = "gone/model:free";
         assert_eq!(pick_live(Kind::Vision, gone, None), gone);
-        assert_eq!(pick_live(Kind::Text, DEFAULT_FIND, a), DEFAULT_FIND);
+        let text_only = "nvidia/nemotron-3.5-lightning:free";
+        assert_eq!(pick_live(Kind::Text, text_only, a), text_only);
         // A text model is not a usable screen model.
-        assert_eq!(pick_live(Kind::Vision, DEFAULT_FIND, a), DEFAULT_MODEL);
+        assert_eq!(pick_live(Kind::Vision, text_only, a), DEFAULT_MODEL);
         let without_default: Vec<Value> = all
             .iter()
             .filter(|m| m["id"].as_str() != Some(DEFAULT_MODEL))
@@ -723,8 +719,8 @@ mod tests {
         let tried = vec![DEFAULT_MODEL.to_string()];
         let next = next_free_model(Kind::Vision, &tried, None);
         assert_eq!(next.as_deref(), Some("google/gemma-4-26b-a4b-it:free"));
-        let tried = vec![DEFAULT_FIND.to_string(), DEFAULT_BRAIN.to_string()];
-        let next = next_free_model(Kind::Find, &tried, None);
+        let tried = vec![DEFAULT_BRAIN.to_string()];
+        let next = next_free_model(Kind::Text, &tried, None);
         let want = "nvidia/nemotron-3-ultra-550b-a55b:free";
         assert_eq!(next.as_deref(), Some(want));
         let pool = pool_for(Kind::Text);

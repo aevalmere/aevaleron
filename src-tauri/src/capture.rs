@@ -298,22 +298,6 @@ pub async fn capture_screen_async(region: Option<Rect>) -> Option<Shot> {
         .flatten()
 }
 
-/// A full-resolution cut of what is under a DIP rect (the lens loupe), from
-/// the display the rect was placed on (`display`, a `Display::id`), else the
-/// one it matches (B-005).
-pub fn crop_dip(rect: Rect, display: Option<u32>) -> Option<Rgb> {
-    let list = screen::all_displays();
-    let on = display.and_then(|id| list.iter().find(|d| d.id == id).cloned());
-    let d = on.unwrap_or_else(|| screen::matching(&list, &rect));
-    let frame = grab(&d).ok()?;
-    let k = frame.width as f64 / d.bounds.width.max(1.0);
-    let x = (((rect.x - d.bounds.x) * k).round().max(0.0) as u32).min(frame.width - 1);
-    let y = (((rect.y - d.bounds.y) * k).round().max(0.0) as u32).min(frame.height - 1);
-    let w = ((rect.width * k).round().max(1.0) as u32).min(frame.width - x);
-    let h = ((rect.height * k).round().max(1.0) as u32).min(frame.height - y);
-    Some(frame.rgb_rect(x, y, w, h))
-}
-
 /// Windows 10 2004 (build 19041) is where WDA_EXCLUDEFROMCAPTURE exists;
 /// before it the only affinity blanks the window, which would put a black
 /// box into every shot, so nothing is set there (main.js

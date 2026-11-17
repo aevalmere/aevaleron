@@ -40,8 +40,8 @@ pub const GEMINI_MODELS: &str = "https://generativelanguage.googleapis.com/v1bet
 pub const NATIVE_FIELD: &str = "_native";
 
 /// Native models think before they answer and count that against the output
-/// limit, so the small limits the free-model flows use (800 for Find, 1600
-/// for the reader) are raised to this floor for them.
+/// limit, so the small limits the free-model flows use (1600 for the
+/// reader) are raised to this floor for them.
 pub const NATIVE_MIN_TOKENS: u64 = 16000;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

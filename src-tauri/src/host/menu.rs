@@ -1,6 +1,5 @@
 //! Right-click menus inside the windows (main.js contextMenu, SPEC-v2 4.5):
-//! an answer (Copy, Find this on screen, Do it), a Find hit (Go to, Copy
-//! text, Ask about this) and a trail row (Copy step, Retry from here). The
+//! an answer (Copy, Do it) and a trail row (Copy step, Retry from here). The
 //! bridge asks for the edit menu on a text field and Copy / Select all on a
 //! selection (main.js attachContextMenu, WIN-14).
 
@@ -13,17 +12,13 @@ use tauri::menu::{IsMenuItem, Menu, MenuItem, PredefinedMenuItem};
 use tauri::{AppHandle, Manager, Wry};
 
 use super::agent::{start_run, StartReq};
-use super::services;
 
 const PREFIX: &str = "ctx:";
 
 #[derive(Clone, Debug)]
 enum Action {
     Copy(String),
-    FindThis(String),
     DoIt { task: String, context: String },
-    GoTo(i64),
-    AskHit(i64),
 }
 
 type Item = Box<dyn IsMenuItem<Wry>>;
@@ -47,21 +42,10 @@ fn text_of(v: &Value) -> String {
 fn items_for(p: &Value) -> Vec<(&'static str, Action)> {
     let mut items = Vec::new();
     let text = text_of(&p["text"]);
-    let index = p["index"].as_f64().map(|f| f as i64).unwrap_or(-1);
     match p["kind"].as_str() {
         Some("answer") => {
-            let sel = text_of(&p["selection"]);
-            let from = if sel.is_empty() { &text } else { &sel };
-            let first: String = from
-                .split('\n')
-                .next()
-                .unwrap_or("")
-                .chars()
-                .take(60)
-                .collect();
             let question = text_of(&p["question"]);
             items.push(("Copy", Action::Copy(text.clone())));
-            items.push(("Find this on screen", Action::FindThis(first)));
             items.push((
                 "Do it",
                 Action::DoIt {
@@ -73,11 +57,6 @@ fn items_for(p: &Value) -> Vec<(&'static str, Action)> {
                     context: format!("Earlier answer:\n{text}"),
                 },
             ));
-        }
-        Some("hit") => {
-            items.push(("Go to", Action::GoTo(index)));
-            items.push(("Copy text", Action::Copy(text)));
-            items.push(("Ask about this", Action::AskHit(index)));
         }
         Some("row") => {
             items.push(("Copy step", Action::Copy(text.clone())));
@@ -155,14 +134,6 @@ fn run(app: &AppHandle, action: Action) {
                 use tauri_plugin_clipboard_manager::ClipboardExt;
                 let _ = app.clipboard().write_text(t);
             }
-            Action::FindThis(t) => {
-                let a = app.clone();
-                let _ = app.run_on_main_thread(move || {
-                    crate::crash::guard("context-menu.find", || {
-                        crate::windows::open_bar(&a, Some("find"), Some(t));
-                    });
-                });
-            }
             Action::DoIt { task, context } => {
                 let req = StartReq {
                     task,
@@ -170,13 +141,6 @@ fn run(app: &AppHandle, action: Action) {
                     ..StartReq::default()
                 };
                 start_run(&app, req).await;
-            }
-            Action::GoTo(i) => {
-                services().find.step(&json!({ "index": i })).await;
-            }
-            Action::AskHit(i) => {
-                let index = (i >= 0).then_some(i);
-                super::find::find_to_ask(&app, index).await;
             }
         }
     };
@@ -248,9 +212,9 @@ mod tests {
         let answer =
             items_for(&json!({ "kind": "answer", "text": "line one\nline two", "question": "q" }));
         let labels: Vec<&str> = answer.iter().map(|(l, _)| *l).collect();
-        assert_eq!(labels, ["Copy", "Find this on screen", "Do it"]);
+        assert_eq!(labels, ["Copy", "Do it"]);
         match &answer[1].1 {
-            Action::FindThis(t) => assert_eq!(t, "line one"),
+            Action::DoIt { task, .. } => assert_eq!(task, "q"),
             other => panic!("{other:?}"),
         }
         let row = items_for(&json!({ "kind": "row", "text": "Typed", "ended": true, "task": "t" }));
@@ -274,15 +238,15 @@ mod tests {
 
     #[test]
     fn pending_lock_not_held_while_building() {
-        let items = items_for(&json!({ "kind": "hit", "index": 2, "text": "t" }));
-        let built = stage(items, |id, text| {
+        let row = json!({ "kind": "row", "text": "t", "ended": true, "task": "x" });
+        let built = stage(items_for(&row), |id, text| {
             let free = pending().try_lock().is_some();
             assert!(free, "pending held while making {id}");
             Ok::<_, String>(format!("{id} {text}"))
         });
-        let want = ["ctx:0 Go to", "ctx:1 Copy text", "ctx:2 Ask about this"];
+        let want = ["ctx:0 Copy step", "ctx:1 Retry from here"];
         assert_eq!(built, want);
-        let action = std::mem::take(&mut *pending().lock()).remove("ctx:1");
+        let action = std::mem::take(&mut *pending().lock()).remove("ctx:0");
         assert!(matches!(action, Some(Action::Copy(t)) if t == "t"));
         assert!(pending().lock().is_empty());
     }

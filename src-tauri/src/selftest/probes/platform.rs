@@ -32,10 +32,9 @@ use crate::{autostart, crash, history, hotkeys, paths, store, updater};
 const SECOND: Duration = Duration::from_secs(1);
 const AUMID: &str = "com.aevaleron.app";
 const MAIN_CHORD: &str = "Ctrl+Alt+Space";
-const ACTIONS: [&str; 5] = [
+const ACTIONS: [&str; 4] = [
     "captureQuery",
     "captureRegion",
-    "findOnScreen",
     "agentTask",
     "toggleVisibility",
 ];
@@ -403,11 +402,10 @@ fn tray_data(cx: &Cx) {
     let update = json!({ "status": "ready", "version": "9.9.9" });
     let ready = labels(&update, false);
     let base = [
-        "Ask, find, or do…",
+        "Ask or do…",
         "Ask about an area…",
         // region-text lane
         "Copy text from screen…",
-        "Find on screen…",
         "Do a task…",
         "-",
         "Hide the overlay",
@@ -444,7 +442,7 @@ fn tray_data(cx: &Cx) {
     let shown = accel("stop").as_deref() == Some("Esc")
         && accel("capture").as_deref() == Some(MAIN_CHORD)
         && accel("region").as_deref() == Some("Ctrl+Alt+Shift+J")
-        && accel("find").is_none();
+        && accel("agent").is_none();
     let registered = chord_held(cx, "Ctrl+Alt+Shift+J");
     let why = format!("{items:?} registered {registered}");
     cx.must("trayAccel", shown && !registered, why);
@@ -603,16 +601,14 @@ fn crash_labels(cx: &Cx) {
 fn context_menus(cx: &Cx) {
     let labels = |p: Value| menu::item_labels(&p);
     let answer = labels(json!({ "kind": "answer", "text": "a", "question": "q" }));
-    let hit = labels(json!({ "kind": "hit", "text": "a", "index": 0 }));
     let ended = labels(json!({ "kind": "row", "text": "a", "ended": true, "task": "t" }));
     let open = labels(json!({ "kind": "row", "text": "a", "ended": false, "task": "t" }));
     let other = labels(json!({ "kind": "other" }));
-    let ok = answer == ["Copy", "Find this on screen", "Do it"]
-        && hit == ["Go to", "Copy text", "Ask about this"]
+    let ok = answer == ["Copy", "Do it"]
         && ended == ["Copy step", "Retry from here"]
         && open == ["Copy step"]
         && other.is_empty();
-    let why = format!("{answer:?} {hit:?} {ended:?} {open:?} {other:?}");
+    let why = format!("{answer:?} {ended:?} {open:?} {other:?}");
     cx.must("contextMenus", ok, why);
 }
 
