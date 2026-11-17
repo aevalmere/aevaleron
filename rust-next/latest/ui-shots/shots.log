@@ -11,16 +11,16 @@
 [UI] shot 13-glob-clock-240.png
 [UI] shot 13-glob-clock-360.png
 [UI] globOnClock=ok
-[UI] scene capture/lens-hits-white
-[UI] lens-hits-white.ready=ok
-[UI] lens-hits-white.drawn=ok
-[UI] shot lens-hits-white.png
-[UI] lens-hits-white.whyCapsule=ok
-[UI] scene capture/lens-hits-dark-editor
-[UI] lens-hits-dark-editor.ready=ok
-[UI] lens-hits-dark-editor.drawn=ok
-[UI] shot lens-hits-dark-editor.png
-[UI] lens-hits-dark-editor.whyCapsule=ok
+[UI] scene capture/lens-frame-white
+[UI] lens-frame-white.ready=ok
+[UI] lens-frame-white.drawn=ok
+[UI] shot lens-frame-white.png
+[UI] lens-frame-white.frameOff=ok
+[UI] scene capture/lens-frame-dark-editor
+[UI] lens-frame-dark-editor.ready=ok
+[UI] lens-frame-dark-editor.drawn=ok
+[UI] shot lens-frame-dark-editor.png
+[UI] lens-frame-dark-editor.frameOff=ok
 [UI] scene capture/region-idle-white
 [UI] regionHint=ok
 [UI] regionRole=ok
@@ -66,14 +66,6 @@
 [UI] tour-step-3.closeInTextRow=ok
 [UI] tour-step-3.buttons=ok
 [UI] shot tour-step-3.png
-[UI] scene capture/tour-step-4
-[UI] tour-step-4.ready=ok
-[UI] tour-step-4.saidAtOnce=ok
-[UI] tour-step-4.concentric=ok
-[UI] tour-step-4.pipsRow=ok
-[UI] tour-step-4.closeInTextRow=ok
-[UI] tour-step-4.buttons=ok
-[UI] shot tour-step-4.png
 [UI] scene bar/bar
 [UI] shot 01-bar-first-run.png
 [UI] suggestionsBeforeFirst=ok
@@ -137,7 +129,7 @@
 [UI] tokenRestsAsGlyph=ok
 [UI] shot bar-token-rest.png
 [UI] tokenShowsChoice=ok
-[UI] shot bar-token-find.png
+[UI] shot bar-token-do.png
 [UI] shot bar-token-reply.png
 [UI] tokenSaysReplyWhileAsking=ok
 [UI] tokenSaysStartOnPlan=ok
@@ -146,16 +138,19 @@
 [UI] tokenRestsAsGlyph-ts200=ok
 [UI] shot bar-token-rest-ts200.png
 [UI] tokenShowsChoice-ts200=ok
-[UI] shot bar-token-find-ts200.png
+[UI] shot bar-token-do-ts200.png
 [UI] shot bar-token-reply-ts200.png
 [UI] tokenSaysReplyWhileAsking-ts200=ok
 [UI] tokenSaysStartOnPlan-ts200=ok
 [UI] shot bar-token-start-ts200.png
-[UI] scene bar/bar-find-keys
-[UI] plainWordIsNotFind=ok
-[UI] slashStartsFind=ok
-[UI] shot bar-find-keys.png
-[UI] ctrl2StartsFind=ok
+[UI] scene bar/bar-ask-or-do
+[UI] clearTaskShowsDo=ok
+[UI] shot bar-guess-do.png
+[UI] clearTaskRunsOnEnter=ok
+[UI] questionAsks=ok
+[UI] middleAsksAndOffersDo=ok
+[UI] altEnterDoesTheOther=ok
+[UI] slashIsText=ok
 [UI] scene bar/bar-notices
 [UI] shot bar-notice-nokey.png
 [UI] noOpenRouterInBarCopy=ok
@@ -185,7 +180,7 @@
 [UI] menuFadesThenHides=ok
 [UI] shot bar-model-chip.png
 [UI] modelPinSentWithSubmit=ok
-[UI] modelChipUnderFind=ok
+[UI] backspaceTakesChipFirst=ok
 [UI] scene bar/window-menu
 [UI] windowMenuOpens=ok
 [UI] shot window-menu-open.png
@@ -218,13 +213,13 @@
 [UI] noDockUi=ok
 [UI] resizeZones=ok
 [UI] globFrameCost=ok
-[UI] globShapeMs=0.016
+[UI] globShapeMs=0.010
 [UI] shot 04a-glob-08.png
 [UI] shot 04b-glob-30.png
 [UI] shot 04c-glob-52.png
 [UI] shot 04d-glob-70.png
 [UI] shot 04e-glob-90.png
-[UI] globOpen ms=494 frames=28 longestFrameMs=33.4
+[UI] globOpen ms=499 frames=30 longestFrameMs=16.8
 [UI] globOpens=ok
 [UI] globSmooth=ok
 [UI] globReducedMotion=ok
@@ -332,13 +327,9 @@
 [UI] scene sheet/sheet-maximized
 [UI] shot sheet-maximized-1600.png
 [UI] readingMeasure640=ok
-[UI] scene sheet/find-empty
-[UI] shot find-empty.png
-[UI] findEmptyIsNotAList=ok
-[UI] findEmptyOffersNextSteps=ok
-[UI] scene sheet/find-results
-[UI] shot find-results.png
-[UI] findListboxArrows=ok
+[UI] scene sheet/sheet-task-just-answer
+[UI] shot sheet-task-just-answer.png
+[UI] justAnswerBeforeActing=ok
 [UI] scene sheet/sheet-task-running
 [UI] shot sheet-task-running.png
 [UI] runningTaskHasNoToggle=ok
@@ -387,6 +378,7 @@
 [UI] openFenceIsCode=ok
 [UI] scene sheet/sheet-done-actions
 [UI] shot sheet-done-copied.png
+[UI] shot sheet-done-do-instead.png
 [UI] doneOffersNextActions=ok
 [UI] scene sheet/sheet-two-turn-scrolled
 [UI] shot sheet-two-turn-scrolled.png
@@ -405,15 +397,6 @@
 [UI] scene sheet/sheet-fixed-height
 [UI] shot sheet-fixed-height.png
 [UI] fixedHeightStopsFollowing=ok
-[UI] scene sheet/find-reading
-[UI] shot find-reading.png
-[UI] findReadingOffersNothingYet=ok
-[UI] scene sheet/find-results-related
-[UI] shot find-results-related.png
-[UI] findMarksOffscreenRows=ok
-[UI] scene sheet/find-offline
-[UI] shot find-offline.png
-[UI] findOfflineOffersNoAsk=ok
 [UI] scene sheet/sheet-task-states
 [UI] shot sheet-task-planning.png
 [UI] shot sheet-task-plan-approval.png
@@ -492,7 +475,6 @@
 [UI] shot settings-page-providers.png
 [UI] shot settings-page-models.png
 [UI] shot settings-page-answers.png
-[UI] shot settings-page-find.png
 [UI] shot settings-page-agent.png
 [UI] shot settings-page-privacy.png
 [UI] shot settings-page-shortcuts.png
@@ -535,10 +517,10 @@
 [UI] scene settings/settings-combo-open
 [UI] menuIsTheSharedMenu=ok
 [UI] shot settings-combo-open.png
-[UI] scene settings/settings-find-choices
+[UI] scene settings/settings-permission-choices
 [UI] radiosRoveWithArrows=ok
 [UI] radiosOneTabStop=ok
-[UI] shot settings-find-choices.png
+[UI] shot settings-permission-choices.png
 [UI] scene settings/settings-delete-all
 [UI] deleteAllConfirmsInline=ok
 [UI] shot settings-delete-all.png
@@ -596,11 +578,19 @@
 [UI] voiceSettingsPage=ok
 [UI] voiceSettingsEngines=ok
 [UI] voiceSettingsSaves=ok
+[UI] shot voice-09-settings-wake.png
+[UI] voiceWakeOffByDefault=ok
+[UI] voiceWakeSaysMicOpen=ok
+[UI] voiceWakeSaves=ok
 [UI] scene voice/voice-settings-ts200
 [UI] shot voice-08-settings-engine-ts200.png
 [UI] voiceSettingsPage-ts200=ok
 [UI] voiceSettingsEngines-ts200=ok
 [UI] voiceSettingsSaves-ts200=ok
+[UI] shot voice-09-settings-wake-ts200.png
+[UI] voiceWakeOffByDefault-ts200=ok
+[UI] voiceWakeSaysMicOpen-ts200=ok
+[UI] voiceWakeSaves-ts200=ok
 [UI] scene polish/menu-bounds-bar
 [UI] menuInsideWindow.barIntent=ok
 [UI] pointerMenuNoRing=ok
@@ -666,28 +656,43 @@
 [UI] watch-card-done.sized=ok
 [UI] watch-card-done.drawn=ok
 [UI] watch-card-done.rows=ok
-[UI] watch-card-done.controls=ok
+[UI] watch-card-done.times=ok
+[UI] watch-card-done.parts=ok
 [UI] shot watch-card-done.png
 [UI] watchDetailOneLineAtRest=ok
+[UI] watchClicksGoThroughOffTheCard=ok
 [UI] watchHoverOpensTheMessage=ok
 [UI] shot watch-card-open.png
 [UI] watchRowOpensItsSession=ok
-[UI] watchCardFoldsAway=ok
+[UI] watchRightClickDismisses=ok
+[UI] watchCardLiftsAway=ok
 [UI] watchCardSaysHidden=ok
 [UI] scene watch/watch-card-needs-you
 [UI] watch-card-needs-you.ready=ok
 [UI] watch-card-needs-you.sized=ok
 [UI] watch-card-needs-you.drawn=ok
 [UI] watch-card-needs-you.rows=ok
-[UI] watch-card-needs-you.controls=ok
+[UI] watch-card-needs-you.times=ok
+[UI] watch-card-needs-you.parts=ok
 [UI] shot watch-card-needs-you.png
+[UI] scene watch/watch-card-tree
+[UI] watch-card-tree.ready=ok
+[UI] watch-card-tree.sized=ok
+[UI] watch-card-tree.drawn=ok
+[UI] watch-card-tree.rows=ok
+[UI] watch-card-tree.times=ok
+[UI] watch-card-tree.tone=ok
+[UI] watch-card-tree.parts=ok
+[UI] shot watch-card-tree.png
 [UI] scene watch/watch-card-offer
 [UI] watch-card-offer.ready=ok
 [UI] watch-card-offer.sized=ok
 [UI] watch-card-offer.drawn=ok
 [UI] watch-card-offer.rows=ok
-[UI] watch-card-offer.controls=ok
+[UI] watch-card-offer.times=ok
+[UI] watch-card-offer.parts=ok
 [UI] shot watch-card-offer.png
+[UI] watchOfferOpensSettings=ok
 [UI] scene watch/watch-settings
 [UI] shot watch-settings-agents.png
 [UI] watchSettingsPage=ok
@@ -749,28 +754,6 @@
 [UI] regionTextShortcutCapturing=ok
 [UI] regionTextShortcutSaves=ok
 [UI] shot region-text-shortcut-set.png
-[UI] scene find-act/find-act-rows
-[UI] shot find-act-rows.png
-[UI] findRowsSayTheAction=ok
-[UI] findActionWordIsQuiet=ok
-[UI] findRowEnterActs=ok
-[UI] findRowClickOnlyGoesThere=ok
-[UI] scene find-act/find-act-rows-ts200
-[UI] shot find-act-rows-ts200.png
-[UI] findRowsSayTheAction-ts200=ok
-[UI] findActionWordIsQuiet-ts200=ok
-[UI] findRowEnterActs-ts200=ok
-[UI] findRowClickOnlyGoesThere-ts200=ok
-[UI] scene find-act/find-act-menu
-[UI] shot find-act-menu.png
-[UI] findMenuRowsComeLast=ok
-[UI] scene find-act/find-act-gone
-[UI] findBarCountsMenus=ok
-[UI] findArrowsStep=ok
-[UI] findEnterActs=ok
-[UI] findGoneIsSaid=ok
-[UI] shot find-act-gone.png
-[UI] enterOutsideFindAsks=ok
 [UI] scene private-apps/private-apps-empty
 [UI] shot private-apps-empty.png
 [UI] privateAppsEmpty=ok
@@ -819,16 +802,16 @@
 [UI] shot 13-glob-clock-240-150.png
 [UI] shot 13-glob-clock-360-150.png
 [UI] globOnClock-150=ok
-[UI] scene capture/lens-hits-white-150
-[UI] lens-hits-white.ready-150=ok
-[UI] lens-hits-white.drawn-150=ok
-[UI] shot lens-hits-white-150.png
-[UI] lens-hits-white.whyCapsule-150=ok
-[UI] scene capture/lens-hits-dark-editor-150
-[UI] lens-hits-dark-editor.ready-150=ok
-[UI] lens-hits-dark-editor.drawn-150=ok
-[UI] shot lens-hits-dark-editor-150.png
-[UI] lens-hits-dark-editor.whyCapsule-150=ok
+[UI] scene capture/lens-frame-white-150
+[UI] lens-frame-white.ready-150=ok
+[UI] lens-frame-white.drawn-150=ok
+[UI] shot lens-frame-white-150.png
+[UI] lens-frame-white.frameOff-150=ok
+[UI] scene capture/lens-frame-dark-editor-150
+[UI] lens-frame-dark-editor.ready-150=ok
+[UI] lens-frame-dark-editor.drawn-150=ok
+[UI] shot lens-frame-dark-editor-150.png
+[UI] lens-frame-dark-editor.frameOff-150=ok
 [UI] scene capture/region-idle-white-150
 [UI] regionHint-150=ok
 [UI] regionRole-150=ok
@@ -874,14 +857,6 @@
 [UI] tour-step-3.closeInTextRow-150=ok
 [UI] tour-step-3.buttons-150=ok
 [UI] shot tour-step-3-150.png
-[UI] scene capture/tour-step-4-150
-[UI] tour-step-4.ready-150=ok
-[UI] tour-step-4.saidAtOnce-150=ok
-[UI] tour-step-4.concentric-150=ok
-[UI] tour-step-4.pipsRow-150=ok
-[UI] tour-step-4.closeInTextRow-150=ok
-[UI] tour-step-4.buttons-150=ok
-[UI] shot tour-step-4-150.png
 [UI] scene bar/bar-150
 [UI] shot 01-bar-first-run-150.png
 [UI] suggestionsBeforeFirst-150=ok
@@ -936,7 +911,7 @@
 [UI] tokenRestsAsGlyph-150=ok
 [UI] shot bar-token-rest-150.png
 [UI] tokenShowsChoice-150=ok
-[UI] shot bar-token-find-150.png
+[UI] shot bar-token-do-150.png
 [UI] shot bar-token-reply-150.png
 [UI] tokenSaysReplyWhileAsking-150=ok
 [UI] tokenSaysStartOnPlan-150=ok
@@ -945,16 +920,19 @@
 [UI] tokenRestsAsGlyph-150-ts200=ok
 [UI] shot bar-token-rest-150-ts200.png
 [UI] tokenShowsChoice-150-ts200=ok
-[UI] shot bar-token-find-150-ts200.png
+[UI] shot bar-token-do-150-ts200.png
 [UI] shot bar-token-reply-150-ts200.png
 [UI] tokenSaysReplyWhileAsking-150-ts200=ok
 [UI] tokenSaysStartOnPlan-150-ts200=ok
 [UI] shot bar-token-start-150-ts200.png
-[UI] scene bar/bar-find-keys-150
-[UI] plainWordIsNotFind-150=ok
-[UI] slashStartsFind-150=ok
-[UI] shot bar-find-keys-150.png
-[UI] ctrl2StartsFind-150=ok
+[UI] scene bar/bar-ask-or-do-150
+[UI] clearTaskShowsDo-150=ok
+[UI] shot bar-guess-do-150.png
+[UI] clearTaskRunsOnEnter-150=ok
+[UI] questionAsks-150=ok
+[UI] middleAsksAndOffersDo-150=ok
+[UI] altEnterDoesTheOther-150=ok
+[UI] slashIsText-150=ok
 [UI] scene bar/bar-notices-150
 [UI] shot bar-notice-nokey-150.png
 [UI] noOpenRouterInBarCopy-150=ok
@@ -984,7 +962,7 @@
 [UI] menuFadesThenHides-150=ok
 [UI] shot bar-model-chip-150.png
 [UI] modelPinSentWithSubmit-150=ok
-[UI] modelChipUnderFind-150=ok
+[UI] backspaceTakesChipFirst-150=ok
 [UI] scene bar/window-menu-150
 [UI] windowMenuOpens-150=ok
 [UI] shot window-menu-open-150.png
@@ -1021,7 +999,7 @@
 [UI] shot 04c-glob-52-150.png
 [UI] shot 04d-glob-70-150.png
 [UI] shot 04e-glob-90-150.png
-[UI] globOpen-150 ms=505 frames=28 longestFrameMs=33.3
+[UI] globOpen-150 ms=496 frames=30 longestFrameMs=16.7
 [UI] globOpens-150=ok
 [UI] globReducedMotion-150=ok
 [UI] scene sheet/multi-150
@@ -1123,13 +1101,9 @@
 [UI] scene sheet/sheet-maximized-150
 [UI] shot sheet-maximized-1600-150.png
 [UI] readingMeasure640-150=ok
-[UI] scene sheet/find-empty-150
-[UI] shot find-empty-150.png
-[UI] findEmptyIsNotAList-150=ok
-[UI] findEmptyOffersNextSteps-150=ok
-[UI] scene sheet/find-results-150
-[UI] shot find-results-150.png
-[UI] findListboxArrows-150=ok
+[UI] scene sheet/sheet-task-just-answer-150
+[UI] shot sheet-task-just-answer-150.png
+[UI] justAnswerBeforeActing-150=ok
 [UI] scene sheet/sheet-task-running-150
 [UI] shot sheet-task-running-150.png
 [UI] runningTaskHasNoToggle-150=ok
@@ -1169,6 +1143,7 @@
 [UI] openFenceIsCode-150=ok
 [UI] scene sheet/sheet-done-actions-150
 [UI] shot sheet-done-copied-150.png
+[UI] shot sheet-done-do-instead-150.png
 [UI] doneOffersNextActions-150=ok
 [UI] scene sheet/sheet-two-turn-scrolled-150
 [UI] shot sheet-two-turn-scrolled-150.png
@@ -1187,15 +1162,6 @@
 [UI] scene sheet/sheet-fixed-height-150
 [UI] shot sheet-fixed-height-150.png
 [UI] fixedHeightStopsFollowing-150=ok
-[UI] scene sheet/find-reading-150
-[UI] shot find-reading-150.png
-[UI] findReadingOffersNothingYet-150=ok
-[UI] scene sheet/find-results-related-150
-[UI] shot find-results-related-150.png
-[UI] findMarksOffscreenRows-150=ok
-[UI] scene sheet/find-offline-150
-[UI] shot find-offline-150.png
-[UI] findOfflineOffersNoAsk-150=ok
 [UI] scene sheet/sheet-task-states-150
 [UI] shot sheet-task-planning-150.png
 [UI] shot sheet-task-plan-approval-150.png
@@ -1272,7 +1238,6 @@
 [UI] shot settings-page-providers-150.png
 [UI] shot settings-page-models-150.png
 [UI] shot settings-page-answers-150.png
-[UI] shot settings-page-find-150.png
 [UI] shot settings-page-agent-150.png
 [UI] shot settings-page-privacy-150.png
 [UI] shot settings-page-shortcuts-150.png
@@ -1315,10 +1280,10 @@
 [UI] scene settings/settings-combo-open-150
 [UI] menuIsTheSharedMenu-150=ok
 [UI] shot settings-combo-open-150.png
-[UI] scene settings/settings-find-choices-150
+[UI] scene settings/settings-permission-choices-150
 [UI] radiosRoveWithArrows-150=ok
 [UI] radiosOneTabStop-150=ok
-[UI] shot settings-find-choices-150.png
+[UI] shot settings-permission-choices-150.png
 [UI] scene settings/settings-delete-all-150
 [UI] deleteAllConfirmsInline-150=ok
 [UI] shot settings-delete-all-150.png
@@ -1376,11 +1341,19 @@
 [UI] voiceSettingsPage-150=ok
 [UI] voiceSettingsEngines-150=ok
 [UI] voiceSettingsSaves-150=ok
+[UI] shot voice-09-settings-wake-150.png
+[UI] voiceWakeOffByDefault-150=ok
+[UI] voiceWakeSaysMicOpen-150=ok
+[UI] voiceWakeSaves-150=ok
 [UI] scene voice/voice-settings-150-ts200
 [UI] shot voice-08-settings-engine-150-ts200.png
 [UI] voiceSettingsPage-150-ts200=ok
 [UI] voiceSettingsEngines-150-ts200=ok
 [UI] voiceSettingsSaves-150-ts200=ok
+[UI] shot voice-09-settings-wake-150-ts200.png
+[UI] voiceWakeOffByDefault-150-ts200=ok
+[UI] voiceWakeSaysMicOpen-150-ts200=ok
+[UI] voiceWakeSaves-150-ts200=ok
 [UI] scene polish/menu-bounds-bar-150
 [UI] menuInsideWindow.barIntent-150=ok
 [UI] pointerMenuNoRing-150=ok
@@ -1446,28 +1419,43 @@
 [UI] watch-card-done.sized-150=ok
 [UI] watch-card-done.drawn-150=ok
 [UI] watch-card-done.rows-150=ok
-[UI] watch-card-done.controls-150=ok
+[UI] watch-card-done.times-150=ok
+[UI] watch-card-done.parts-150=ok
 [UI] shot watch-card-done-150.png
 [UI] watchDetailOneLineAtRest-150=ok
+[UI] watchClicksGoThroughOffTheCard-150=ok
 [UI] watchHoverOpensTheMessage-150=ok
 [UI] shot watch-card-open-150.png
 [UI] watchRowOpensItsSession-150=ok
-[UI] watchCardFoldsAway-150=ok
+[UI] watchRightClickDismisses-150=ok
+[UI] watchCardLiftsAway-150=ok
 [UI] watchCardSaysHidden-150=ok
 [UI] scene watch/watch-card-needs-you-150
 [UI] watch-card-needs-you.ready-150=ok
 [UI] watch-card-needs-you.sized-150=ok
 [UI] watch-card-needs-you.drawn-150=ok
 [UI] watch-card-needs-you.rows-150=ok
-[UI] watch-card-needs-you.controls-150=ok
+[UI] watch-card-needs-you.times-150=ok
+[UI] watch-card-needs-you.parts-150=ok
 [UI] shot watch-card-needs-you-150.png
+[UI] scene watch/watch-card-tree-150
+[UI] watch-card-tree.ready-150=ok
+[UI] watch-card-tree.sized-150=ok
+[UI] watch-card-tree.drawn-150=ok
+[UI] watch-card-tree.rows-150=ok
+[UI] watch-card-tree.times-150=ok
+[UI] watch-card-tree.tone-150=ok
+[UI] watch-card-tree.parts-150=ok
+[UI] shot watch-card-tree-150.png
 [UI] scene watch/watch-card-offer-150
 [UI] watch-card-offer.ready-150=ok
 [UI] watch-card-offer.sized-150=ok
 [UI] watch-card-offer.drawn-150=ok
 [UI] watch-card-offer.rows-150=ok
-[UI] watch-card-offer.controls-150=ok
+[UI] watch-card-offer.times-150=ok
+[UI] watch-card-offer.parts-150=ok
 [UI] shot watch-card-offer-150.png
+[UI] watchOfferOpensSettings-150=ok
 [UI] scene watch/watch-settings-150
 [UI] shot watch-settings-agents-150.png
 [UI] watchSettingsPage-150=ok
@@ -1529,28 +1517,6 @@
 [UI] regionTextShortcutCapturing-150=ok
 [UI] regionTextShortcutSaves-150=ok
 [UI] shot region-text-shortcut-set-150.png
-[UI] scene find-act/find-act-rows-150
-[UI] shot find-act-rows-150.png
-[UI] findRowsSayTheAction-150=ok
-[UI] findActionWordIsQuiet-150=ok
-[UI] findRowEnterActs-150=ok
-[UI] findRowClickOnlyGoesThere-150=ok
-[UI] scene find-act/find-act-rows-150-ts200
-[UI] shot find-act-rows-150-ts200.png
-[UI] findRowsSayTheAction-150-ts200=ok
-[UI] findActionWordIsQuiet-150-ts200=ok
-[UI] findRowEnterActs-150-ts200=ok
-[UI] findRowClickOnlyGoesThere-150-ts200=ok
-[UI] scene find-act/find-act-menu-150
-[UI] shot find-act-menu-150.png
-[UI] findMenuRowsComeLast-150=ok
-[UI] scene find-act/find-act-gone-150
-[UI] findBarCountsMenus-150=ok
-[UI] findArrowsStep-150=ok
-[UI] findEnterActs-150=ok
-[UI] findGoneIsSaid-150=ok
-[UI] shot find-act-gone-150.png
-[UI] enterOutsideFindAsks-150=ok
 [UI] scene private-apps/private-apps-empty-150
 [UI] shot private-apps-empty-150.png
 [UI] privateAppsEmpty-150=ok
@@ -1590,17 +1556,16 @@
 [UI] lane harness sceneRuns=8
 [UI] lane platform sceneRuns=0
 [UI] lane windows sceneRuns=0
-[UI] lane capture sceneRuns=22
+[UI] lane capture sceneRuns=20
 [UI] lane llm sceneRuns=0
 [UI] lane agent sceneRuns=0
 [UI] lane bar sceneRuns=49
-[UI] lane sheet sceneRuns=95
+[UI] lane sheet sceneRuns=87
 [UI] lane settings sceneRuns=68
 [UI] lane voice sceneRuns=8
 [UI] lane polish sceneRuns=28
-[UI] lane watch sceneRuns=10
+[UI] lane watch sceneRuns=12
 [UI] lane regionText sceneRuns=14
-[UI] lane find-act sceneRuns=8
 [UI] lane private-apps sceneRuns=16
 [UI] sheetCssLint=ok
 [UI] markdownNeverInjects=ok
@@ -1610,11 +1575,12 @@
 [UI] iconsFromSprite=ok
 [UI] voicePillOnlyListens=ok
 [UI] watchCardNeedsNoFocus=ok
+[UI] watchNotificationIsGlass=ok
 [UI] regionNoteOnlyReports=ok
 [UI] regionNoteKeepsNothing=ok
 [UI] privateLineIsWrittenOnce=ok
-[UI] axe audits=162 ms=16962
+[UI] axe audits=155 ms=12984
 [UI] axeClean=ok
 [UI] axeAllowListFresh=ok
 [UI] noPageErrors=ok
-[UI] done failed=0 shots=488
+[UI] done failed=0 shots=476
