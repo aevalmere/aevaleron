@@ -329,9 +329,286 @@ fn start_fixture(path: PathBuf) -> Result<Recorder, String> {
     })
 }
 
+// ---------------------------------------------------------------- listening
+
+/// A fixed ring of mono samples. The microphone's callback writes into it
+/// and never allocates; the listener reads what is new. Old sound is
+/// overwritten, so at most [`RING_SECONDS`] of it is ever held.
+pub struct Ring {
+    buf: Box<[f32]>,
+    /// Samples written since the start.
+    written: u64,
+}
+
+/// What the ring holds: enough for a listener that wakes every few tens of
+/// milliseconds to miss nothing, even on a busy PC.
+pub const RING_SECONDS: u32 = 2;
+
+impl Ring {
+    pub fn new(rate: u32) -> Ring {
+        let len = (rate * RING_SECONDS).max(1) as usize;
+        Ring {
+            buf: vec![0.0; len].into_boxed_slice(),
+            written: 0,
+        }
+    }
+
+    fn put(&mut self, sample: f32) {
+        let at = (self.written % self.buf.len() as u64) as usize;
+        self.buf[at] = sample;
+        self.written += 1;
+    }
+
+    /// Writes interleaved frames as mono.
+    pub fn write(&mut self, interleaved: impl Iterator<Item = f32>, channels: usize) {
+        let channels = channels.max(1);
+        let mut sum = 0.0;
+        let mut n = 0;
+        for s in interleaved {
+            sum += s;
+            n += 1;
+            if n == channels {
+                self.put(sum / channels as f32);
+                sum = 0.0;
+                n = 0;
+            }
+        }
+    }
+
+    pub fn written(&self) -> u64 {
+        self.written
+    }
+
+    /// Copies whole frames of `frame` samples written since `cursor` into
+    /// `out` (cleared first, its room kept) and moves the cursor past them.
+    /// Sound the ring no longer holds is skipped.
+    pub fn read(&self, cursor: &mut u64, frame: usize, out: &mut Vec<f32>) {
+        out.clear();
+        let len = self.buf.len() as u64;
+        if self.written.saturating_sub(*cursor) > len {
+            *cursor = self.written - len;
+        }
+        let frame = frame.max(1) as u64;
+        let whole = (self.written.saturating_sub(*cursor) / frame) * frame;
+        for i in *cursor..*cursor + whole {
+            out.push(self.buf[(i % len) as usize]);
+        }
+        *cursor += whole;
+    }
+}
+
+pub type SharedRing = Arc<Mutex<Ring>>;
+
+/// Where listening reads from: the microphone, or (in the smoke run) sound
+/// put in a queue, spoken in real time ([`listen_queue`]).
+pub struct Listen {
+    pub ring: SharedRing,
+    pub rate: u32,
+    /// Set when the device fails (unplugged, taken away).
+    broken: Arc<std::sync::atomic::AtomicBool>,
+    /// Bumped by each callback: no change for a while is a stream that
+    /// stopped without saying so (after the PC slept).
+    beats: Arc<AtomicU32>,
+    stop: Option<mpsc::Sender<()>>,
+}
+
+impl Listen {
+    pub fn broken(&self) -> bool {
+        self.broken.load(Ordering::Relaxed)
+    }
+
+    pub fn beats(&self) -> u32 {
+        self.beats.load(Ordering::Relaxed)
+    }
+}
+
+impl Drop for Listen {
+    // The sender going ends the thread that owns the stream.
+    fn drop(&mut self) {
+        self.stop.take();
+    }
+}
+
+/// Opens the named microphone (empty: the Windows default) for listening.
+/// The stream lives on a thread of its own, as cpal needs; its callback
+/// only writes into the ring.
+pub fn listen(device: &str) -> Result<Listen, String> {
+    let (ready_tx, ready_rx) = mpsc::sync_channel::<Result<(SharedRing, u32), String>>(1);
+    let (stop_tx, stop_rx) = mpsc::channel::<()>();
+    let broken = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let beats = Arc::new(AtomicU32::new(0));
+    let (b, n) = (broken.clone(), beats.clone());
+    let device = device.to_string();
+    thread::Builder::new()
+        .name("voice-listen-mic".into())
+        .spawn(move || match open_ring(&device, b, n) {
+            Ok((stream, ring, rate)) => {
+                let _ = ready_tx.send(Ok((ring, rate)));
+                let _ = stop_rx.recv();
+                drop(stream);
+            }
+            Err(e) => {
+                let _ = ready_tx.send(Err(e));
+            }
+        })
+        .map_err(|e| format!("The microphone did not start ({e})."))?;
+    match ready_rx.recv_timeout(Duration::from_secs(5)) {
+        Ok(Ok((ring, rate))) => Ok(Listen {
+            ring,
+            rate,
+            broken,
+            beats,
+            stop: Some(stop_tx),
+        }),
+        Ok(Err(e)) => Err(e),
+        Err(_) => Err("The microphone did not start in time.".into()),
+    }
+}
+
+/// A test source at 16 kHz: what is put in `queue`, then silence, 20 ms at
+/// a time, as a microphone would deliver it.
+pub fn listen_queue(queue: Arc<Mutex<std::collections::VecDeque<f32>>>) -> Listen {
+    let ring: SharedRing = Arc::new(Mutex::new(Ring::new(wav::RATE)));
+    let (stop_tx, stop_rx) = mpsc::channel::<()>();
+    let beats = Arc::new(AtomicU32::new(0));
+    let (r, q, n) = (ring.clone(), queue, beats.clone());
+    let _ = thread::Builder::new()
+        .name("voice-listen-test".into())
+        .spawn(move || {
+            let step = (wav::RATE / 50) as usize;
+            let began = Instant::now();
+            let mut sent: u64 = 0;
+            while let Err(mpsc::RecvTimeoutError::Timeout) =
+                stop_rx.recv_timeout(Duration::from_millis(10))
+            {
+                // Keeps to real time however late this thread wakes.
+                let due = began.elapsed().as_millis() as u64 / 20;
+                while sent < due {
+                    let mut queued = q.lock();
+                    let take = queued.len().min(step);
+                    let mut ring = r.lock();
+                    for s in queued.drain(..take) {
+                        ring.put(s);
+                    }
+                    for _ in take..step {
+                        ring.put(0.0);
+                    }
+                    sent += 1;
+                }
+                n.fetch_add(1, Ordering::Relaxed);
+            }
+        });
+    Listen {
+        ring,
+        rate: wav::RATE,
+        broken: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+        beats,
+        stop: Some(stop_tx),
+    }
+}
+
+type Opened = (cpal::Stream, SharedRing, u32);
+
+fn open_ring(
+    device: &str,
+    broken: Arc<std::sync::atomic::AtomicBool>,
+    beats: Arc<AtomicU32>,
+) -> Result<Opened, String> {
+    let host = cpal::default_host();
+    let named = || {
+        host.input_devices()
+            .ok()?
+            .find(|d| d.name().ok().as_deref() == Some(device))
+    };
+    let dev = if device.is_empty() { None } else { named() };
+    let dev = dev.or_else(|| host.default_input_device()).ok_or(NO_MIC)?;
+    let cfg = dev.default_input_config().map_err(mic_error)?;
+    let channels = cfg.channels() as usize;
+    let rate = cfg.sample_rate().0;
+    let sc: cpal::StreamConfig = cfg.config();
+    let ring: SharedRing = Arc::new(Mutex::new(Ring::new(rate)));
+    let on_err = move |_e: cpal::StreamError| broken.store(true, Ordering::Relaxed);
+    let (r1, r2, r3) = (ring.clone(), ring.clone(), ring.clone());
+    let (n1, n2, n3) = (beats.clone(), beats.clone(), beats);
+    let stream = match cfg.sample_format() {
+        cpal::SampleFormat::F32 => dev.build_input_stream(
+            &sc,
+            move |d: &[f32], _: &cpal::InputCallbackInfo| {
+                r1.lock().write(d.iter().copied(), channels);
+                n1.fetch_add(1, Ordering::Relaxed);
+            },
+            on_err,
+            None,
+        ),
+        cpal::SampleFormat::I16 => dev.build_input_stream(
+            &sc,
+            move |d: &[i16], _: &cpal::InputCallbackInfo| {
+                let it = d.iter().map(|s| *s as f32 / 32768.0);
+                r2.lock().write(it, channels);
+                n2.fetch_add(1, Ordering::Relaxed);
+            },
+            on_err,
+            None,
+        ),
+        cpal::SampleFormat::U16 => dev.build_input_stream(
+            &sc,
+            move |d: &[u16], _: &cpal::InputCallbackInfo| {
+                let it = d.iter().map(|s| (*s as f32 - 32768.0) / 32768.0);
+                r3.lock().write(it, channels);
+                n3.fetch_add(1, Ordering::Relaxed);
+            },
+            on_err,
+            None,
+        ),
+        other => {
+            return Err(format!(
+                "The microphone sends {other:?} audio, which is not supported."
+            ))
+        }
+    }
+    .map_err(mic_error)?;
+    stream.play().map_err(mic_error)?;
+    Ok((stream, ring, rate))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_ring_keeps_the_newest_sound_in_whole_frames() {
+        let mut r = Ring::new(4); // 8 samples
+        r.write([1.0, 3.0, 5.0, 7.0].into_iter(), 2);
+        assert_eq!(r.written(), 2);
+        let mut out = Vec::with_capacity(8);
+        let mut cursor = 0;
+        r.read(&mut cursor, 1, &mut out);
+        assert_eq!((out.as_slice(), cursor), (&[2.0, 6.0][..], 2));
+        // Ten more: the first two of them are gone by the time it is read.
+        r.write((0..10).map(|i| i as f32), 1);
+        r.read(&mut cursor, 3, &mut out);
+        assert_eq!(out, vec![2.0, 3.0, 4.0, 5.0, 6.0, 7.0]);
+        assert_eq!(cursor, 10);
+        // Less than a frame waits for the rest.
+        r.read(&mut cursor, 3, &mut out);
+        assert_eq!((out.len(), cursor), (0, 10));
+        assert!(out.capacity() >= 8, "the buffer is reused");
+    }
+
+    #[test]
+    fn a_test_source_speaks_then_goes_quiet() {
+        let q = Arc::new(Mutex::new(std::collections::VecDeque::new()));
+        q.lock().extend([0.5f32; 3200]);
+        let l = listen_queue(q);
+        thread::sleep(Duration::from_millis(400));
+        let mut out = Vec::new();
+        let mut cursor = 0;
+        l.ring.lock().read(&mut cursor, 320, &mut out);
+        assert!(out.len() >= 3200, "{}", out.len());
+        assert!(out[..3200].iter().all(|s| *s == 0.5));
+        assert!(out[3200..].iter().all(|s| *s == 0.0));
+        assert!(l.beats() > 0 && !l.broken());
+    }
 
     #[test]
     fn a_fixture_records_like_a_microphone() {

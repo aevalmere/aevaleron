@@ -8,6 +8,9 @@
 //! into the app that has the focus. Every utterance's stage timings are
 //! kept for the speed probe ([`last_timings`]). Nothing is written to disk
 //! and nothing outlives the utterance.
+//!
+//! Listening for the name (`wake`) is the third way in: off until the person
+//! turns it on, it gives way to the other two.
 
 pub mod capture;
 pub mod cleanup;
@@ -15,16 +18,18 @@ pub mod engine;
 pub mod gemini;
 pub mod insert;
 pub mod ipc;
+pub mod keyword;
 pub mod model;
 pub mod pill;
 pub mod ptt;
 pub mod settings;
 pub mod stream;
 pub mod vad;
+pub mod wake;
 pub mod wav;
 pub mod whisper;
 
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -119,6 +124,38 @@ static GENERATION: AtomicU64 = AtomicU64::new(0);
 
 pub fn generation() -> u64 {
     GENERATION.load(Ordering::SeqCst)
+}
+
+/// Takes the pill for listening's own input: a hide that an earlier
+/// utterance asked for no longer applies. Only while nothing else records
+/// or is being written down ([`busy`]), so no work is cut short.
+pub fn claim_pill() -> u64 {
+    GENERATION.fetch_add(1, Ordering::SeqCst) + 1
+}
+
+/// Utterances from the bar or hold-to-talk being written down now.
+static WRITING: AtomicUsize = AtomicUsize::new(0);
+
+/// Counts one utterance being written down while it lives.
+struct Writing;
+
+impl Writing {
+    fn new() -> Writing {
+        WRITING.fetch_add(1, Ordering::SeqCst);
+        Writing
+    }
+}
+
+impl Drop for Writing {
+    fn drop(&mut self) {
+        WRITING.fetch_sub(1, Ordering::SeqCst);
+    }
+}
+
+/// Whether the bar's mic or hold-to-talk is recording or still writing
+/// down: listening for the name stands aside meanwhile.
+pub fn busy() -> bool {
+    recording(None) || WRITING.load(Ordering::SeqCst) > 0
 }
 
 fn moved(since: u64) -> bool {
@@ -265,7 +302,9 @@ pub fn finish(app: &AppHandle, origin: Origin) {
     let released = Instant::now();
     emit_state(app, origin, "working", json!({}));
     let app = app.clone();
+    let writing = Writing::new();
     tauri::async_runtime::spawn(async move {
+        let _writing = writing;
         let Live {
             recorder, streamer, ..
         } = live;
@@ -498,11 +537,12 @@ fn on_ptt(app: &AppHandle, e: ptt::Event) {
 /// dictation is on, so the first words after a quiet spell are as quick as
 /// any; the quantized model fetched in place of an earlier build's.
 pub fn refresh(s: &settings::VoiceSettings) {
-    whisper::pin(s.dictation);
-    if s.dictation {
+    whisper::pin(s.dictation || s.wake);
+    if s.dictation || s.wake {
         engine::warm(s);
     }
     engine::upgrade(s);
+    wake::apply(s);
 }
 
 /// Called once from the app's setup: the dictation hook, the pill and the
@@ -516,6 +556,7 @@ pub fn setup(app: &AppHandle) {
     if s.dictation {
         pill::prepare(app);
     }
+    wake::init(app);
     refresh(&s);
 }
 

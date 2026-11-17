@@ -105,9 +105,150 @@ pub fn last_pause(samples: &[f32], min_speech: usize, min_pause: usize) -> Optio
     best
 }
 
+/// The gate's noise floor never goes below this (about -70 dBFS): a
+/// digitally silent input would otherwise make any click speech.
+const GATE_FLOOR_MIN: f32 = 0.000_3;
+/// A frame is loud at this many times the floor (about 10 dB), and never
+/// below [`ABS_FLOOR`].
+const GATE_OVER: f32 = 3.2;
+/// How fast the floor rises toward a louder room, per frame: quickly while
+/// nobody speaks (a fan coming on is the floor within a few seconds), very
+/// slowly while someone does (steady music or noise becomes the floor in
+/// about ten seconds, so it does not count as speech for ever; real speech
+/// dips between syllables, and a quieter frame pulls the floor down at once).
+const RISE_QUIET: f32 = 0.02;
+const RISE_SPEAKING: f32 = 0.000_8;
+/// Speech goes on through this many quiet frames (200 ms): the gaps between
+/// words.
+const HANG: u32 = 10;
+
+/// Speech or not, a frame at a time, as the sound arrives: the listening
+/// for the name (`voice::wake`), where there is no whole recording to look
+/// at. An energy gate against a noise floor that follows the room, with
+/// [`MIN_RUN`] loud frames to start and [`HANG`] quiet ones to stop. It
+/// keeps three numbers and allocates nothing.
+#[derive(Clone, Debug)]
+pub struct Gate {
+    floor: f32,
+    loud_run: u32,
+    quiet_run: u32,
+    speaking: bool,
+}
+
+impl Default for Gate {
+    fn default() -> Self {
+        Gate {
+            floor: ABS_FLOOR / GATE_OVER,
+            loud_run: 0,
+            quiet_run: u32::MAX / 2,
+            speaking: false,
+        }
+    }
+}
+
+impl Gate {
+    /// Takes one 20 ms frame's loudness ([`wav::rms`]) and says whether it
+    /// is loud enough to be speech.
+    pub fn push(&mut self, rms: f32) -> bool {
+        let threshold = (self.floor * GATE_OVER).max(ABS_FLOOR);
+        let loud = rms > threshold;
+        if rms < self.floor {
+            self.floor = rms.max(GATE_FLOOR_MIN);
+        } else {
+            let rise = if self.speaking {
+                RISE_SPEAKING
+            } else {
+                RISE_QUIET
+            };
+            self.floor += (rms - self.floor) * rise;
+        }
+        if loud {
+            self.loud_run += 1;
+            self.quiet_run = 0;
+            if self.loud_run >= MIN_RUN as u32 {
+                self.speaking = true;
+            }
+        } else {
+            self.loud_run = 0;
+            self.quiet_run = self.quiet_run.saturating_add(1);
+            if self.quiet_run >= HANG {
+                self.speaking = false;
+            }
+        }
+        loud
+    }
+
+    /// Someone is speaking: [`MIN_RUN`] loud frames, and less than [`HANG`]
+    /// quiet ones since.
+    pub fn speaking(&self) -> bool {
+        self.speaking
+    }
+
+    /// Quiet frames in a row up to now.
+    pub fn quiet(&self) -> u32 {
+        self.quiet_run
+    }
+
+    /// Loud frames in a row up to now.
+    pub fn loud(&self) -> u32 {
+        self.loud_run
+    }
+
+    /// Forgets the speech, keeps the floor: after a pause in listening.
+    pub fn settle(&mut self) {
+        self.loud_run = 0;
+        self.quiet_run = u32::MAX / 2;
+        self.speaking = false;
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_gate_hears_speech_and_learns_the_room() {
+        let mut g = Gate::default();
+        // A quiet room: nothing.
+        for _ in 0..100 {
+            assert!(!g.push(0.0008));
+        }
+        assert!(!g.speaking());
+        // A click is not speech.
+        g.push(0.2);
+        g.push(0.0008);
+        assert!(!g.speaking());
+        // Speech: three loud frames start it.
+        for _ in 0..3 {
+            g.push(0.05);
+        }
+        assert!(g.speaking());
+        // The gaps between words do not end it; a fifth of a second does.
+        for _ in 0..(HANG - 1) {
+            g.push(0.0008);
+        }
+        assert!(g.speaking());
+        g.push(0.0008);
+        assert!(!g.speaking());
+        assert_eq!(g.quiet(), HANG);
+        // A fan comes on and stays: after a few seconds it is the room.
+        let mut loud_at_end = true;
+        for _ in 0..600 {
+            loud_at_end = g.push(0.02);
+        }
+        assert!(!loud_at_end && !g.speaking(), "{g:?}");
+        // Speech over the fan still counts.
+        for _ in 0..3 {
+            g.push(0.2);
+        }
+        assert!(g.speaking());
+        // A digital silence does not make a hiss speech.
+        let mut s = Gate::default();
+        for _ in 0..50 {
+            s.push(0.0);
+        }
+        assert!(!s.push(0.002));
+    }
 
     /// `parts` of (seconds, loud): a tone for speech, faint noise for silence.
     fn clip(parts: &[(f32, bool)]) -> Vec<f32> {

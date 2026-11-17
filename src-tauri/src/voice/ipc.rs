@@ -31,7 +31,12 @@ pub async fn route(
             json!({ "ok": true })
         }
         "voice:get" => snapshot().await,
-        "voice:set" => set(p),
+        "voice:set" => {
+            let out = set(p);
+            // The tray's switch for listening follows.
+            crate::tray::refresh(app);
+            out
+        }
         "voice:download" => download(app).await,
         "voice:capture-hotkey" => {
             ptt::set_paused(p.get("on").and_then(Value::as_bool).unwrap_or(false));
@@ -91,6 +96,7 @@ async fn snapshot() -> Value {
         "lastTimings": super::last_timings(),
         "gemini": gemini::available(),
         "cpuOk": whisper::cpu_ok(),
+        "wake": super::wake::status_json(),
     })
 }
 

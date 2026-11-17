@@ -257,17 +257,40 @@
                 </div>
               </div>
             </section>
+            <!-- wake lane: listening for the name (voice::wake). -->
+            <section class="row" id="sec-voice-wake">
+              <div class="row-head">
+                <h2 id="voice-wake-heading">Listen for a name</h2>
+                <span id="voice-wake-summary" class="summary">Off</span>
+                <button class="edit" type="button" aria-expanded="false" aria-controls="sec-voice-wake-body" aria-labelledby="voice-wake-heading voice-wake-summary"><span class="ico i-chevron" aria-hidden="true"></span></button>
+              </div>
+              <div class="body" id="sec-voice-wake-body">
+                <div class="body-in">
+                  <label class="switch">
+                    <span id="voice-wake-label">Start when I say Aevaleron</span>
+                    <input id="voice-wake" type="checkbox" role="switch" />
+                  </label>
+                  <p class="note">Say the name, then what you want, and stop talking: it is sent as if you typed it and pressed Enter. While this is on, the microphone stays open and a red dot shows on the tray icon. Nothing is saved or sent while it waits: the last two seconds of sound are kept in memory only, and a short check on this PC listens for the name when someone speaks.</p>
+                  <label class="field-label" for="voice-wake-word">The name to listen for</label>
+                  <div class="field-row">
+                    <input id="voice-wake-word" class="field" type="text" placeholder="Aevaleron" autocomplete="off" spellcheck="false" maxlength="32" />
+                    <button id="voice-wake-save" type="button" class="g-btn">Save</button>
+                  </div>
+                  <p id="voice-wake-status" class="status" role="status" hidden></p>
+                </div>
+              </div>
+            </section>
             <section class="row" id="sec-voice-engine">
               <div class="row-head">
                 <h2 id="voice-engine-heading">Transcription</h2>
-                <span id="voice-engine-summary" class="summary">Parakeet 110M</span>
+                <span id="voice-engine-summary" class="summary">Whisper base</span>
                 <button class="edit" type="button" aria-expanded="false" aria-controls="sec-voice-engine-body" aria-labelledby="voice-engine-heading voice-engine-summary"><span class="ico i-chevron" aria-hidden="true"></span></button>
               </div>
               <div class="body" id="sec-voice-engine-body">
                 <div class="body-in">
                   <div class="choice" role="radiogroup" aria-labelledby="voice-engine-heading" id="voice-engines">
+                    <button type="button" class="choice-option" role="radio" data-voice-engine="whisper-base">Whisper base<span class="choice-note">On this PC. The default: every language, with fuller punctuation.</span></button>
                     <button type="button" class="choice-option" role="radio" data-voice-engine="parakeet-110m">Parakeet 110M<span class="choice-note">On this PC. Fastest. English, with plainer punctuation.</span></button>
-                    <button type="button" class="choice-option" role="radio" data-voice-engine="whisper-base">Whisper base<span class="choice-note">On this PC. Slower, with fuller punctuation.</span></button>
                     <button type="button" class="choice-option" role="radio" data-voice-engine="whisper-tiny">Whisper tiny<span class="choice-note">On this PC. Small download, gets more words wrong.</span></button>
                     <button type="button" class="choice-option" role="radio" data-voice-engine="whisper-small">Whisper small<span class="choice-note">On this PC. More accurate than base, slower on older PCs.</span></button>
                     <button type="button" class="choice-option" role="radio" data-voice-engine="parakeet-0.6b">Parakeet 0.6B<span class="choice-note">On this PC. Best text. Large download, slower without a strong processor.</span></button>

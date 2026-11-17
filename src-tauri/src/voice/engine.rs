@@ -1,6 +1,6 @@
-//! Turns a recording into text with the engine Settings chose: Parakeet on
-//! this PC (the default, free and offline), Whisper on this PC, or Gemini
-//! with the person's key.
+//! Turns a recording into text with the engine Settings chose: Whisper on
+//! this PC (base, the default, free and offline), Parakeet on this PC, or
+//! Gemini with the person's key.
 
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -97,10 +97,13 @@ pub fn upgrade(s: &VoiceSettings) {
         return;
     }
     if model::usable(m).is_none() {
-        // Nothing of this model is here. With dictation on, or a model from
-        // before on disk (voice is in use), it is fetched now and not at the
-        // first words. The smoke run fetches what its probes ask for.
-        let wanted = s.dictation || spare(s).is_some();
+        // Nothing of this model is here. With dictation or listening for
+        // the name on, or a model from before on disk (voice is in use), it
+        // is fetched now and not at the first words. That is the chosen
+        // engine's model only: a model that stands in is never deleted, and
+        // nothing else is fetched. The smoke run fetches what its probes ask
+        // for.
+        let wanted = s.dictation || s.wake || spare(s).is_some();
         if wanted && !crate::selftest::smoke_enabled() {
             fetch(s);
         }
@@ -144,7 +147,7 @@ pub fn fetch(s: &VoiceSettings) {
         }
         let now = settings::get();
         let chosen = spec(&now).is_some_and(|x| x.id == m.id);
-        if chosen && now.dictation && whisper::cpu_ok() {
+        if chosen && (now.dictation || now.wake) && whisper::cpu_ok() {
             let new = model::path(m);
             let load = tauri::async_runtime::spawn_blocking(move || {
                 if whisper::preload(&new) {
@@ -173,7 +176,7 @@ pub fn tune_soon(path: PathBuf) {
         return;
     }
     std::thread::spawn(move || {
-        let busy = || super::recording(None);
+        let busy = || super::busy() || super::wake::working();
         for _ in 0..TUNE_TRIES {
             std::thread::sleep(TUNE_WAIT);
             if busy() {
@@ -286,13 +289,18 @@ mod tests {
 
     #[test]
     fn english_is_heard_by_what_is_on_disk_until_the_chosen_model_arrives() {
-        // The default engine is not here yet: Whisper's base model from an
-        // earlier build is the first one asked for.
+        // Parakeet chosen and not here yet: Whisper's base model is the
+        // first one asked for.
         let for_parakeet = ids(model::parakeet(), "en");
         assert_eq!(for_parakeet[0], "base.en");
         assert!(!for_parakeet.contains(&"parakeet-110m"));
         assert!(for_parakeet.contains(&"base"), "{for_parakeet:?}");
-        // The other way round, Parakeet stands in for a Whisper model.
+        // The default engine, Whisper base, not here yet: Parakeet, which
+        // the builds before this one fetched as their default, hears it.
+        let for_base = ids(model::spec_for("base", "en"), "en");
+        assert_eq!(for_base[0], "parakeet-110m");
+        assert!(!for_base.contains(&"base.en"));
+        // Parakeet stands in for the other Whisper models too.
         let for_small = ids(model::spec_for("small", "en"), "en");
         assert_eq!(for_small[0], "parakeet-110m");
         assert!(!for_small.contains(&"small.en"));

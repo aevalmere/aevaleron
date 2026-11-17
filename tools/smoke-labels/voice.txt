@@ -16,3 +16,11 @@ voiceSpeedWhisper
 voiceSpare
 voiceSpareFetch
 voiceTuned
+voiceWakeListens
+voiceWakeIdle
+voiceWakeOneBreath
+voiceWakePause
+voiceWakeIgnores
+voiceWakeBare
+voiceWakeYields
+voiceWakeOff

@@ -15,7 +15,7 @@ use base64::Engine;
 use parking_lot::Mutex;
 use serde_json::{Map, Value};
 use tauri::image::Image;
-use tauri::menu::{IsMenuItem, Menu, MenuItem, PredefinedMenuItem};
+use tauri::menu::{CheckMenuItem, IsMenuItem, Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{AppHandle, Wry};
 use windows_sys::Win32::UI::Input::KeyboardAndMouse::GetDoubleClickTime;
@@ -81,6 +81,8 @@ pub struct Item {
     /// Shown beside the label, never registered (TRAY-04).
     pub accelerator: Option<String>,
     pub enabled: bool,
+    /// A row with a check mark, on or off (wake lane); None for a plain row.
+    pub checked: Option<bool>,
 }
 
 impl Item {
@@ -90,6 +92,7 @@ impl Item {
             label: label.into(),
             accelerator: accelerator.filter(|a| !a.is_empty()),
             enabled: true,
+            checked: None,
         }
     }
 
@@ -301,6 +304,7 @@ enum Change {
     Rows,
     Text(usize, String),
     Enabled(usize, bool),
+    Checked(usize, bool),
 }
 
 /// The edits that turn `old` into `new`; none for a row that is the same.
@@ -316,6 +320,9 @@ fn diff(old: &[Item], new: &[Item]) -> Vec<Change> {
         }
         if a.enabled != b.enabled {
             out.push(Change::Enabled(i, b.enabled));
+        }
+        if a.checked != b.checked {
+            out.push(Change::Checked(i, b.checked.unwrap_or(false)));
         }
     }
     out
@@ -379,16 +386,26 @@ fn snapshot(app: &AppHandle) -> (Vec<Item>, String, Vec<String>) {
         now: crate::state::now_ms(),
     };
     let (rows, more) = crate::agents::tray_rows();
+    // wake lane: the switch for listening for the name, and the tooltip
+    // says when the microphone is open for it.
+    let voice = crate::voice::settings::get();
+    let items = with_wake(template(&input), voice.wake, &voice.wake_word);
+    let mut tip = tooltip(&update, agent_running, &shortcuts);
+    if crate::voice::wake::listening() {
+        tip = format!("{tip} · listening for {}", voice.wake_word);
+    }
     (
-        with_sessions(template(&input), &rows, more),
-        tooltip(&update, agent_running, &shortcuts),
+        with_sessions(items, &rows, more),
+        tip,
         rows.into_iter().map(|row| row.session).collect(),
     )
 }
 
-/// A live row: the menu item for a label, or a separator.
+/// A live row: the menu item for a label, one with a check mark, or a
+/// separator.
 enum Handle {
     Row(MenuItem<Wry>),
+    Check(CheckMenuItem<Wry>),
     Sep(PredefinedMenuItem<Wry>),
 }
 
@@ -396,8 +413,25 @@ impl Handle {
     fn item(&self) -> &dyn IsMenuItem<Wry> {
         match self {
             Handle::Row(row) => row,
+            Handle::Check(row) => row,
             Handle::Sep(sep) => sep,
         }
+    }
+
+    fn set_text(&self, t: String) {
+        let _ = match self {
+            Handle::Row(row) => row.set_text(t),
+            Handle::Check(row) => row.set_text(t),
+            Handle::Sep(_) => Ok(()),
+        };
+    }
+
+    fn set_enabled(&self, on: bool) {
+        let _ = match self {
+            Handle::Row(row) => row.set_enabled(on),
+            Handle::Check(row) => row.set_enabled(on),
+            Handle::Sep(_) => Ok(()),
+        };
     }
 }
 
@@ -412,6 +446,8 @@ struct Live {
     icon: u32,
     /// When the download percentage last changed on screen (ms).
     progress_at: u64,
+    /// The icon carries the listening mark (wake lane).
+    marked: bool,
 }
 
 fn live() -> &'static Mutex<Option<Live>> {
@@ -422,6 +458,10 @@ fn live() -> &'static Mutex<Option<Live>> {
 fn make(app: &AppHandle, item: &Item) -> tauri::Result<Handle> {
     if item.is_separator() {
         return Ok(Handle::Sep(PredefinedMenuItem::separator(app)?));
+    }
+    if let Some(on) = item.checked {
+        let row = CheckMenuItem::with_id(app, item.id, text(item), item.enabled, on, None::<&str>)?;
+        return Ok(Handle::Check(row));
     }
     let row = MenuItem::with_id(app, item.id, text(item), item.enabled, None::<&str>)?;
     Ok(Handle::Row(row))
@@ -464,14 +504,11 @@ fn apply(app: &AppHandle, items: Vec<Item>, tip: String, sessions: Vec<String>) 
         } else {
             for change in changes {
                 match change {
-                    Change::Text(i, t) => {
-                        if let Handle::Row(row) = &live.handles[i] {
-                            let _ = row.set_text(t);
-                        }
-                    }
-                    Change::Enabled(i, on) => {
-                        if let Handle::Row(row) = &live.handles[i] {
-                            let _ = row.set_enabled(on);
+                    Change::Text(i, t) => live.handles[i].set_text(t),
+                    Change::Enabled(i, on) => live.handles[i].set_enabled(on),
+                    Change::Checked(i, on) => {
+                        if let Handle::Check(row) = &live.handles[i] {
+                            let _ = row.set_checked(on);
                         }
                     }
                     Change::Rows => {}
@@ -488,10 +525,17 @@ fn apply(app: &AppHandle, items: Vec<Item>, tip: String, sessions: Vec<String>) 
         live.tip = tip;
     }
     let size = screen_icon_size();
-    if size != live.icon {
-        if let Some(img) = icon(size) {
+    let marked = crate::voice::wake::listening();
+    if size != live.icon || marked != live.marked {
+        let img = if marked {
+            marked_icon(size)
+        } else {
+            icon(size)
+        };
+        if let Some(img) = img {
             let _ = tray.set_icon(Some(img));
             live.icon = size;
+            live.marked = marked;
         }
     }
 }
@@ -508,6 +552,7 @@ pub fn init(app: &AppHandle) -> tauri::Result<()> {
         tip: tip.clone(),
         icon: screen_icon_size(),
         progress_at: 0,
+        marked: false,
     };
     fill(app, &mut state, items)?;
     let mut builder = TrayIconBuilder::with_id(TRAY_ID)
@@ -700,6 +745,8 @@ fn on_menu(app: &AppHandle, id: &str) {
                 w::open_help(&app);
             }
             "check" => run_check(&app),
+            // wake lane
+            "wake" => crate::voice::wake::toggle(&app),
             "quit" => app.exit(0),
             other => {
                 if let Some(session) = session_of(other) {
@@ -715,6 +762,60 @@ fn session_of(id: &str) -> Option<String> {
     let slot = slot_of(id)?;
     live().lock().as_ref()?.sessions.get(slot).cloned()
 }
+
+// ---- wake lane: the switch for listening for the name, and the mark ----
+
+/// `items` with the switch for listening for the name above Settings.
+fn with_wake(mut items: Vec<Item>, on: bool, word: &str) -> Vec<Item> {
+    let at = items.iter().position(|it| it.id == "settings");
+    let at = at.unwrap_or(items.len());
+    let row = Item {
+        checked: Some(on),
+        ..Item::new("wake", format!("Listen for {word}"), None)
+    };
+    items.insert(at, row);
+    items
+}
+
+/// The icon with the listening mark: a small round dot at the lower right,
+/// with a clear ring around it so it reads on any taskbar. It shows while
+/// the microphone is open for the name.
+fn marked_icon(size: u32) -> Option<Image<'static>> {
+    let base = icon(size)?;
+    let (w, h) = (base.width(), base.height());
+    let mut px = base.rgba().to_vec();
+    mark(&mut px, w, h);
+    Some(Image::new_owned(px, w, h))
+}
+
+/// The mark's colour: a warm red, as a recording light.
+const MARK: [u8; 3] = [255, 69, 58];
+
+fn mark(px: &mut [u8], w: u32, h: u32) {
+    let r = w as f32 * 0.22;
+    let ring = r + (w as f32 * 0.09).max(1.0);
+    let (cx, cy) = (w as f32 - r - 0.5, h as f32 - r - 0.5);
+    for y in 0..h {
+        for x in 0..w {
+            let dx = x as f32 + 0.5 - cx;
+            let dy = y as f32 + 0.5 - cy;
+            let d = (dx * dx + dy * dy).sqrt();
+            let i = ((y * w + x) * 4) as usize;
+            let Some(p) = px.get_mut(i..i + 4) else {
+                continue;
+            };
+            let dot = (r + 0.5 - d).clamp(0.0, 1.0);
+            if dot > 0.0 {
+                p[..3].copy_from_slice(&MARK);
+                p[3] = (dot * 255.0).round() as u8;
+            } else if d <= ring {
+                p[3] = 0;
+            }
+        }
+    }
+}
+
+// ---- end wake lane ----
 
 #[cfg(test)]
 mod tests {
@@ -963,6 +1064,35 @@ mod tests {
         );
         assert_eq!(tooltip(&json!({}), false, &s), "Aevaleron · Ctrl+Alt+Space");
         assert_eq!(tooltip(&json!({}), false, &Map::new()), "Aevaleron");
+    }
+
+    // wake lane
+    #[test]
+    fn the_listening_switch_sits_above_settings() {
+        let base = items_for(json!({"status": "idle"}), false, false, Manual::Idle);
+        let items = with_wake(base.clone(), true, "Aevaleron");
+        let at = items.iter().position(|it| it.id == "wake").unwrap();
+        assert_eq!(items[at + 1].id, "settings");
+        assert_eq!(items[at].label, "Listen for Aevaleron");
+        assert_eq!(items[at].checked, Some(true));
+        let off = with_wake(base, false, "Aevaleron");
+        assert_eq!(diff(&items, &off), [Change::Checked(at, false)]);
+    }
+
+    // wake lane
+    #[test]
+    fn the_mark_is_a_dot_in_the_corner() {
+        let (w, h) = (16u32, 16u32);
+        let mut px = vec![200u8; (w * h * 4) as usize];
+        mark(&mut px, w, h);
+        let at = |x: u32, y: u32| {
+            let i = ((y * w + x) * 4) as usize;
+            [px[i], px[i + 1], px[i + 2], px[i + 3]]
+        };
+        assert_eq!(at(13, 13), [255, 69, 58, 255], "the dot");
+        assert_eq!(at(2, 2), [200, 200, 200, 200], "the arrow is left alone");
+        assert_eq!(at(7, 12)[3], 0, "a clear ring around the dot");
+        assert!(marked_icon(16).is_some() && marked_icon(32).is_some());
     }
 
     #[test]
