@@ -15,7 +15,7 @@ use std::sync::Mutex;
 
 use futures_util::FutureExt;
 use serde_json::{json, Value};
-use tauri::{AppHandle, Manager, State, WebviewWindow};
+use crate::shell::{AppHandle, Manager, WebviewWindow};
 
 use crate::state::{shared, AppState, Mode};
 use crate::windows::{self, outputs};
@@ -228,20 +228,6 @@ pub const LISTEN_CHANNELS: &[&str] = &[
     // end region-text lane
 ];
 
-const BRIDGE_JS: &str = include_str!("../bridge/aeval-bridge.js");
-
-/// The initialization script injected into every webview: the bridge plus
-/// the allowlists, so the JS and Rust lists come from one place.
-pub fn bridge_script() -> String {
-    let invoke = js_list(INVOKE_CHANNELS);
-    let listen = js_list(LISTEN_CHANNELS);
-    format!("(() => {{\n{BRIDGE_JS}\naevalBridge({invoke}, {listen});\n}})();\n")
-}
-
-fn js_list(list: &[&str]) -> String {
-    serde_json::to_string(list).unwrap_or_default()
-}
-
 fn allowed(channel: &str) -> bool {
     INVOKE_CHANNELS.contains(&channel)
 }
@@ -332,6 +318,7 @@ const EXCEPTIONS: &[(&str, &[Caller])] = &[
     ("a11y:announce", ANY),
     ("open-external", PAGES),
     ("clipboard:write", PAGES),
+    ("models:list", &[Caller::Bar, Caller::Settings, Caller::Output]),
     ("app:help", PAGES),
     ("window:nudge", PAGES),
     // Every page that loads glass.js, the buddy card included, reads the
@@ -455,10 +442,10 @@ impl Seen {
     }
 }
 
-#[tauri::command]
-pub async fn aeval_invoke(
+/// One call from a native page (crate::ui::bridge): the allowlist, the
+/// caller rule, then the route.
+pub async fn invoke(
     window: WebviewWindow,
-    seen: State<'_, Seen>,
     channel: String,
     payload: Option<Value>,
 ) -> Result<Value, String> {
@@ -467,7 +454,10 @@ pub async fn aeval_invoke(
     }
     let payload = payload.unwrap_or(Value::Null);
     authorize(&window, &channel, &payload)?;
-    seen.record(window.label(), &channel);
+    window
+        .app_handle()
+        .state::<Seen>()
+        .record(window.label(), &channel);
     let app = window.app_handle().clone();
     let label = window.label().to_string();
     let was_busy = shared(&app).lock().busy;
@@ -705,14 +695,9 @@ async fn route(
         }
         "overlay:minimize" => windows::minimize(app),
         "overlay:resize" => windows::overlay_resize(app, p_num(&p, "height")),
-        "overlay:set-ignore" => windows::overlay_set_ignore(app, p_bool(&p, "ignore")),
-        "glass:passthrough" => {
-            // The shadow margin lets clicks through; the page says when the
-            // pointer is over glass. Output windows only, as main.js.
-            if outputs::is_output(&label) && shared(app).lock().mode != Mode::Hud {
-                windows::flags::set_click_through(win, p_bool(&p, "ignore"));
-            }
-        }
+        // Native windows pass clicks through their clear pixels themselves
+        // (per-pixel alpha), so these two have nothing left to do.
+        "overlay:set-ignore" | "glass:passthrough" => {}
         "overlay:open-settings" => {
             let section = p_str(&p, "section");
             windows::open_settings(app, Some(section.as_str()).filter(|s| !s.is_empty()));
@@ -943,9 +928,8 @@ async fn route(
         "update:check" => return Ok(updater::check(app).await),
         "update:restart" => return Ok(json!({ "ok": updater::restart(app) })),
         "clipboard:write" => {
-            use tauri_plugin_clipboard_manager::ClipboardExt;
             // The page says "Copied" only when it was.
-            let done = app.clipboard().write_text(p_str(&p, "text")).is_ok();
+            let done = crate::shell::sys::clipboard_write(&p_str(&p, "text"));
             return Ok(json!({ "ok": done }));
         }
         "shortcuts:capture-mode" => hotkeys::set_capture_mode(app, p_bool(&p, "on")),
@@ -1449,16 +1433,5 @@ mod tests {
         assert_eq!(p_num(&p, "missing"), 0.0);
         assert!(p_bool(&p, "on"));
         assert_eq!(p_str(&p, "s"), "5");
-    }
-
-    #[test]
-    fn bridge_script_carries_both_allowlists() {
-        let s = bridge_script();
-        assert!(s.contains("aevalBridge([\"overlay:trigger\""));
-        let invoke = js_list(INVOKE_CHANNELS);
-        let listen = js_list(LISTEN_CHANNELS);
-        assert!(s.contains(&format!("aevalBridge({invoke}, {listen});")));
-        assert!(listen.contains("\"lens:draw\""));
-        assert!(invoke.contains("\"settings:set-glass\""));
     }
 }

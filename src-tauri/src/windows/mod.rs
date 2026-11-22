@@ -11,7 +11,6 @@ pub mod flags;
 pub mod layout;
 pub mod motion;
 pub mod outputs;
-mod rebuild;
 pub mod screen;
 pub mod stage;
 pub mod text_scale;
@@ -22,10 +21,10 @@ use std::time::{Duration, Instant};
 
 use parking_lot::Mutex;
 use serde_json::{json, Value};
-use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
+use crate::shell::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 
 use crate::state::{shared, BusEvent, Mode, Rect};
-use crate::{hotkeys, ipc, paths, store};
+use crate::{hotkeys, store};
 use flags::{Meta, Resize};
 use layout::Anchor;
 
@@ -159,7 +158,7 @@ fn debounce_ticket(key: &str) -> u64 {
 fn debounce(key: &str, ms: u64, f: impl FnOnce() + Send + 'static) {
     let ticket = debounce_ticket(key);
     let key = key.to_string();
-    tauri::async_runtime::spawn(async move {
+    crate::shell::async_runtime::spawn(async move {
         tokio::time::sleep(Duration::from_millis(ms)).await;
         if debounce_gens().lock().get(&key).copied() == Some(ticket) {
             f();
@@ -209,17 +208,16 @@ fn pending_section() -> &'static Mutex<Option<String>> {
     S.get_or_init(|| Mutex::new(None))
 }
 
-/// One page in a frameless, transparent, topmost tool window that is hidden
-/// from capture and sees only `window.aeval`. `outer` is the OS window in
-/// DIPs (glass plus margin).
+/// One native page in a frameless, topmost tool window hidden from capture
+/// (crate::ui builds the page for the path). `outer` is the OS window in
+/// DIPs (glass plus margin; the margin is 0 now there is no shadow to hold).
 pub fn create_page(
     app: &AppHandle,
     label: &str,
     page: &str,
     outer: Rect,
     meta: Meta,
-) -> tauri::Result<WebviewWindow> {
-    let bridge = ipc::bridge_script();
+) -> crate::shell::Result<WebviewWindow> {
     let w = WebviewWindowBuilder::new(app, label, WebviewUrl::App(page.into()))
         .title("Aevaleron")
         .decorations(false)
@@ -236,12 +234,8 @@ pub fn create_page(
         .visible(false)
         .position(outer.x, outer.y)
         .inner_size(outer.width, outer.height)
-        .data_directory(paths::webview_data_dir())
-        .initialization_script(&bridge)
         .build()?;
     flags::adopt(app, &w, meta);
-    // A dead renderer reloads; a dead browser process rebuilds the window.
-    crate::crash::guard_webview(&w, rebuild::on_browser_exit);
     Ok(w)
 }
 
@@ -249,7 +243,7 @@ pub fn create_page(
 pub fn on_page_loaded(app: &AppHandle, label: &str) {
     let app = app.clone();
     let label = label.to_string();
-    tauri::async_runtime::spawn(async move {
+    crate::shell::async_runtime::spawn(async move {
         if label == OVERLAY {
             let first = {
                 let st = shared(&app);
@@ -262,7 +256,7 @@ pub fn on_page_loaded(app: &AppHandle, label: &str) {
                     false
                 }
             };
-            if (first || rebuild::overlay_loaded()) && button() {
+            if first && button() {
                 if let Some(h) = hwnd(&app, OVERLAY) {
                     flags::show_inactive(h);
                 }
@@ -516,17 +510,16 @@ pub fn send_overlay_state(app: &AppHandle) {
 // --------------------------------------------------------------- boot
 
 /// Creates the overlay and the warm output window (LIFE-06).
-pub fn boot(app: &AppHandle) -> tauri::Result<()> {
+pub fn boot(app: &AppHandle) -> crate::shell::Result<()> {
     screen::latch_active();
     create_overlay(app)?;
     outputs::create_spare(app)?;
-    flags::start_poll(app);
     text_scale::start_watch(app);
     Ok(())
 }
 
 /// The overlay window as the orb, hidden until its page loads.
-fn create_overlay(app: &AppHandle) -> tauri::Result<()> {
+fn create_overlay(app: &AppHandle) -> crate::shell::Result<()> {
     let glass = pill_rect();
     let outer = stage::inflate(glass, stage::MARGIN);
     let meta = Meta {
@@ -541,28 +534,15 @@ fn create_overlay(app: &AppHandle) -> tauri::Result<()> {
         flags::set_focusable(h, false);
         motion::set_glass(h, glass);
     }
-    flags::set_click_through(&w, true);
-    Ok(())
-}
-
-/// B-090: the bar's page went with the browser process; it comes back as
-/// the orb.
-fn rebuild_overlay(app: &AppHandle) -> tauri::Result<()> {
-    {
-        let st = shared(app);
-        let mut s = st.lock();
-        s.mode = Mode::Pill;
-        s.input_height = layout::DEFAULT_INPUT_HEIGHT;
-    }
-    create_overlay(app)?;
-    hotkeys::apply(app);
+    // No click-through flag: the window is drawn with per-pixel alpha, so
+    // the clear pixels around the orb and the bar let clicks through.
     Ok(())
 }
 
 /// LIFE-19: every 4 s, every visible window back on top.
 pub fn start_keep_on_top(app: &AppHandle) {
     let app = app.clone();
-    tauri::async_runtime::spawn(async move {
+    crate::shell::async_runtime::spawn(async move {
         loop {
             tokio::time::sleep(Duration::from_secs(4)).await;
             keep_on_top(&app);
@@ -738,7 +718,6 @@ pub fn expand_panel(app: &AppHandle) {
         (was, s.input_height)
     };
     *fold_pending().lock() = None;
-    flags::set_click_through(&w, false);
     flags::set_focusable(h, true);
     flags::pin_on_top(h);
     bar_mark("top");
@@ -783,7 +762,6 @@ pub fn collapse_panel(app: &AppHandle) {
     flags::blur(h);
     flags::set_focusable(h, false);
     flags::pin_on_top(h);
-    flags::set_click_through(&w, true);
     let button = button();
     if button {
         flags::show_inactive(h);
@@ -814,7 +792,7 @@ fn await_fold(app: &AppHandle) {
     };
     *fold_pending().lock() = Some(gen);
     let app2 = app.clone();
-    tauri::async_runtime::spawn(async move {
+    crate::shell::async_runtime::spawn(async move {
         tokio::time::sleep(Duration::from_millis(FOLD_WAIT)).await;
         finish_fold(&app2, Some(gen));
     });
@@ -1083,17 +1061,6 @@ pub fn overlay_resize(app: &AppHandle, height: f64) {
     set_input_bounds(app, input_rect(height));
 }
 
-/// IPC-04.
-pub fn overlay_set_ignore(app: &AppHandle, ignore: bool) {
-    let mode = shared(app).lock().mode;
-    if mode != Mode::Pill && mode != Mode::Panel {
-        return;
-    }
-    if let Some(w) = window(app, OVERLAY) {
-        flags::set_click_through(&w, ignore);
-    }
-}
-
 // ------------------------------------------------- keyboard and a11y
 
 /// Where an announcement goes: the Aevaleron window with focus, else the
@@ -1283,7 +1250,6 @@ pub fn enter_hud(app: &AppHandle) {
         s.hud_pending = Some(pending.clone());
     }
     outputs::hide_all(app);
-    flags::set_click_through(&w, false);
     flags::set_focusable(h, true);
     let size = hud_size();
     let r = layout::bounds_for_size(bar_area(), size, &Anchor::from_value(&pending));
@@ -1387,8 +1353,7 @@ pub fn open_url(app: &AppHandle, url: &str) -> bool {
         return false;
     }
     lower_for_browser(app);
-    use tauri_plugin_opener::OpenerExt;
-    app.opener().open_url(url, None::<&str>).is_ok()
+    crate::shell::sys::open_url(url)
 }
 
 pub fn open_help(app: &AppHandle) -> Value {
@@ -1561,8 +1526,9 @@ pub fn new_chat(app: &AppHandle) {
 // ------------------------------------------------------------- events
 
 /// lib.rs routes every window event here (main thread: no blocking).
-pub fn on_window_event(w: &tauri::Window, event: &tauri::WindowEvent) {
-    use tauri::WindowEvent as E;
+pub fn on_window_event(w: &crate::shell::Window, event: &crate::shell::WindowEvent) {
+    crate::ui::on_window_event(w, event);
+    use crate::shell::WindowEvent as E;
     let app = w.app_handle().clone();
     let label = w.label().to_string();
     match event {
@@ -1665,35 +1631,25 @@ fn on_destroyed(app: &AppHandle, label: &str) {
     // The window's flags, frame and animation entries went with its handle
     // (flags::forget_hwnd on WM_NCDESTROY), so a window reopened under the
     // same label at once keeps its own (B-092).
-    let rebuilt = rebuild::take(label);
     crate::backdrop::forget(label);
     lowered().lock().remove(label);
     forget_debounces(label);
     app_marks().lock().remove(label);
-    if rebuilt && outputs::is_output(label) {
-        // What is sent while the window is built again waits for its page.
-        held().lock().entry(label.to_string()).or_default();
-    } else {
-        drop_held(label);
-    }
+    drop_held(label);
     let again = closing().lock().remove(label).flatten();
     if let Some(section) = again {
         let (a, l) = (app.clone(), label.to_string());
-        tauri::async_runtime::spawn(async move {
+        crate::shell::async_runtime::spawn(async move {
             reopen(&a, &l, section).await;
         });
     }
-    if rebuilt {
-        let (a, l) = (app.clone(), label.to_string());
-        tauri::async_runtime::spawn(rebuild::rebuild(a, l));
-    }
     if label == SETTINGS {
         let app = app.clone();
-        tauri::async_runtime::spawn(async move {
+        crate::shell::async_runtime::spawn(async move {
             hotkeys::set_capture_mode(&app, false);
             tour_notify(&app, "settings-closed");
         });
-    } else if outputs::is_output(label) && !rebuilt {
+    } else if outputs::is_output(label) {
         outputs::on_destroyed(app, label);
     }
 }

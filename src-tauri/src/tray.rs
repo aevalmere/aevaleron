@@ -7,20 +7,20 @@
 //! which touches only the rows whose text or state changed. The menu is never
 //! swapped, so one that is open stays open.
 
-use std::sync::atomic::{AtomicU64, Ordering::SeqCst};
+use std::cell::RefCell;
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering::SeqCst};
 use std::sync::OnceLock;
 
 use base64::engine::general_purpose::STANDARD as B64;
 use base64::Engine;
 use parking_lot::Mutex;
 use serde_json::{Map, Value};
-use tauri::image::Image;
-use tauri::menu::{CheckMenuItem, IsMenuItem, Menu, MenuItem, PredefinedMenuItem};
-use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
-use tauri::{AppHandle, Wry};
+use tray_icon::menu::{CheckMenuItem, IsMenuItem, Menu, MenuEvent, MenuItem, PredefinedMenuItem};
+use tray_icon::{MouseButton, MouseButtonState, TrayIcon, TrayIconBuilder, TrayIconEvent};
 use windows_sys::Win32::UI::Input::KeyboardAndMouse::GetDoubleClickTime;
 
 use crate::agents::TrayRow;
+use crate::shell::AppHandle;
 use crate::state::shared;
 
 const TRAY_ID: &str = "main";
@@ -347,10 +347,45 @@ fn icon_size(scale: f64) -> u32 {
         .unwrap_or(32)
 }
 
-fn icon(size: u32) -> Option<Image<'static>> {
+/// An icon as straight RGBA pixels.
+struct Image {
+    px: Vec<u8>,
+    w: u32,
+    h: u32,
+}
+
+impl Image {
+    fn tray(self) -> Option<tray_icon::Icon> {
+        tray_icon::Icon::from_rgba(self.px, self.w, self.h).ok()
+    }
+}
+
+/// One of the PNGs above, decoded to RGBA.
+fn decode(bytes: &[u8]) -> Option<Image> {
+    let mut dec = png::Decoder::new(std::io::Cursor::new(bytes));
+    dec.set_transformations(png::Transformations::normalize_to_color8());
+    let mut reader = dec.read_info().ok()?;
+    let mut buf = vec![0; reader.output_buffer_size()];
+    let info = reader.next_frame(&mut buf).ok()?;
+    buf.truncate(info.buffer_size());
+    let px = match info.color_type {
+        png::ColorType::Rgba => buf,
+        png::ColorType::Rgb => buf.chunks(3).flat_map(|c| [c[0], c[1], c[2], 255]).collect(),
+        png::ColorType::GrayscaleAlpha => buf.chunks(2).flat_map(|c| [c[0], c[0], c[0], c[1]]).collect(),
+        png::ColorType::Grayscale => buf.iter().flat_map(|&g| [g, g, g, 255]).collect(),
+        png::ColorType::Indexed => return None,
+    };
+    Some(Image {
+        px,
+        w: info.width,
+        h: info.height,
+    })
+}
+
+fn icon(size: u32) -> Option<Image> {
     let (_, b64) = ICONS.iter().find(|(s, _)| *s == size)?;
     let bytes = B64.decode(b64).ok()?;
-    Image::from_bytes(&bytes).ok().map(|i| i.to_owned())
+    decode(&bytes)
 }
 
 fn screen_icon_size() -> u32 {
@@ -404,13 +439,13 @@ fn snapshot(app: &AppHandle) -> (Vec<Item>, String, Vec<String>) {
 /// A live row: the menu item for a label, one with a check mark, or a
 /// separator.
 enum Handle {
-    Row(MenuItem<Wry>),
-    Check(CheckMenuItem<Wry>),
-    Sep(PredefinedMenuItem<Wry>),
+    Row(MenuItem),
+    Check(CheckMenuItem),
+    Sep(PredefinedMenuItem),
 }
 
 impl Handle {
-    fn item(&self) -> &dyn IsMenuItem<Wry> {
+    fn item(&self) -> &dyn IsMenuItem {
         match self {
             Handle::Row(row) => row,
             Handle::Check(row) => row,
@@ -419,29 +454,29 @@ impl Handle {
     }
 
     fn set_text(&self, t: String) {
-        let _ = match self {
+        match self {
             Handle::Row(row) => row.set_text(t),
             Handle::Check(row) => row.set_text(t),
-            Handle::Sep(_) => Ok(()),
-        };
+            Handle::Sep(_) => {}
+        }
     }
 
     fn set_enabled(&self, on: bool) {
-        let _ = match self {
+        match self {
             Handle::Row(row) => row.set_enabled(on),
             Handle::Check(row) => row.set_enabled(on),
-            Handle::Sep(_) => Ok(()),
-        };
+            Handle::Sep(_) => {}
+        }
     }
 }
 
-/// What the tray shows, with the handles that change it in place.
+/// What the tray shows, with the handles that change it in place. The menu
+/// and the icon live on the UI thread, whose loop runs them.
 struct Live {
-    menu: Menu<Wry>,
+    tray: TrayIcon,
+    menu: Menu,
     items: Vec<Item>,
     handles: Vec<Handle>,
-    /// The session each session row shows, in row order.
-    sessions: Vec<String>,
     tip: String,
     icon: u32,
     /// When the download percentage last changed on screen (ms).
@@ -450,126 +485,148 @@ struct Live {
     marked: bool,
 }
 
-fn live() -> &'static Mutex<Option<Live>> {
-    static L: OnceLock<Mutex<Option<Live>>> = OnceLock::new();
-    L.get_or_init(|| Mutex::new(None))
+thread_local! {
+    static LIVE: RefCell<Option<Live>> = const { RefCell::new(None) };
 }
 
-fn make(app: &AppHandle, item: &Item) -> tauri::Result<Handle> {
+/// The tray is up (any thread may ask).
+static READY: AtomicBool = AtomicBool::new(false);
+
+/// The session each session row shows, in row order (read when a row is
+/// clicked, from the menu's event thread).
+fn sessions() -> &'static Mutex<Vec<String>> {
+    static S: OnceLock<Mutex<Vec<String>>> = OnceLock::new();
+    S.get_or_init(|| Mutex::new(Vec::new()))
+}
+
+fn make(item: &Item) -> Handle {
     if item.is_separator() {
-        return Ok(Handle::Sep(PredefinedMenuItem::separator(app)?));
+        return Handle::Sep(PredefinedMenuItem::separator());
     }
     if let Some(on) = item.checked {
-        let row = CheckMenuItem::with_id(app, item.id, text(item), item.enabled, on, None::<&str>)?;
-        return Ok(Handle::Check(row));
+        return Handle::Check(CheckMenuItem::with_id(item.id, text(item), item.enabled, on, None));
     }
-    let row = MenuItem::with_id(app, item.id, text(item), item.enabled, None::<&str>)?;
-    Ok(Handle::Row(row))
+    Handle::Row(MenuItem::with_id(item.id, text(item), item.enabled, None))
 }
 
 /// Replaces every row inside the same menu: never `set_menu`, which would
 /// swap out a menu the person has open.
-fn fill(app: &AppHandle, live: &mut Live, items: Vec<Item>) -> tauri::Result<()> {
-    for h in live.handles.drain(..) {
-        let _ = live.menu.remove(h.item());
+fn fill(menu: &Menu, handles: &mut Vec<Handle>, items: &[Item]) -> Result<(), String> {
+    for h in handles.drain(..) {
+        let _ = menu.remove(h.item());
     }
-    live.items = Vec::new();
-    for item in &items {
-        let h = make(app, item)?;
-        live.menu.append(h.item())?;
-        live.handles.push(h);
+    for item in items {
+        let h = make(item);
+        menu.append(h.item()).map_err(|e| e.to_string())?;
+        handles.push(h);
     }
-    live.items = items;
     Ok(())
 }
 
-/// Main thread: applies one snapshot, touching only what changed.
-fn apply(app: &AppHandle, items: Vec<Item>, tip: String, sessions: Vec<String>) {
-    let mut guard = live().lock();
-    let Some(live) = guard.as_mut() else {
-        return;
-    };
-    live.sessions = sessions;
-    let changes = diff(&live.items, &items);
-    let now = crate::state::now_ms();
-    let progress = progress_only(&items, &changes);
-    if !progress || now >= live.progress_at + 1000 {
-        if progress {
-            live.progress_at = now;
-        }
-        if changes.contains(&Change::Rows) {
-            if let Err(e) = fill(app, live, items) {
-                crate::crash::write("tray", &e.to_string());
-            }
-        } else {
-            for change in changes {
-                match change {
-                    Change::Text(i, t) => live.handles[i].set_text(t),
-                    Change::Enabled(i, on) => live.handles[i].set_enabled(on),
-                    Change::Checked(i, on) => {
-                        if let Handle::Check(row) = &live.handles[i] {
-                            let _ = row.set_checked(on);
-                        }
-                    }
-                    Change::Rows => {}
-                }
-            }
-            live.items = items;
-        }
-    }
-    let Some(tray) = app.tray_by_id(TRAY_ID) else {
-        return;
-    };
-    if tip != live.tip {
-        let _ = tray.set_tooltip(Some(&tip));
-        live.tip = tip;
-    }
-    let size = screen_icon_size();
-    let marked = crate::voice::wake::listening();
-    if size != live.icon || marked != live.marked {
-        let img = if marked {
-            marked_icon(size)
-        } else {
-            icon(size)
+/// UI thread: applies one snapshot, touching only what changed.
+fn apply(items: Vec<Item>, tip: String, rows: Vec<String>) {
+    *sessions().lock() = rows;
+    LIVE.with(|l| {
+        let mut guard = l.borrow_mut();
+        let Some(live) = guard.as_mut() else {
+            return;
         };
-        if let Some(img) = img {
-            let _ = tray.set_icon(Some(img));
-            live.icon = size;
-            live.marked = marked;
+        let changes = diff(&live.items, &items);
+        let now = crate::state::now_ms();
+        let progress = progress_only(&items, &changes);
+        if !progress || now >= live.progress_at + 1000 {
+            if progress {
+                live.progress_at = now;
+            }
+            if changes.contains(&Change::Rows) {
+                live.items = Vec::new();
+                if let Err(e) = fill(&live.menu, &mut live.handles, &items) {
+                    crate::crash::write("tray", &e);
+                }
+                live.items = items;
+            } else {
+                for change in changes {
+                    match change {
+                        Change::Text(i, t) => live.handles[i].set_text(t),
+                        Change::Enabled(i, on) => live.handles[i].set_enabled(on),
+                        Change::Checked(i, on) => {
+                            if let Handle::Check(row) = &live.handles[i] {
+                                row.set_checked(on);
+                            }
+                        }
+                        Change::Rows => {}
+                    }
+                }
+                live.items = items;
+            }
         }
-    }
+        if tip != live.tip {
+            let _ = live.tray.set_tooltip(Some(&tip));
+            live.tip = tip;
+        }
+        let size = screen_icon_size();
+        let marked = crate::voice::wake::listening();
+        if size != live.icon || marked != live.marked {
+            let img = if marked {
+                marked_icon(size)
+            } else {
+                icon(size)
+            };
+            if let Some(img) = img.and_then(Image::tray) {
+                let _ = live.tray.set_icon(Some(img));
+                live.icon = size;
+                live.marked = marked;
+            }
+        }
+    });
 }
 
-/// Creates the tray (boot, before hotkeys).
-pub fn init(app: &AppHandle) -> tauri::Result<()> {
-    let (items, tip, sessions) = snapshot(app);
-    let menu = Menu::new(app)?;
-    let mut state = Live {
-        menu: menu.clone(),
-        items: Vec::new(),
-        handles: Vec::new(),
-        sessions,
-        tip: tip.clone(),
-        icon: screen_icon_size(),
-        progress_at: 0,
-        marked: false,
-    };
-    fill(app, &mut state, items)?;
-    let mut builder = TrayIconBuilder::with_id(TRAY_ID)
-        .menu(&menu)
-        .tooltip(tip)
-        .show_menu_on_left_click(false)
-        .on_menu_event(|app, event| {
-            crate::crash::guard("tray.menu", || on_menu(app, event.id().as_ref()));
-        })
-        .on_tray_icon_event(|tray, event| {
-            crate::crash::guard("tray.click", || on_icon(tray, &event));
-        });
-    if let Some(img) = icon(state.icon) {
-        builder = builder.icon(img);
+/// Creates the tray (boot, on the UI thread, before hotkeys).
+pub fn init(app: &AppHandle) -> Result<(), String> {
+    let (items, tip, rows) = snapshot(app);
+    *sessions().lock() = rows;
+    let menu = Menu::new();
+    let mut handles = Vec::new();
+    fill(&menu, &mut handles, &items)?;
+    let size = screen_icon_size();
+    let mut builder = TrayIconBuilder::new()
+        .with_id(TRAY_ID)
+        .with_menu(Box::new(menu.clone()))
+        .with_tooltip(&tip)
+        .with_menu_on_left_click(false);
+    if let Some(img) = icon(size).and_then(Image::tray) {
+        builder = builder.with_icon(img);
     }
-    builder.build(app)?;
-    *live().lock() = Some(state);
+    let tray = builder.build().map_err(|e| e.to_string())?;
+    let a = app.clone();
+    MenuEvent::set_event_handler(Some(move |event: MenuEvent| {
+        crate::crash::guard("tray.menu", || on_menu(&a, event.id().as_ref()));
+    }));
+    let a = app.clone();
+    TrayIconEvent::set_event_handler(Some(move |event: TrayIconEvent| {
+        let left_up = matches!(
+            event,
+            TrayIconEvent::Click {
+                button: MouseButton::Left,
+                button_state: MouseButtonState::Up,
+                ..
+            }
+        );
+        crate::crash::guard("tray.click", || on_icon(&a, left_up));
+    }));
+    LIVE.with(|l| {
+        *l.borrow_mut() = Some(Live {
+            tray,
+            menu,
+            items,
+            handles,
+            tip,
+            icon: size,
+            progress_at: 0,
+            marked: false,
+        })
+    });
+    READY.store(true, SeqCst);
     Ok(())
 }
 
@@ -587,25 +644,18 @@ fn opens(last: &AtomicU64, now: u64, double_click_ms: u64) -> bool {
 /// A left click opens the bar (or the trail while a task runs). Windows
 /// reports a double click as two clicks and a double click, so only the
 /// first click of it opens (D-07); Electron opened on all three.
-fn on_icon(tray: &tauri::tray::TrayIcon, event: &TrayIconEvent) {
+/// `left_up` is false for every other tray event.
+fn on_icon(app: &AppHandle, left_up: bool) {
     static LAST_OPEN: AtomicU64 = AtomicU64::new(0);
-    let click = matches!(
-        event,
-        TrayIconEvent::Click {
-            button: MouseButton::Left,
-            button_state: MouseButtonState::Up,
-            ..
-        }
-    );
-    if !click {
+    if !left_up {
         return;
     }
     // SAFETY: GetDoubleClickTime takes no arguments and only reads a setting.
     let double_click_ms = u64::from(unsafe { GetDoubleClickTime() });
     if opens(&LAST_OPEN, crate::state::now_ms(), double_click_ms) {
         CLICK_OPENS.fetch_add(1, SeqCst);
-        let app = tray.app_handle().clone();
-        tauri::async_runtime::spawn(async move {
+        let app = app.clone();
+        crate::shell::async_runtime::spawn(async move {
             crate::windows::trigger_or_trail(&app);
         });
     }
@@ -621,62 +671,47 @@ pub fn click_opens() -> u64 {
 /// Delivers what Windows sends for one double click on the icon, in order:
 /// a click, the double click, and a second click (smoke `trayClick`).
 pub fn deliver_double_click(app: &AppHandle) {
-    let Some(tray) = app.tray_by_id(TRAY_ID) else {
+    if !is_ready(app) {
         return;
-    };
-    let id = tray.id().clone();
-    let position = tauri::PhysicalPosition::new(0.0, 0.0);
-    let rect = || tauri::Rect {
-        position: tauri::Position::Physical(tauri::PhysicalPosition::new(0, 0)),
-        size: tauri::Size::Physical(tauri::PhysicalSize::new(0, 0)),
-    };
-    let click = TrayIconEvent::Click {
-        id: id.clone(),
-        position,
-        rect: rect(),
-        button: MouseButton::Left,
-        button_state: MouseButtonState::Up,
-    };
-    let double = TrayIconEvent::DoubleClick {
-        id,
-        position,
-        rect: rect(),
-        button: MouseButton::Left,
-    };
-    for event in [&click, &double, &click] {
-        on_icon(&tray, event);
+    }
+    for left_up in [true, false, true] {
+        on_icon(app, left_up);
     }
 }
 
 /// Whether the tray came up (smoke `tray`).
-pub fn is_ready(app: &AppHandle) -> bool {
-    app.tray_by_id(TRAY_ID).is_some()
+pub fn is_ready(_app: &AppHandle) -> bool {
+    READY.load(SeqCst)
 }
 
 /// Brings menu, tooltip and icon up to date; called whenever a label could
-/// change. Never blocks: the edit runs on the main thread (inline when this
-/// is the main thread).
+/// change. Never blocks: the edit runs on the UI thread (inline when this
+/// is the UI thread).
 pub fn refresh(app: &AppHandle) {
     static TAKEN: AtomicU64 = AtomicU64::new(0);
     static SHOWN: AtomicU64 = AtomicU64::new(0);
-    if live().lock().is_none() {
+    if !READY.load(SeqCst) {
         return;
     }
     let seq = TAKEN.fetch_add(1, SeqCst) + 1;
-    let (items, tip, sessions) = snapshot(app);
-    let handle = app.clone();
+    let (items, tip, rows) = snapshot(app);
     let _ = app.run_on_main_thread(move || {
         // A snapshot older than one already shown is stale.
         if SHOWN.fetch_max(seq, SeqCst) > seq {
             return;
         }
-        crate::crash::guard("tray.refresh", || apply(&handle, items, tip, sessions));
+        crate::crash::guard("tray.refresh", || apply(items, tip, rows));
     });
 }
 
-pub fn destroy(app: &AppHandle) {
-    *live().lock() = None;
-    let _ = app.remove_tray_by_id(TRAY_ID);
+/// On the way out (UI thread): the icon leaves the notification area.
+pub fn destroy(_app: &AppHandle) {
+    READY.store(false, SeqCst);
+    MenuEvent::set_event_handler(None::<fn(MenuEvent)>);
+    TrayIconEvent::set_event_handler(None::<fn(TrayIconEvent)>);
+    if crate::shell::platform::is_ui_thread() {
+        LIVE.with(|l| l.borrow_mut().take());
+    }
 }
 
 /// After a check that found nothing, "Up to date" shows for 10 s. Each check
@@ -685,7 +720,7 @@ fn run_check(app: &AppHandle) {
     *manual().lock() = Manual::Checking;
     refresh(app);
     let app = app.clone();
-    tauri::async_runtime::spawn(async move {
+    crate::shell::async_runtime::spawn(async move {
         let u = crate::updater::check(&app).await;
         let next = match u["status"].as_str().unwrap_or("") {
             "current" => Manual::Current {
@@ -720,7 +755,7 @@ fn expire(m: &mut Manual, mine: &Manual) -> bool {
 fn on_menu(app: &AppHandle, id: &str) {
     let app = app.clone();
     let id = id.to_string();
-    tauri::async_runtime::spawn(async move {
+    crate::shell::async_runtime::spawn(async move {
         use crate::windows as w;
         match id.as_str() {
             "restart" => {
@@ -760,7 +795,7 @@ fn on_menu(app: &AppHandle, id: &str) {
 /// The session behind a clicked session row.
 fn session_of(id: &str) -> Option<String> {
     let slot = slot_of(id)?;
-    live().lock().as_ref()?.sessions.get(slot).cloned()
+    sessions().lock().get(slot).cloned()
 }
 
 // ---- wake lane: the switch for listening for the name, and the mark ----
@@ -780,12 +815,10 @@ fn with_wake(mut items: Vec<Item>, on: bool, word: &str) -> Vec<Item> {
 /// The icon with the listening mark: a small round dot at the lower right,
 /// with a clear ring around it so it reads on any taskbar. It shows while
 /// the microphone is open for the name.
-fn marked_icon(size: u32) -> Option<Image<'static>> {
-    let base = icon(size)?;
-    let (w, h) = (base.width(), base.height());
-    let mut px = base.rgba().to_vec();
-    mark(&mut px, w, h);
-    Some(Image::new_owned(px, w, h))
+fn marked_icon(size: u32) -> Option<Image> {
+    let mut img = icon(size)?;
+    mark(&mut img.px, img.w, img.h);
+    Some(img)
 }
 
 /// The mark's colour: a warm red, as a recording light.
@@ -1102,6 +1135,8 @@ mod tests {
             assert_eq!(&bytes[1..4], b"PNG");
             let w = u32::from_be_bytes(bytes[16..20].try_into().unwrap());
             assert_eq!(w, size);
+            let img = icon(size).unwrap();
+            assert_eq!((img.w, img.h, img.px.len()), (size, size, (size * size * 4) as usize));
         }
     }
 }

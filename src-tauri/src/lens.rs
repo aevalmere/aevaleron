@@ -12,7 +12,6 @@ use serde_json::{json, Value};
 use crate::capture::{self, screen};
 use crate::desktop::win;
 use crate::shell::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
-use crate::windows::flags;
 
 #[derive(Default)]
 struct State {
@@ -176,15 +175,6 @@ fn all_windows(app: &AppHandle) -> Vec<WebviewWindow> {
         .into_iter()
         .filter(|(l, _)| l.starts_with("lens-"))
         .map(|(_, w)| w)
-        .collect()
-}
-
-/// The lens windows on screen. A hidden one must not count as something the
-/// backdrop has to keep fresh (B-030).
-pub fn windows(app: &AppHandle) -> Vec<WebviewWindow> {
-    all_windows(app)
-        .into_iter()
-        .filter(|w| flags::is_visible(capture::hwnd_of(w)))
         .collect()
 }
 

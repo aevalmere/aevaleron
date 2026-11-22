@@ -5,7 +5,6 @@
 # An answer window stays shown, in place and inside the work area while the real
 # pointer crosses it, with the bar in each corner (chatfix lane).
 hoverKeepsAnswer
-# Its clear part still lets clicks through; the sheet takes them.
-marginClickThrough
+# native-ui: marginClickThrough removed; the native answer window is opaque, with no clear margin to pass clicks
 # Minimize folds the bar and its answers into the pill; reopening brings them back.
 minimizeToPill

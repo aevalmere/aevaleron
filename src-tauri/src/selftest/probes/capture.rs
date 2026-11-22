@@ -12,11 +12,11 @@ use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
 
 use serde_json::{json, Value};
-use tauri::Manager;
 
 use crate::capture::{self, encode, screen, Rect};
 use crate::llm::elements::{match_element, parse_elements};
 use crate::selftest::{Cx, Input};
+use crate::shell::Manager;
 use crate::state::shared;
 use crate::{backdrop, buddy, desktop, ipc, lens, region, store, windows};
 
@@ -28,10 +28,21 @@ pub fn run(cx: &mut Cx) {
     selector_escape(cx);
     fail_null(cx);
     dpi_round_trip(cx);
-    glass(cx);
+    glass_tier(cx);
     lens_first_draw(cx);
-    backdrop_idle(cx);
     tour(cx);
+}
+
+/// smoke-glass.js's tier line. Native pages draw their own solid surface,
+/// so the tier is always "solid"; the line stays for the record.
+fn glass_tier(cx: &Cx) {
+    let tier = backdrop::tier();
+    let mut reasons = backdrop::reasons().join("+");
+    if reasons.is_empty() {
+        reasons = "none".into();
+    }
+    let can_hide = capture::can_hide_from_capture();
+    cx.log("glassTier", format!("{tier} reasons={reasons} canHide={can_hide}"));
 }
 
 /// `value` under `label` when `ok`, else `label=FAIL:<value>`.
@@ -130,7 +141,7 @@ fn open_selector(cx: &Cx) -> JoinHandle<Option<Rect>> {
     let d = screen::primary(&screen::all_displays());
     thread::spawn(move || {
         let pick = region::select(&app, Some(d));
-        tauri::async_runtime::block_on(pick)
+        crate::shell::async_runtime::block_on(pick)
     })
 }
 
@@ -180,17 +191,13 @@ fn selector_escape(cx: &Cx) {
 
 /// CAP-06 and B-110: a capture thread that hangs makes the capture come back
 /// empty within its limit (the question goes on as text), and the next
-/// capture runs on a fresh thread. The glass stands still meanwhile, so the
-/// hung thread is ours alone to find.
+/// capture runs on a fresh thread.
 fn fail_null(cx: &Cx) {
-    backdrop::pause();
-    cx.sleep(300);
     capture::stall_worker(Duration::from_secs(8));
     let t = Instant::now();
     let hung = cx.block_on(capture::capture_screen_async(None));
     let ms = t.elapsed().as_millis();
     let next = cx.block_on(capture::capture_screen_async(None));
-    backdrop::resume();
     let first = if hung.is_some() { "a shot" } else { "null" };
     let then = if next.is_some() { "a shot" } else { "null" };
     let value = format!("{first} in {ms}ms, then {then}");
@@ -256,90 +263,6 @@ fn dpi_round_trip(cx: &Cx) {
     check(cx, "dpiRoundTrip", bad.is_empty(), value);
 }
 
-/// smoke-glass.js: the glass pages have glass.js and a tier, a backdrop
-/// capture costs the event loop under 25 ms at p95, and the process CPU with
-/// the glass live and then solid.
-fn glass(cx: &Cx) {
-    let js = "(() => (window.AevalGlass ? 'glass' : 'none') + ':' \
-              + (document.documentElement.dataset.glass || 'notier'))()";
-    let mut seen = Vec::new();
-    for (name, label) in [("overlay", windows::OVERLAY), ("output", "output-1")] {
-        let r = match cx.eval(label, js) {
-            Ok(Value::String(s)) => s,
-            Ok(v) => v.to_string(),
-            Err(e) => format!("error:{e}"),
-        };
-        seen.push(format!("{name}={r}"));
-    }
-    let tier = backdrop::tier();
-    let mut reasons = backdrop::reasons().join("+");
-    if reasons.is_empty() {
-        reasons = "none".into();
-    }
-    let can_hide = capture::can_hide_from_capture();
-    let value = format!("{tier} reasons={reasons} canHide={can_hide}");
-    cx.log("glassTier", value);
-    let has_tier = |s: &String| s.ends_with("=glass:live") || s.ends_with("=glass:solid");
-    let loaded = seen.iter().all(has_tier);
-    cx.must("glassLoaded", loaded, seen.join(" "));
-
-    if tier == "live" {
-        let m = backdrop::measure(50);
-        let f = |k: &str| (m[k].as_f64().unwrap_or(f64::NAN) * 10.0).round() / 10.0;
-        let block = f("blockP95");
-        cx.log(
-            "snapCost",
-            format!(
-                "n={} wallP50={}ms wallP95={}ms encodeP95={}ms blockP95={block}ms",
-                m["n"],
-                f("wallP50"),
-                f("wallP95"),
-                f("encodeP95")
-            ),
-        );
-        let why = format!("main thread blocked {block}ms p95, budget 25ms");
-        cx.must("snapCost", block < 25.0, why);
-    } else {
-        let why = format!("the glass is {tier} ({reasons}), so there is nothing to measure");
-        cx.must("snapCost", false, why);
-    }
-
-    let live = cpu_over(Duration::from_secs(3));
-    let was = backdrop::intensity();
-    backdrop::set_intensity(0.0);
-    cx.sleep(600);
-    let solid = cpu_over(Duration::from_secs(3));
-    backdrop::set_intensity(was);
-    let how = "percent of one core over 3 s, the app process; solid is glassIntensity 0";
-    let value = format!("live total={live:.1}% | solid total={solid:.1}% ({how})");
-    cx.log("glassCost", value);
-}
-
-/// Kernel plus user CPU time of this process, in milliseconds.
-fn cpu_ms() -> f64 {
-    use windows_sys::Win32::Foundation::FILETIME;
-    use windows_sys::Win32::System::Threading::{GetCurrentProcess, GetProcessTimes};
-    let zero = || FILETIME {
-        dwLowDateTime: 0,
-        dwHighDateTime: 0,
-    };
-    let (mut c, mut e, mut k, mut u) = (zero(), zero(), zero(), zero());
-    // SAFETY: four valid out pointers and the pseudo-handle of this process.
-    let ok = unsafe { GetProcessTimes(GetCurrentProcess(), &mut c, &mut e, &mut k, &mut u) };
-    if ok == 0 {
-        return 0.0;
-    }
-    let ms = |f: FILETIME| (((f.dwHighDateTime as u64) << 32) | f.dwLowDateTime as u64) as f64;
-    (ms(k) + ms(u)) / 10_000.0
-}
-
-/// This process's CPU over `d`, in percent of one core.
-fn cpu_over(d: Duration) -> f64 {
-    let (c0, t0) = (cpu_ms(), Instant::now());
-    thread::sleep(d);
-    (cpu_ms() - c0) / t0.elapsed().as_secs_f64() / 10.0
-}
-
 /// smoke-v2-desktop.js: a fresh lens told its frame once, with nothing sent
 /// after, draws it with its chip (`lensFirstDraw`).
 fn lens_first_draw(cx: &Cx) {
@@ -347,11 +270,10 @@ fn lens_first_draw(cx: &Cx) {
     let label = lens::label_for(d.id);
     lens::destroy(&cx.app);
     lens::set_frame(&cx.app, Some(&d), "smoke");
-    let read_js = "(() => document.getElementById('frame').classList.contains('on') + ':'                    + document.getElementById('chip').textContent)()";
-    let read = || match cx.eval(&label, read_js) {
-        Ok(Value::String(s)) => s,
-        Ok(v) => v.to_string(),
-        Err(e) => format!("error:{e}"),
+    let read = || match (cx.probe(&label, "frame"), cx.probe(&label, "chip")) {
+        (Ok(frame), Ok(Value::String(chip))) => format!("{frame}:{chip}"),
+        (Ok(frame), Ok(chip)) => format!("{frame}:{chip}"),
+        (Err(e), _) | (_, Err(e)) => format!("error:{e}"),
     };
     let drew = cx.wait_for(Duration::from_secs(5), || read() == "true:smoke");
     let last = read();
@@ -367,33 +289,6 @@ fn lens_first_draw(cx: &Cx) {
     lens::destroy(&cx.app);
 }
 
-/// B-030: the agent's frame holds the backdrop at its fast pace; once it is
-/// gone and only the orb shows, it is back at 5 s within 6 s.
-fn backdrop_idle(cx: &Cx) {
-    let d = screen::primary(&screen::all_displays());
-    lens::set_frame(&cx.app, Some(&d), "smoke");
-    let fast = cx.wait_for(Duration::from_secs(5), || !backdrop::slow_paced());
-    lens::set_frame(&cx.app, None, "");
-    let t = Instant::now();
-    let slow = cx.wait_for(Duration::from_secs(6), backdrop::slow_paced);
-    let ms = t.elapsed().as_millis();
-    // What holds the fast pace: every window still shown but the orb's.
-    let shown: Vec<String> = cx
-        .on_main(|app| {
-            app.webview_windows()
-                .into_iter()
-                .filter(|(l, w)| l != "overlay" && w.is_visible().unwrap_or(false))
-                .map(|(l, _)| l)
-                .collect()
-        })
-        .unwrap_or_default();
-    let value = format!(
-        "fast={fast} slow={slow} after {ms}ms shown=[{}]",
-        shown.join(",")
-    );
-    check(cx, "backdropIdle", fast && slow, value);
-}
-
 fn point_at(x: f64, y: f64, label: &str) -> buddy::Point {
     buddy::Point {
         x,
@@ -404,32 +299,10 @@ fn point_at(x: f64, y: f64, label: &str) -> buddy::Point {
 
 /// Whether the pointer page is showing `message` within `within`.
 fn pointer_shows(cx: &Cx, message: &str, within: Duration) -> bool {
-    let js = format!(
-        "document.getElementById('buddy').classList.contains('visible') && message === {}",
-        json!(message)
-    );
-    cx.wait_for(within, || cx.eval(buddy::LABEL, &js) == Ok(json!(true)))
-}
-
-/// Kills the page's renderer through DevTools, as a crash would.
-fn crash_renderer(cx: &Cx, label: &str) -> Result<(), String> {
-    use ::windows::core::w;
-    use webview2_com::CallDevToolsProtocolMethodCompletedHandler;
-
-    let window = cx
-        .app
-        .get_webview_window(label)
-        .ok_or_else(|| format!("no window {label}"))?;
-    let sent = window.with_webview(|pw| {
-        let done = CallDevToolsProtocolMethodCompletedHandler::create(Box::new(|_, _| Ok(())));
-        // SAFETY: COM calls on the webview's own thread, inside `with_webview`.
-        unsafe {
-            if let Ok(core) = pw.controller().CoreWebView2() {
-                let _ = core.CallDevToolsProtocolMethod(w!("Page.crash"), w!("{}"), &done);
-            }
-        }
-    });
-    sent.map_err(|e| e.to_string())
+    cx.wait_for(within, || {
+        cx.probe(buddy::LABEL, "visible") == Ok(json!(true))
+            && cx.probe(buddy::LABEL, "message") == Ok(json!(message))
+    })
 }
 
 /// main.js:3653-3658: a point the model named resolves through the reader's
@@ -453,11 +326,12 @@ fn point_resolved(cx: &Cx) {
     let named = points.len();
     buddy::show_points(points, Some(&d));
     let shown = pointer_shows(cx, "terminal tab", Duration::from_secs(8));
-    let ok = named == 1 && shown && buddy::is_active();
+    let ready = buddy::is_ready();
+    let ok = named == 1 && shown && ready && buddy::is_active();
     let value = if ok {
         "true".to_string()
     } else {
-        format!("named={named} shown={shown}")
+        format!("named={named} shown={shown} ready={ready}")
     };
     check(cx, "pointResolved", ok, value);
     buddy::cancel();
@@ -520,56 +394,6 @@ fn reuse(cx: &Cx) {
     check(cx, "buddyReuse", first && second && waited < 300, value);
 }
 
-/// B-114: a pointer page whose renderer dies comes back, and the window has
-/// stopped eating clicks.
-fn reload(cx: &Cx) {
-    // The point goes in the quarter of the display away from the real
-    // cursor, which earlier probes leave wherever their input ended: a page
-    // whose bubble is under the cursor takes the mouse, as it should.
-    let d = screen::primary(&screen::all_displays());
-    let b = d.bounds;
-    let cursor = screen::cursor_phys().unwrap_or((d.phys.x, d.phys.y));
-    let left = f64::from(cursor.0 - d.phys.x) / d.scale_factor < b.width / 2.0;
-    let top = f64::from(cursor.1 - d.phys.y) / d.scale_factor < b.height / 2.0;
-    let x = if left {
-        b.x + b.width - 360.0
-    } else {
-        b.x + 120.0
-    };
-    let y = if top {
-        b.y + b.height - 260.0
-    } else {
-        b.y + 140.0
-    };
-    buddy::show_points(vec![point_at(x, y, "reload point")], Some(&d));
-    let shown = pointer_shows(cx, "reload point", Duration::from_secs(5));
-    buddy::set_click_through(false);
-    let _ = cx.eval(buddy::LABEL, "(window.smokeBefore = 1)");
-    let crashed = crash_renderer(cx, buddy::LABEL);
-    let t = Instant::now();
-    let new_page = "window.smokeBefore === undefined";
-    // Each condition on its own, so a failure says which one held out. The
-    // page check has a short timeout: a script started in a page that is
-    // being replaced never settles, and a 5 s eval would use up the budget.
-    let (mut through, mut ready, mut fresh) = (false, false, false);
-    let back = cx.wait_for(Duration::from_secs(5), || {
-        through = buddy::lets_mouse_through();
-        ready = buddy::is_ready();
-        if through && ready && !fresh {
-            let short = Duration::from_millis(400);
-            fresh = cx.eval_for(buddy::LABEL, new_page, short) == Ok(json!(true));
-        }
-        through && ready && fresh
-    });
-    let ms = t.elapsed().as_millis();
-    let value = format!(
-        "shown={shown} crash={crashed:?} back={back} in {ms}ms \
-         (clickThrough={through} ready={ready} freshPage={fresh} cursor={cursor:?})"
-    );
-    check(cx, "buddyReload", shown && crashed.is_ok() && back, value);
-    buddy::cancel();
-}
-
 /// main.js:3921-3926: model points show and finish, and the walkthrough
 /// starts.
 fn tour(cx: &Cx) {
@@ -584,13 +408,18 @@ fn tour(cx: &Cx) {
     let shown = buddy::is_active();
     check(cx, "buddyPoints", shown, shown);
     buddy::advance();
+    // Done, and the pointer's window no longer takes clicks (B-114's half
+    // that still applies to a native page).
+    cx.sleep(200);
     let done = !buddy::is_active();
-    check(cx, "buddyPointsDone", done, done);
+    let through = buddy::lets_mouse_through();
+    let value = format!("{done} clickThrough={through}");
+    check(cx, "buddyPointsDone", done && through, value);
     shared(&cx.app).call(&cx.app, |h| h.start_tour.as_ref());
     let started = cx.wait_for(Duration::from_secs(2), buddy::is_active);
     check(cx, "walkthrough", started, started);
     buddy::cancel();
     onboarding(cx);
     reuse(cx);
-    reload(cx);
+
 }

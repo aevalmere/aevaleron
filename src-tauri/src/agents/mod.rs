@@ -37,9 +37,11 @@ use crate::state::Rect;
 
 /// The notification's window.
 pub const LABEL: &str = "agents";
-/// The card is 420 wide with 22 of room for its shadow each side, as
-/// Aevalsistant's (Toast.cs, ToastArt.W and Pad). DIPs.
-const WINDOW_WIDTH: f64 = 464.0;
+/// The card is 420 wide, as Aevalsistant's (Toast.cs, ToastArt.W). The
+/// native window is the card itself, so it is that wide. DIPs.
+const CARD_WIDTH: f64 = 420.0;
+/// How far below the top of the work area the card hangs, DIPs.
+const CARD_TOP: f64 = 16.0;
 /// The countdown runs only while the person is at the keyboard.
 const AWAY_AFTER_MS: u64 = 20_000;
 const TICK_MS: u64 = 250;
@@ -595,7 +597,7 @@ fn window(app: &AppHandle) -> Option<crate::shell::WebviewWindow> {
         WebviewWindowBuilder::new(app, LABEL, WebviewUrl::App("renderer/agents.html".into()))
             .title("Aevaleron agents")
             .decorations(false)
-            .transparent(true)
+            .transparent(false)
             .shadow(false)
             .resizable(false)
             .focusable(false)
@@ -611,13 +613,11 @@ fn window(app: &AppHandle) -> Option<crate::shell::WebviewWindow> {
             // Never takes the keyboard, and stays out of screenshots.
             win::tool_window(raw, true);
             capture::exclude_window(raw);
-            // The shared window flags keep it that way, and let the mouse
-            // through everywhere but the card: the page says where the card
-            // is (`agents:pass`) from the pointer moves forwarded to it.
+            // The shared window flags keep it that way. The window is the
+            // card, so it takes the mouse everywhere.
             let flags = crate::windows::flags::Meta::default();
             crate::windows::flags::adopt(app, &w, flags);
             crate::windows::flags::set_focusable(raw, false);
-            crate::windows::flags::set_click_through(&w, true);
             Some(w)
         }
         Err(e) => {
@@ -797,15 +797,16 @@ fn spot_now() -> Spot {
     }
 }
 
-/// The window for a page `height` DIPs tall: centred on the work area,
-/// against its top edge (so under a taskbar at the top), physical pixels.
-/// The card sits 16 DIPs down inside it, as Aevalsistant's does.
+/// The window for a card `height` DIPs tall: centred on the work area, 16
+/// DIPs below its top edge (so under a taskbar at the top), as
+/// Aevalsistant's card hangs. Physical pixels.
 fn place_px(spot: Spot, height: f64) -> PxRect {
-    let width = (WINDOW_WIDTH * spot.scale).ceil();
+    let width = (CARD_WIDTH * spot.scale).ceil();
     let x = spot.work.x + ((spot.work.width - width) / 2.0).trunc();
+    let y = spot.work.y + (CARD_TOP * spot.scale).round();
     PxRect {
         x: x as i32,
-        y: spot.work.y as i32,
+        y: y as i32,
         width: width as i32,
         height: (height * spot.scale).ceil() as i32,
     }
@@ -840,13 +841,10 @@ fn page_size(app: &AppHandle, p: &Value) -> Value {
     json!({ "ok": true })
 }
 
-/// `agents:pass`: whether the pointer is off the card, so clicks go
-/// through to whatever is under the window.
-fn page_pass(app: &AppHandle, p: &Value) -> Value {
-    let through = p.get("ignore").and_then(Value::as_bool).unwrap_or(true);
-    if let Some(w) = app.get_webview_window(LABEL) {
-        crate::windows::flags::set_click_through(&w, through);
-    }
+/// `agents:pass`: the web page let clicks through around its card. The
+/// native window is only the card, so it always takes them; still
+/// answered, as the page sends it once at start.
+fn page_pass() -> Value {
     json!({ "ok": true })
 }
 
@@ -1440,35 +1438,35 @@ mod tests {
     #[test]
     fn the_notification_hangs_from_the_top_centre_like_aevalsistants() {
         let px = |r: PxRect| (r.x, r.y, r.width, r.height);
-        // 100%: 464 wide, centred, against the top of the work area.
+        // 100%: 420 wide, centred, 16 below the top of the work area.
         let one = Spot {
             work: Rect::new(0.0, 0.0, 1920.0, 1032.0),
             scale: 1.0,
         };
-        assert_eq!(px(place_px(one, 102.0)), (728, 0, 464, 102));
-        // A taskbar at the top: the work area starts under it.
+        assert_eq!(px(place_px(one, 102.0)), (750, 16, 420, 102));
+        // A taskbar at the top: the card hangs 16 under it.
         let top_bar = Spot {
             work: Rect::new(0.0, 48.0, 1920.0, 1032.0),
             scale: 1.0,
         };
-        assert_eq!(place_px(top_bar, 102.0).y, 48);
+        assert_eq!(place_px(top_bar, 102.0).y, 64);
         // 125% and 150%: the same DIPs in more pixels, still centred.
         let five_four = Spot {
             work: Rect::new(0.0, 0.0, 2560.0, 1380.0),
             scale: 1.25,
         };
-        assert_eq!(px(place_px(five_four, 102.0)), (990, 0, 580, 128));
+        assert_eq!(px(place_px(five_four, 102.0)), (1017, 20, 525, 128));
         let three_two = Spot {
             work: Rect::new(0.0, 0.0, 2880.0, 1560.0),
             scale: 1.5,
         };
-        assert_eq!(px(place_px(three_two, 102.0)), (1092, 0, 696, 153));
+        assert_eq!(px(place_px(three_two, 102.0)), (1125, 24, 630, 153));
         // A second display to the left of the primary, at 150%.
         let left = Spot {
             work: Rect::new(-2880.0, 120.0, 2880.0, 1560.0),
             scale: 1.5,
         };
-        assert_eq!(px(place_px(left, 102.0)), (-1788, 120, 696, 153));
+        assert_eq!(px(place_px(left, 102.0)), (-1755, 144, 630, 153));
     }
 
     #[test]

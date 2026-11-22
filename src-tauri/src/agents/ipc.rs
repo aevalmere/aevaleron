@@ -15,8 +15,8 @@ pub async fn route(app: &AppHandle, channel: &str, p: &Value) -> Option<Result<V
             json!({ "ok": true })
         }
         "agents:size" => super::page_size(app, p),
-        // The pointer is on the card or off it: clicks off it go through.
-        "agents:pass" => super::page_pass(app, p),
+        // Sent once at start; the native card always takes the mouse.
+        "agents:pass" => super::page_pass(),
         // The card has lifted away: the window may hide.
         "agents:hidden" => super::page_hidden(app),
         // The countdown waits while the pointer is on the card.

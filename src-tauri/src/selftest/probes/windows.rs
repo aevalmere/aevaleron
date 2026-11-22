@@ -1,21 +1,22 @@
 //! The windows lane's smoke labels, listed in `tools/smoke-labels/windows.txt`.
 //! `selftest/mod.rs` documents the probe API, with a worked example.
 //!
-//! - `hoverKeepsAnswer`: the real pointer crosses an open answer window, its
-//!   clear margin and its sheet, and the window stays shown, where it was,
-//!   with its sheet in view. tao's click-through hid any window shown with
-//!   `show_inactive` the first time the pointer reached the margin.
-//! - `marginClickThrough`: the clear margin still lets clicks through and the
-//!   sheet still takes them.
+//! - `hoverKeepsAnswer`: the real pointer crosses an open answer window and
+//!   leaves it, and the window stays shown, where it was, inside the work
+//!   area, with its page saying it shows. tao's click-through hid any window
+//!   shown with `show_inactive` the first time the pointer reached it.
 //! - `minimizeToPill`: Minimize folds the bar into the pill and hides the
 //!   answer window; opening the bar again brings the same conversation back.
+//!
+//! The native answer window is opaque, so it has no clear margin and
+//! Electron's `marginClickThrough` is gone.
 
 use std::time::Duration;
 
 use serde_json::{json, Value};
-use tauri::Manager;
 
 use crate::selftest::{Cx, Input};
+use crate::shell::Manager;
 use crate::state::{shared, Rect};
 use crate::store;
 use crate::windows::{self, flags, outputs, screen, OVERLAY};
@@ -23,29 +24,20 @@ use crate::windows::{self, flags, outputs, screen, OVERLAY};
 const WAIT: Duration = Duration::from_secs(5);
 const BOOT: Duration = Duration::from_secs(20);
 
-const LABELS: [&str; 3] = ["hoverKeepsAnswer", "marginClickThrough", "minimizeToPill"];
+const LABELS: [&str; 2] = ["hoverKeepsAnswer", "minimizeToPill"];
 
-const OUTPUT_READY: &str = "!!(document.getElementById('opanel') && window.AevalGlass)";
-const BAR_READY: &str = "!!document.getElementById('query-input')";
-const MODE_JS: &str = "document.body.dataset.mode || ''";
+/// How many messages the answer page shows: its `messages` probe, a list or
+/// a count.
+fn message_count(v: &Value) -> usize {
+    match v {
+        Value::Array(a) => a.len(),
+        Value::Number(n) => n.as_u64().unwrap_or(0) as usize,
+        _ => 0,
+    }
+}
 
-/// The sheet as the page lays it out, in CSS px from the window's corner.
-const SHEET_JS: &str = r#"(() => {
-  const s = document.getElementById('opanel');
-  const r = s.getBoundingClientRect();
-  return {
-    shown: !s.hidden && !document.hidden && !s.classList.contains('away') && r.height > 0,
-    x: r.left + r.width / 2,
-    top: r.top,
-    bottom: r.bottom,
-    dpr: devicePixelRatio,
-    inner: innerHeight,
-    msgs: document.querySelectorAll('#chat > .msg').length,
-  };
-})()"#;
-
-fn num(v: &Value, key: &str) -> f64 {
-    v.get(key).and_then(Value::as_f64).unwrap_or(0.0)
+fn page_shown(cx: &Cx, label: &str) -> bool {
+    cx.probe(label, "visible") == Ok(json!(true))
 }
 
 fn conversation() -> Vec<Value> {
@@ -62,8 +54,8 @@ pub fn run(cx: &mut Cx) {
         }
         return;
     };
-    let ready = cx.wait_for(BOOT, || cx.eval(&label, OUTPUT_READY) == Ok(json!(true)))
-        && cx.wait_for(BOOT, || cx.eval(OVERLAY, BAR_READY) == Ok(json!(true)));
+    let ready = cx.wait_for(BOOT, || cx.probe(&label, "visible").is_ok())
+        && cx.wait_for(BOOT, || cx.probe(OVERLAY, "input").is_ok());
     if !ready {
         for l in LABELS {
             cx.must(l, false, "a page never loaded");
@@ -101,7 +93,6 @@ pub fn run(cx: &mut Cx) {
     // Andy lost the answer with the bar at the bottom left: the window
     // grows up from it, so the pointer comes down through its clear part.
     let mut kept = true;
-    let mut through = true;
     let mut whys = Vec::new();
     for (h, v) in [
         ("left", "bottom"),
@@ -110,14 +101,11 @@ pub fn run(cx: &mut Cx) {
         ("center", "top"),
     ] {
         place(cx, &label, h, v);
-        let (k, t, why) = hover(cx, &label);
+        let (k, why) = hover(cx, &label);
         kept &= k;
-        through &= t;
         whys.push(format!("[{h}-{v}] {why}"));
     }
-    let why = whys.join(" ");
-    cx.must("hoverKeepsAnswer", kept, &why);
-    cx.must("marginClickThrough", through, why);
+    cx.must("hoverKeepsAnswer", kept, whys.join(" "));
 
     minimize(cx, &label);
     store::get().set_overlay_pos(&pos);
@@ -217,75 +205,51 @@ fn same(a: Rect, b: Rect) -> bool {
         && (a.height - b.height).abs() < 1.0
 }
 
-/// One stop of the pointer: moved there, given time, then looked at.
-fn stop(cx: &Cx, label: &str, hwnd: isize, at: (i32, i32)) -> (bool, Rect, bool, bool) {
-    // Two moves, as a hand makes: the page decides on a mousemove.
+/// One stop of the pointer: moved there, given time, then looked at:
+/// (the window shows, where it is, its page says it shows).
+fn stop(cx: &Cx, label: &str, hwnd: isize, at: (i32, i32)) -> (bool, Rect, bool) {
+    // Two moves, as a hand makes.
     let moved = cx.input(Input::Move(at.0 + 2, at.1)).is_ok();
     cx.sleep(60);
     let moved = moved && cx.input(Input::Move(at.0, at.1)).is_ok();
     cx.sleep(450);
-    let page = cx.eval(label, SHEET_JS).unwrap_or(Value::Null);
-    let shown = page.get("shown") == Some(&json!(true));
     (
         moved && flags::is_visible(hwnd),
         flags::rect_px(hwnd),
-        shown,
-        flags::is_click_through(label),
+        page_shown(cx, label),
     )
 }
 
-/// The pointer over the sheet, the clear part and back: (stayed, clicks
-/// passed where they should, the trail).
-fn hover(cx: &Cx, label: &str) -> (bool, bool, String) {
-    let page = cx.eval(label, SHEET_JS).unwrap_or(Value::Null);
+/// The pointer over the answer, near its edges, off it and back: (stayed,
+/// the trail).
+fn hover(cx: &Cx, label: &str) -> (bool, String) {
     let Some(hwnd) = flags::hwnd_for(label) else {
-        return (false, false, "no window handle".into());
+        return (false, "no window handle".into());
     };
     let start = flags::rect_px(hwnd);
-    // The glass, not the window: its clear stage margin may hang past the
-    // work area's edge.
     let wa = screen::matching_px(start).work_area;
     let in_wa = inside(windows::motion::glass(hwnd), wa);
-    let start_shown = flags::is_visible(hwnd) && page.get("shown") == Some(&json!(true));
-    let dpr = num(&page, "dpr").max(1.0);
-    let x = (start.x + num(&page, "x") * dpr).round() as i32;
-    let on_sheet = (start.y + (num(&page, "top") + 24.0) * dpr).round() as i32;
-    // The clear part of the window: it keeps room for the tallest sheet
-    // (B-027), under the sheet when it grows down, over it when it grows up.
-    let below = num(&page, "bottom") + 48.0;
-    let above = num(&page, "top") - 48.0;
-    let in_margin = if below < num(&page, "inner") - 4.0 {
-        Some((start.y + below * dpr).round() as i32)
-    } else if above > 4.0 {
-        Some((start.y + above * dpr).round() as i32)
-    } else {
-        None
-    };
-    let outside = ((start.x - 60.0).max(0.0) as i32, on_sheet);
-
-    let mut steps = vec![("sheet", (x, on_sheet))];
-    if let Some(y) = in_margin {
-        steps.extend([
-            ("margin", (x, y)),
-            ("sheet", (x, on_sheet)),
-            ("margin", (x, y)),
-        ]);
-    }
-    steps.push(("outside", outside));
+    let start_shown = flags::is_visible(hwnd) && page_shown(cx, label);
+    let x = (start.x + start.width / 2.0).round() as i32;
+    let middle = (start.y + start.height / 2.0).round() as i32;
+    let near_top = (start.y + 12.0).round() as i32;
+    let near_bottom = (start.y + start.height - 12.0).round() as i32;
+    let outside = ((start.x - 60.0).max(0.0) as i32, middle);
+    let steps = [
+        ("middle", (x, middle)),
+        ("top", (x, near_top)),
+        ("bottom", (x, near_bottom)),
+        ("middle", (x, middle)),
+        ("outside", outside),
+    ];
 
     let mut ok = start_shown && in_wa;
-    let mut through = in_margin.is_some();
     let mut trail = Vec::new();
     for (name, at) in steps {
-        let (visible, rect, sheet, ignoring) = stop(cx, label, hwnd, at);
-        ok &= visible && same(rect, start) && sheet && inside(windows::motion::glass(hwnd), wa);
-        match name {
-            "sheet" => through &= !ignoring,
-            "margin" => through &= ignoring,
-            _ => {}
-        }
+        let (visible, rect, shown) = stop(cx, label, hwnd, at);
+        ok &= visible && same(rect, start) && shown && inside(windows::motion::glass(hwnd), wa);
         trail.push(format!(
-            "{name}:visible={visible},sheet={sheet},through={ignoring},rect={},{},{},{}",
+            "{name}:visible={visible},page={shown},rect={},{},{},{}",
             rect.x, rect.y, rect.width, rect.height
         ));
     }
@@ -295,14 +259,12 @@ fn hover(cx: &Cx, label: &str) -> (bool, bool, String) {
     // lane's push-to-talk and would leave its pill up for the later probes.
     cx.on_main(|app| windows::on_hotkey(app, "captureQuery"));
     cx.sleep(600);
-    if let Some(y) = in_margin {
-        let (visible, rect, sheet, _) = stop(cx, label, hwnd, (x, y));
-        ok &= visible && sheet;
-        trail.push(format!(
-            "after-hotkey:visible={visible},sheet={sheet},rect={},{},{},{}",
-            rect.x, rect.y, rect.width, rect.height
-        ));
-    }
+    let (visible, rect, shown) = stop(cx, label, hwnd, (x, near_bottom));
+    ok &= visible && shown;
+    trail.push(format!(
+        "after-hotkey:visible={visible},page={shown},rect={},{},{},{}",
+        rect.x, rect.y, rect.width, rect.height
+    ));
     let why = format!(
         "start_shown={start_shown} in_work_area={in_wa} wa={},{},{},{} {}",
         wa.x,
@@ -312,11 +274,11 @@ fn hover(cx: &Cx, label: &str) -> (bool, bool, String) {
         trail.join(" ")
     );
     cx.log("hoverTrail", &why);
-    (ok, through, why)
+    (ok, why)
 }
 
 fn bar_mode(cx: &Cx) -> String {
-    cx.eval(OVERLAY, MODE_JS)
+    cx.probe(OVERLAY, "mode")
         .ok()
         .and_then(|v| v.as_str().map(str::to_string))
         .unwrap_or_default()
@@ -335,11 +297,12 @@ fn minimize(cx: &Cx, label: &str) {
     cx.on_main(|app| windows::open_bar(app, None, None));
     let back = cx.wait_for(WAIT, || bar_mode(cx) == "panel") && cx.wait_for(WAIT, visible);
     cx.sleep(600);
-    let page = cx.eval(label, SHEET_JS).unwrap_or(Value::Null);
-    let kept = num(&page, "msgs") >= 2.0 && page.get("shown") == Some(&json!(true));
+    let messages = cx.probe(label, "messages").unwrap_or(Value::Null);
+    let shown = page_shown(cx, label);
+    let kept = message_count(&messages) >= 2 && shown;
     cx.must(
         "minimizeToPill",
         opened && folded && back && kept,
-        format!("opened={opened} folded={folded} back={back} kept={kept} page={page}"),
+        format!("opened={opened} folded={folded} back={back} kept={kept} messages={messages}"),
     );
 }

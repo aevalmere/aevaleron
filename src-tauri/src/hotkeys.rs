@@ -13,11 +13,10 @@ use std::time::Duration;
 
 use parking_lot::Mutex;
 use serde_json::{json, Value};
-use tauri::AppHandle;
-use tauri_plugin_global_shortcut::{
-    Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutEvent, ShortcutState,
-};
+use global_hotkey::hotkey::{Code, HotKey, Modifiers};
+use global_hotkey::{GlobalHotKeyEvent, GlobalHotKeyManager, HotKeyState};
 
+use crate::shell::AppHandle;
 use crate::state::{shared, Mode};
 use crate::store::{self, ACTIONS};
 
@@ -305,8 +304,61 @@ const ALTERNATIVES: [&str; 3] = ["Ctrl+Alt+A", "Super+Shift+Space", "Ctrl+Shift+
 const TAKEN: &str = "Another app already uses that shortcut. Try another.";
 const NOT_CHANGED: &str = "The shortcut was not changed. Try again.";
 
-/// Registration, as `reconcile` needs it: the plugin in the app, a fake in
-/// the tests.
+// ---------------------------------------------------- the registrar
+
+thread_local! {
+    /// RegisterHotKey belongs to the thread whose loop hears WM_HOTKEY: the
+    /// UI thread, which makes this on first use.
+    static MANAGER: Option<GlobalHotKeyManager> = GlobalHotKeyManager::new().ok();
+}
+
+/// Every hotkey registered now, so all of them can go at once.
+fn live() -> &'static Mutex<Vec<HotKey>> {
+    static L: OnceLock<Mutex<Vec<HotKey>>> = OnceLock::new();
+    L.get_or_init(|| Mutex::new(Vec::new()))
+}
+
+/// global-hotkey on this thread; Err when it could not start.
+fn register_key(key: HotKey) -> Result<(), String> {
+    MANAGER.with(|m| match m {
+        Some(m) => m.register(key).map_err(|e| e.to_string()),
+        None => Err("no hotkey manager".to_string()),
+    })?;
+    live().lock().push(key);
+    Ok(())
+}
+
+fn unregister_key(key: HotKey) {
+    MANAGER.with(|m| {
+        if let Some(m) = m {
+            let _ = m.unregister(key);
+        }
+    });
+    live().lock().retain(|k| k.id() != key.id());
+}
+
+/// Lets go of every chord (on quit, and before re-registering all).
+pub fn unregister_all() {
+    let keys: Vec<HotKey> = std::mem::take(&mut *live().lock());
+    if crate::shell::platform::is_ui_thread() {
+        MANAGER.with(|m| {
+            if let Some(m) = m {
+                let _ = m.unregister_all(&keys);
+            }
+        });
+    }
+}
+
+/// Wires the hotkey events to `on_shortcut` (lib.rs, before setup).
+pub fn init(app: &AppHandle) {
+    let app = app.clone();
+    GlobalHotKeyEvent::set_event_handler(Some(move |e: GlobalHotKeyEvent| {
+        crate::crash::guard("hotkey", || on_shortcut(&app, e.id, e.state));
+    }));
+}
+
+/// Registration, as `reconcile` needs it: global-hotkey in the app, a fake
+/// in the tests.
 trait Keys {
     fn register(&mut self, acc: &str, action: &str) -> bool;
     fn unregister(&mut self, acc: &str);
@@ -320,8 +372,8 @@ impl Keys for Plugin<'_> {
         let Ok((mods, code)) = parse(acc) else {
             return false;
         };
-        let sc = Shortcut::new(Some(mods), code);
-        if self.0.global_shortcut().register(sc).is_err() {
+        let sc = HotKey::new(Some(mods), code);
+        if register_key(sc).is_err() {
             return false;
         }
         bound().lock().insert(sc.id(), action.to_string());
@@ -330,14 +382,14 @@ impl Keys for Plugin<'_> {
 
     fn unregister(&mut self, acc: &str) {
         if let Ok((mods, code)) = parse(acc) {
-            let sc = Shortcut::new(Some(mods), code);
-            let _ = self.0.global_shortcut().unregister(sc);
+            let sc = HotKey::new(Some(mods), code);
+            unregister_key(sc);
             bound().lock().remove(&sc.id());
         }
     }
 
     fn unregister_all(&mut self) {
-        let _ = self.0.global_shortcut().unregister_all();
+        unregister_all();
         bound().lock().clear();
     }
 }
@@ -550,12 +602,12 @@ pub fn main_chord_failed(app: &AppHandle) -> bool {
         == Some(false)
 }
 
-/// The plugin's handler, wired in lib.rs.
-pub fn on_shortcut(app: &AppHandle, shortcut: &Shortcut, event: ShortcutEvent) {
-    if event.state() != ShortcutState::Pressed {
+/// A hotkey went down or up (`init` wires it).
+fn on_shortcut(app: &AppHandle, id: u32, state: HotKeyState) {
+    if state != HotKeyState::Pressed {
         return;
     }
-    let action = bound().lock().get(&shortcut.id()).cloned();
+    let action = bound().lock().get(&id).cloned();
     let Some(action) = action else {
         return;
     };
@@ -563,7 +615,7 @@ pub fn on_shortcut(app: &AppHandle, shortcut: &Shortcut, event: ShortcutEvent) {
         ESCAPE_FIRED.fetch_add(1, SeqCst);
     }
     let app = app.clone();
-    tauri::async_runtime::spawn(async move {
+    crate::shell::async_runtime::spawn(async move {
         crate::windows::on_hotkey(&app, &action);
     });
 }
@@ -623,15 +675,14 @@ fn free_alternatives(ours: &[String], mut probe: impl FnMut(&str) -> bool) -> Ve
 }
 
 /// Whether another app holds `acc`. Only meaningful with ours unregistered.
-fn probe(app: &AppHandle, acc: &str) -> bool {
+fn probe(acc: &str) -> bool {
     let Ok((m, c)) = parse(acc) else {
         return false;
     };
-    let gs = app.global_shortcut();
-    let sc = Shortcut::new(Some(m), c);
-    let ok = gs.register(sc).is_ok();
+    let sc = HotKey::new(Some(m), c);
+    let ok = register_key(sc).is_ok();
     if ok {
-        let _ = gs.unregister(sc);
+        unregister_key(sc);
     }
     ok
 }
@@ -678,14 +729,14 @@ fn set_now(app: &AppHandle, action: &str, accelerator: &str) -> Value {
     Plugin(app).unregister_all();
     *registered().lock() = Registered::default();
     shared(app).lock().escape_registered = false;
-    if !probe(app, accelerator) {
+    if !probe(accelerator) {
         let mut ours: Vec<String> = shortcuts
             .values()
             .filter_map(Value::as_str)
             .map(String::from)
             .collect();
         ours.push(accelerator.to_string());
-        let free = free_alternatives(&ours, |c| probe(app, c));
+        let free = free_alternatives(&ours, probe);
         apply_now(app);
         return json!({ "ok": false, "error": TAKEN, "free": free });
     }

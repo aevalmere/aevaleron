@@ -2,7 +2,7 @@
 //! `tools/smoke-labels/region-text.txt`: "Copy text from screen" over the
 //! smoke's Notepad (exact text), over a picture of text (only OCR can read
 //! it) and over nothing, all without the mouse. The picker is driven as the
-//! capture probe drives it: a real Escape, and a drag dispatched in its page.
+//! capture probe drives it: a real Escape, and a real drag (`SendInput`).
 
 use std::os::windows::process::CommandExt;
 use std::path::PathBuf;
@@ -10,7 +10,6 @@ use std::process::{Child, Command, Stdio};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use serde_json::{json, Value};
-use tauri::Manager;
 use windows_sys::Win32::UI::WindowsAndMessaging::GetForegroundWindow;
 
 use crate::capture::screen::{self, PxRect};
@@ -76,16 +75,15 @@ fn note_up(cx: &Cx) -> bool {
     cx.on_main(note::visible).unwrap_or(false)
 }
 
-/// The text of one element of the note's page.
-fn note_text(cx: &Cx, id: &str) -> String {
-    let js = format!("document.getElementById('{id}').textContent");
-    let got = cx.eval(note::LABEL, &js).ok();
+/// One of the note page's probe keys, as text ("title", "lead").
+fn note_text(cx: &Cx, key: &str) -> String {
+    let got = cx.probe(note::LABEL, key).ok();
     got.and_then(|v| v.as_str().map(str::to_string))
         .unwrap_or_default()
 }
 
 fn note_kind(cx: &Cx) -> String {
-    let got = cx.eval(note::LABEL, "document.body.dataset.kind").ok();
+    let got = cx.probe(note::LABEL, "kind").ok();
     got.and_then(|v| v.as_str().map(str::to_string))
         .unwrap_or_default()
 }
@@ -105,11 +103,8 @@ fn open_picker(cx: &Cx) -> bool {
 /// nothing was read, no note shows and the keyboard is back where it was.
 fn escape(cx: &Cx, front: u64) {
     let open = open_picker(cx);
-    let hint = cx.eval(
-        region::LABEL,
-        "document.getElementById('hint-text').textContent",
-    );
-    let named = cx.eval(region::LABEL, "document.body.getAttribute('aria-label')");
+    let hint = cx.probe(region::LABEL, "hint");
+    let named = cx.probe(region::LABEL, "label");
     let says = hint == Ok(json!(HINT));
     let labelled = named
         .as_ref()
@@ -194,22 +189,14 @@ fn fixture_rect(cx: &Cx, handle: &str) -> Result<PxRect, String> {
     })
 }
 
-/// A left-button drag in the picker's page over `area`, as desktop/checks.rs
-/// does it. The page answers `region:done` and its window closes.
+/// A real left-button drag over `area` (physical pixels), as
+/// desktop/checks.rs does it. The picker answers `region:done` and its
+/// window closes.
 fn drag_over(cx: &Cx, area: PxRect) {
-    let d = screen::active_display(&screen::all_displays());
-    let dip = d.rect_to_dip(area);
-    let (x1, y1) = (dip.x - d.bounds.x, dip.y - d.bounds.y);
-    let (x2, y2) = (x1 + dip.width, y1 + dip.height);
-    let js = format!(
-        "(() => {{\
-         const at = (t, x, y) => document.dispatchEvent(\
-         new MouseEvent(t, {{ clientX: x, clientY: y, button: 0, bubbles: true }}));\
-         at('mousedown', {x1}, {y1}); at('mousemove', {x2}, {y2}); at('mouseup', {x2}, {y2});\
-         }})();"
-    );
-    if let Some(w) = cx.app.get_webview_window(region::LABEL) {
-        let _ = w.eval(js.as_str());
+    let from = (area.x, area.y);
+    let to = (area.x + area.width, area.y + area.height);
+    if let Err(e) = cx.input(Input::Drag { from, to }) {
+        cx.log("regionTextDragInput", e);
     }
 }
 

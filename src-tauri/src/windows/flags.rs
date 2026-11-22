@@ -26,7 +26,6 @@ use std::time::Duration;
 
 use parking_lot::Mutex;
 use raw_window_handle::{HasWindowHandle, RawWindowHandle};
-use tauri::{AppHandle, Manager, WebviewWindow};
 use windows_sys::Win32::Foundation::{HWND, LPARAM, LRESULT, RECT, WPARAM};
 use windows_sys::Win32::UI::HiDpi::GetDpiForWindow;
 use windows_sys::Win32::UI::Input::KeyboardAndMouse::{GetAsyncKeyState, VK_LBUTTON};
@@ -40,6 +39,7 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{
     WS_EX_APPWINDOW, WS_EX_LAYERED, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TRANSPARENT,
 };
 
+use crate::shell::{AppHandle, WebviewWindow};
 use crate::state::Rect;
 
 const WDA_EXCLUDEFROMCAPTURE: u32 = 0x11;
@@ -236,8 +236,10 @@ fn kept_ex_style(new: u32, no_activate: bool) -> u32 {
     }
 }
 
-/// What click-through sets: the mouse passes through (TRANSPARENT needs
-/// LAYERED to do so). tao's own click-through sets the same two bits.
+/// What click-through sets: the mouse passes through. TRANSPARENT needs
+/// LAYERED to do so; every see-through native window is layered from birth
+/// (shell/platform.rs), so turning click-through off takes TRANSPARENT only
+/// and never the LAYERED its pixels are drawn with.
 const CLICK_BITS: u32 = WS_EX_TRANSPARENT | WS_EX_LAYERED;
 
 /// Windows that let the mouse through right now.
@@ -251,7 +253,7 @@ fn click_style(style: u32, ignore: bool) -> u32 {
     if ignore {
         style | CLICK_BITS
     } else {
-        style & !CLICK_BITS
+        style & !WS_EX_TRANSPARENT
     }
 }
 
@@ -794,9 +796,6 @@ fn poll_once(app: &AppHandle) -> bool {
         if !is_visible(hwnd) {
             continue;
         }
-        let Some(w) = app.get_webview_window(&label) else {
-            continue;
-        };
         let r = rect_px(hwnd);
         let inside = r.contains(cx, cy);
         let s = scale_of(hwnd);
@@ -816,19 +815,9 @@ fn poll_once(app: &AppHandle) -> bool {
                 });
             }
         }
+        // A native page reads the pointer itself; nothing is forwarded.
         if c.effective {
-            let px = (cx as i32, cy as i32);
-            if inside && px != c.last {
-                let x = (cx - r.x) / s;
-                let y = (cy - r.y) / s;
-                let _ = w.eval(format!(
-                    "document.dispatchEvent(new MouseEvent('mousemove',\
-                     {{clientX:{x},clientY:{y},bubbles:true}}))"
-                ));
-            } else if c.inside && !inside {
-                let _ = w.eval("document.dispatchEvent(new MouseEvent('mouseleave'))");
-            }
-            c.last = px;
+            c.last = (cx as i32, cy as i32);
         }
         c.inside = inside;
         if let Some(slot) = clicks().lock().get_mut(&label) {
@@ -912,7 +901,7 @@ mod tests {
         // tao's styles for the same window opaque and click-through
         // (style_rewrite_keeps_our_bits): the two differ by exactly these.
         assert_eq!(click_style(0x40118, true), 0xc0138);
-        assert_eq!(click_style(0xc0138, false), 0x40118);
+        assert_eq!(click_style(0xc0138, false), 0xc0118);
         assert_eq!(click_style(0xc0138, true), 0xc0138);
     }
 

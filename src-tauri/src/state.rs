@@ -11,7 +11,7 @@ use std::collections::BTreeMap;
 use parking_lot::{Mutex, MutexGuard, RwLock};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use tauri::{AppHandle, Manager};
+use crate::shell::{AppHandle, Manager};
 use tokio::sync::broadcast;
 
 /// A rectangle in DIPs (Electron's unit), the glass and never the window.
@@ -385,7 +385,7 @@ impl Shared {
 }
 
 /// The shared state of a running app.
-pub fn shared(app: &AppHandle) -> tauri::State<'_, Shared> {
+pub fn shared(app: &AppHandle) -> crate::shell::State<'_, Shared> {
     app.state::<Shared>()
 }
 

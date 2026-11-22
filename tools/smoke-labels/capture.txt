@@ -13,17 +13,17 @@ regionEscape
 captureFailNull
 dpiRoundTrip
 glassTier
-glassLoaded
-snapCost
-glassCost
+# native-ui: glassLoaded removed; there is no glass.js in a native page (glassTier stays, always solid)
+# native-ui: snapCost removed; no backdrop captures to time any more
+# native-ui: glassCost removed; no live glass to compare against (idleCpuPct in harness.txt covers the cost at rest)
 lensFirstDraw
 buddyPoints
 buddyPointsDone
 walkthrough
 
 lensReady
-backdropIdle
+# native-ui: backdropIdle removed; there is no backdrop pace any more
 pointResolved
 onboardingSteps
 buddyReuse
-buddyReload
+# native-ui: buddyReload removed; a native page has no renderer process to crash and reload
