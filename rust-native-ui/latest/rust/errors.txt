@@ -192,6 +192,13 @@ warning: linker stdout: LINK : warning LNK4098: defaultlib 'libvcruntime.lib' co
 
 warning: `aevaleron` (lib test) generated 1 warning
 
+test llm::cli::run::tests::a_silent_cli_times_out_and_is_killed ... FAILED
+thread 'llm::cli::run::tests::a_silent_cli_times_out_and_is_killed' (1188) panicked at src\llm\cli\run.rs:862:9:
+both processes ran
+
+test result: FAILED. 656 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 15.32s
+error: test failed, to rerun pass `--lib`
+
 
 == build.log ==
 warning: aevaleron@1.1.1: The property 'viewport-height' has been deprecated: Please use 'content-height' instead
@@ -289,9 +296,3 @@ warning: linker stdout: LINK : warning LNK4098: defaultlib 'libvcruntime.lib' co
 
 warning: `aevaleron` (bin "aevaleron") generated 1 warning
 
-
-== smoke.log ==
-[SMOKE] uiaTree=FAIL:TIMEOUT:readTree did not finish in 12000ms (the target app may be hung)
-[SMOKE] failed: uiaTree
-[GATE] fail uiaTree=FAIL:TIMEOUT:readTree did not finish in 12000ms (the target app may be hung)
-[GATE] verdict=FAIL:1 FAIL line(s); no "done" line; failed: uiaTree; 1 listed label(s) never printed

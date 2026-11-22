@@ -92,5 +92,5 @@ warning: linker stdout: LINK : warning LNK4098: defaultlib 'libvcruntime.lib' co
   = note: `#[warn(linker_messages)]` on by default
 
 warning: `aevaleron` (bin "aevaleron") generated 1 warning
-    Finished `release` profile [optimized] target(s) in 4m 56s
+    Finished `release` profile [optimized] target(s) in 7m 01s
 [METRIC] exeKB=28388

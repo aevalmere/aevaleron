@@ -1,29 +1,29 @@
 {
   "workflow": "rust",
   "workflow_name": "rust",
-  "run_id": 45050024359,
+  "run_id": 45052287103,
   "run_attempt": 1,
-  "run_url": "https://github.com/aevalmere/aevaleron/actions/runs/45050024359",
+  "run_url": "https://github.com/aevalmere/aevaleron/actions/runs/45052287103",
   "event": "push",
-  "sha": "d07b3b940cf0405014a7bae5c2fb337b7423c9dd",
+  "sha": "bdecdcd7c8d3b2dab344f1ad9f00505452143b43",
   "ref": "rust/native-ui",
   "ref_dir": "rust-native-ui",
   "conclusion": "failure",
   "failed": [
-    "Smoke"
+    "Unit tests"
   ],
-  "finished": "2026-11-22T17:46:43Z",
-  "error_lines": 278,
+  "finished": "2026-11-22T18:14:45Z",
+  "error_lines": 279,
   "metrics": {
     "exeKB": "28388",
-    "installerKB": "8526",
+    "installerKB": "8525",
     "upgrade": "ok:from-1.1.1",
     "processCount": "1",
-    "idlePrivateMB": "38.9",
-    "idleWorkingSetMB": "130.2",
+    "idlePrivateMB": "39.4",
+    "idleWorkingSetMB": "130.4",
     "idleCpuPct": "0.16",
-    "idleThreads": "18",
-    "secondLaunchMs": "20"
+    "idleThreads": "19",
+    "secondLaunchMs": "28"
   },
   "steps": [
     {
@@ -78,7 +78,7 @@
     },
     {
       "name": "Unit tests",
-      "outcome": "success",
+      "outcome": "failure",
       "log": "test.log"
     },
     {
@@ -108,7 +108,7 @@
     },
     {
       "name": "Smoke",
-      "outcome": "failure",
+      "outcome": "success",
       "log": "smoke.log"
     },
     {

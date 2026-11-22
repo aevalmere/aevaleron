@@ -1,12 +1,12 @@
 # rust: failure
 
 - Workflow: rust
-- Run: [45050024359](https://github.com/aevalmere/aevaleron/actions/runs/45050024359), attempt 1, on push
-- Commit: d07b3b940cf0405014a7bae5c2fb337b7423c9dd
+- Run: [45052287103](https://github.com/aevalmere/aevaleron/actions/runs/45052287103), attempt 1, on push
+- Commit: bdecdcd7c8d3b2dab344f1ad9f00505452143b43
 - Ref: rust/native-ui
 - Conclusion: **failure**
-- Failed: Smoke
-- Finished: 2026-11-22T17:46:43Z
+- Failed: Unit tests
+- Finished: 2026-11-22T18:14:45Z
 
 | Step | Outcome | Log |
 |---|---|---|
@@ -20,13 +20,13 @@
 | Format | success |  |
 | Format patch | skipped |  |
 | Clippy | success | [clippy.log](clippy.log) |
-| Unit tests | success | [test.log](test.log) |
+| Unit tests | failure | [test.log](test.log) |
 | Release build | success | [build.log](build.log) |
 | Restore NSIS toolset | success |  |
 | Seed NSIS toolset | success | [nsis.log](nsis.log) |
 | Save NSIS toolset | skipped |  |
 | Build installer | success | [installer.log](installer.log) |
-| Smoke | failure | [smoke.log](smoke.log) |
+| Smoke | success | [smoke.log](smoke.log) |
 | Capture check | success | [capture.log](capture.log) |
 | Desktop selfcheck | success | [desktop.log](desktop.log) |
 | Install check | success | [install.log](install.log) |
@@ -36,13 +36,13 @@
 | Metric | Value |
 |---|---|
 | exeKB | 28388 |
-| installerKB | 8526 |
+| installerKB | 8525 |
 | upgrade | ok:from-1.1.1 |
 | processCount | 1 |
-| idlePrivateMB | 38.9 |
-| idleWorkingSetMB | 130.2 |
+| idlePrivateMB | 39.4 |
+| idleWorkingSetMB | 130.4 |
 | idleCpuPct | 0.16 |
-| idleThreads | 18 |
-| secondLaunchMs | 20 |
+| idleThreads | 19 |
+| secondLaunchMs | 28 |
 
-errors.txt: 278 error and warning lines from the logs.
+errors.txt: 279 error and warning lines from the logs.
