@@ -20,11 +20,11 @@ EXE header size:               50176 / 38912 bytes
 Install code:                          (29832 bytes)
 Install data:                          (29177360 bytes)
 Uninstall code+data:                   (46742 bytes)
-Compressed data:             8679556 / 29253934 bytes
-CRC (0x15A20678):                  4 / 4 bytes
+Compressed data:             8683869 / 29253934 bytes
+CRC (0x1472D77C):                  4 / 4 bytes
 
-Total size:                  8729736 / 29292850 bytes (29.8%)
+Total size:                  8734049 / 29292850 bytes (29.8%)
 
 1 warning:
   9100: Generating version information for language "1033-English" without standard key "LegalCopyright"
-[METRIC] installerKB=8525
+[METRIC] installerKB=8529

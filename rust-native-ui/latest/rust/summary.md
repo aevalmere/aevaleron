@@ -1,12 +1,11 @@
-# rust: failure
+# rust: success
 
 - Workflow: rust
-- Run: [45052287103](https://github.com/aevalmere/aevaleron/actions/runs/45052287103), attempt 1, on push
-- Commit: bdecdcd7c8d3b2dab344f1ad9f00505452143b43
+- Run: [45054412210](https://github.com/aevalmere/aevaleron/actions/runs/45054412210), attempt 1, on push
+- Commit: 415e6c02d29a702f72e89d5fd1d39d8bbc40cc60
 - Ref: rust/native-ui
-- Conclusion: **failure**
-- Failed: Unit tests
-- Finished: 2026-11-22T18:14:45Z
+- Conclusion: **success**
+- Finished: 2026-11-22T18:36:41Z
 
 | Step | Outcome | Log |
 |---|---|---|
@@ -20,7 +19,7 @@
 | Format | success |  |
 | Format patch | skipped |  |
 | Clippy | success | [clippy.log](clippy.log) |
-| Unit tests | failure | [test.log](test.log) |
+| Unit tests | success | [test.log](test.log) |
 | Release build | success | [build.log](build.log) |
 | Restore NSIS toolset | success |  |
 | Seed NSIS toolset | success | [nsis.log](nsis.log) |
@@ -36,13 +35,13 @@
 | Metric | Value |
 |---|---|
 | exeKB | 28388 |
-| installerKB | 8525 |
+| installerKB | 8529 |
 | upgrade | ok:from-1.1.1 |
 | processCount | 1 |
-| idlePrivateMB | 39.4 |
-| idleWorkingSetMB | 130.4 |
-| idleCpuPct | 0.16 |
-| idleThreads | 19 |
-| secondLaunchMs | 28 |
+| idlePrivateMB | 38 |
+| idleWorkingSetMB | 129.9 |
+| idleCpuPct | 0.08 |
+| idleThreads | 20 |
+| secondLaunchMs | 22 |
 
-errors.txt: 279 error and warning lines from the logs.
+errors.txt: 274 error and warning lines from the logs.

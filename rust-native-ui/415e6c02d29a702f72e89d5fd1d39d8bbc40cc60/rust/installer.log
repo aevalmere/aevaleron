@@ -1,0 +1,30 @@
+MakeNSIS v3.13 - Copyright 1999-2026 Contributors
+See the file COPYING for license details.
+Credits can be found in the Users Manual.
+
+Command line defined: "VERSION=1.1.1"
+Command line defined: "VERSIONWITHBUILD=1.1.1.0"
+Processing config: C:\Users\runneradmin\AppData\Local\tauri\NSIS\nsisconf.nsh
+Processing script file: "installer.nsi" (ACP)
+
+Processed 1 file, writing output (x86-unicode):
+warning 9100: Generating version information for language "1033-English" without standard key "LegalCopyright"
+
+Output: "D:\a\aevaleron\aevaleron\src-tauri\target\release\bundle\nsis\Aevaleron_1.1.1_x64-setup.exe"
+Install: 1 page (64 bytes), 1 section (2072 bytes), 747 instructions (20916 bytes), 213 strings (6086 bytes), 1 language table (230 bytes).
+Uninstall: 2 pages (192 bytes), 1 section (2072 bytes), 285 instructions (7980 bytes), 145 strings (4432 bytes), 1 language table (254 bytes).
+
+Using lzma (compress whole) compression.
+
+EXE header size:               50176 / 38912 bytes
+Install code:                          (29832 bytes)
+Install data:                          (29177360 bytes)
+Uninstall code+data:                   (46742 bytes)
+Compressed data:             8683869 / 29253934 bytes
+CRC (0x1472D77C):                  4 / 4 bytes
+
+Total size:                  8734049 / 29292850 bytes (29.8%)
+
+1 warning:
+  9100: Generating version information for language "1033-English" without standard key "LegalCopyright"
+[METRIC] installerKB=8529
