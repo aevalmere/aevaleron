@@ -241,4 +241,3 @@ pub(crate) fn stop() {
         });
     let _ = rx.recv_timeout(Duration::from_millis(1000));
 }
-

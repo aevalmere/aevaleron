@@ -330,12 +330,7 @@ mod tests {
         assert_eq!(type_timeout(1000), 4000);
         assert_eq!(type_timeout(5000), 12000);
         assert_eq!(
-            (
-                OP_TIMEOUT,
-                UIA_COLD_TIMEOUT,
-                OCR_TIMEOUT,
-                CAPTURE_TIMEOUT
-            ),
+            (OP_TIMEOUT, UIA_COLD_TIMEOUT, OCR_TIMEOUT, CAPTURE_TIMEOUT),
             (4000, 12000, 15000, 8000)
         );
         assert_eq!(CODES.len(), 16);

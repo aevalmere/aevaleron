@@ -16,13 +16,12 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{GetCursorPos, GetSystemMetrics
 
 use super::uia::{self, El, Info, RefEntry};
 use super::wins::{
-    focus_window, foreground_root, is_excluded_window, is_window, pid_of,
-    refuse_elevated, refuse_excluded, refuse_own_point, refuse_secure_desktop, root, title,
-    window_at,
+    focus_window, foreground_root, is_excluded_window, is_window, pid_of, refuse_elevated,
+    refuse_excluded, refuse_own_point, refuse_secure_desktop, root, title, window_at,
 };
 use super::{
-    arg, bool_arg, check_cancel, current_req, err, handle_str, int_arg, parse_handle, parse_ref, require_int,
-    sleep_ms, spawn_op, str_arg, to_text, u16len, DResult,
+    arg, bool_arg, check_cancel, current_req, err, handle_str, int_arg, parse_handle, parse_ref,
+    require_int, sleep_ms, spawn_op, str_arg, to_text, u16len, DResult,
 };
 
 const INPUT_MOUSE: u32 = 0;
@@ -309,10 +308,7 @@ pub(crate) fn parse_chord(chord: &str) -> DResult<Vec<u16>> {
                 continue;
             }
         }
-        return Err(err(
-            "BAD_ARGS",
-            format!("unknown key '{p}' in '{chord}'"),
-        ));
+        return Err(err("BAD_ARGS", format!("unknown key '{p}' in '{chord}'")));
     }
     if keys.is_empty() {
         return Err(err("BAD_ARGS", "empty key chord"));
@@ -495,6 +491,8 @@ pub(crate) fn click(a: &Value) -> DResult<Value> {
             }
             let el = e.el.clone();
             let done = run_bounded(2000, move || {
+                // The whole El moves in, not its non-Send field.
+                let el = el;
                 let p: IUIAutomationInvokePattern =
                     pattern(&el.0, UIA_InvokePatternId).ok_or_else(|| no_pattern("invoke"))?;
                 unsafe { p.Invoke() }.map_err(Into::into)
@@ -509,12 +507,7 @@ pub(crate) fn click(a: &Value) -> DResult<Value> {
         "left" => (0x2, 0x4),
         "right" => (0x8, 0x10),
         "middle" => (0x20, 0x40),
-        _ => {
-            return Err(err(
-                "BAD_ARGS",
-                "button must be left, right or middle",
-            ))
-        }
+        _ => return Err(err("BAD_ARGS", "button must be left, right or middle")),
     };
     let hit_top = check_point(p[0], p[1], e.as_ref(), force)?;
     // A click at a point that names its window lands in that window (or
@@ -525,10 +518,7 @@ pub(crate) fn click(a: &Value) -> DResult<Value> {
         if hit_top != want && pid_of(hit_top) != pid_of(want) {
             return Err(err(
                 "OCCLUDED",
-                format!(
-                    "another window (\"{}\") covers that spot",
-                    title(hit_top)
-                ),
+                format!("another window (\"{}\") covers that spot", title(hit_top)),
             ));
         }
     }
@@ -693,10 +683,7 @@ pub(crate) fn scroll_cmd(a: &Value) -> DResult<Value> {
         _ => 0,
     };
     if dx == 0 && dy == 0 {
-        return Err(err(
-            "BAD_ARGS",
-            "direction must be up, down, left or right",
-        ));
+        return Err(err("BAD_ARGS", "direction must be up, down, left or right"));
     }
     let (p, e, info) = target_point(a)?;
     if let (Some(e), Some(info)) = (&e, &info) {
@@ -861,8 +848,8 @@ pub(crate) fn set_value_cmd(a: &Value) -> DResult<Value> {
                 }
                 via = "toggle";
             } else {
-                let sp: IUIAutomationSelectionItemPattern = pattern(el, UIA_SelectionItemPatternId)
-                    .ok_or_else(|| no_pattern("select"))?;
+                let sp: IUIAutomationSelectionItemPattern =
+                    pattern(el, UIA_SelectionItemPatternId).ok_or_else(|| no_pattern("select"))?;
                 if want {
                     sp.Select()?;
                 } else {
@@ -918,10 +905,9 @@ pub(crate) fn set_value_cmd(a: &Value) -> DResult<Value> {
 fn select_option(el: &El, i: &Info, text: &str) -> DResult<()> {
     let mut ec: Option<IUIAutomationExpandCollapsePattern> = None;
     if i.expand {
-        if let Some(p) = pattern::<IUIAutomationExpandCollapsePattern>(
-            &el.0,
-            UIA_ExpandCollapsePatternId,
-        ) {
+        if let Some(p) =
+            pattern::<IUIAutomationExpandCollapsePattern>(&el.0, UIA_ExpandCollapsePatternId)
+        {
             if unsafe { p.Expand() }.is_ok() {
                 sleep_ms(120);
                 ec = Some(p);

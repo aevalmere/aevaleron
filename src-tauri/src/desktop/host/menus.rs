@@ -315,10 +315,7 @@ fn opened_menu_child(parent: &El, h: isize, name: &str) -> Option<El> {
     let pid = pid_of(h);
     let mut popups = Vec::new();
     enum_windows(|w| {
-        if w != h
-            && unsafe { IsWindowVisible(hw(w)) } != 0
-            && pid_of(w) == pid
-            && popups.len() < 12
+        if w != h && unsafe { IsWindowVisible(hw(w)) } != 0 && pid_of(w) == pid && popups.len() < 12
         {
             popups.push(w);
         }
@@ -360,6 +357,8 @@ fn open_step(open: &El, name: &str) -> DResult<()> {
         run_bounded(2000, move || expand(&el))?;
     } else if has::<IUIAutomationInvokePattern>(open, UIA_InvokePatternId) {
         run_bounded(2000, move || {
+            // The whole El moves in, not its non-Send field.
+            let el = el;
             let p: IUIAutomationInvokePattern = pattern(&el.0, UIA_InvokePatternId)
                 .ok_or_else(|| err("NO_PATTERN", "invoke went away"))?;
             unsafe { p.Invoke()? };
@@ -384,6 +383,8 @@ fn run_leaf(leaf: &El) -> DResult<Value> {
     let el = leaf.clone();
     let (via, done) = if has::<IUIAutomationInvokePattern>(leaf, UIA_InvokePatternId) {
         let done = run_bounded(2000, move || {
+            // The whole El moves in, not its non-Send field.
+            let el = el;
             let p: IUIAutomationInvokePattern = pattern(&el.0, UIA_InvokePatternId)
                 .ok_or_else(|| err("NO_PATTERN", "invoke went away"))?;
             unsafe { p.Invoke()? };
@@ -392,6 +393,8 @@ fn run_leaf(leaf: &El) -> DResult<Value> {
         ("invoke", done)
     } else if has::<IUIAutomationTogglePattern>(leaf, UIA_TogglePatternId) {
         let done = run_bounded(2000, move || {
+            // The whole El moves in, not its non-Send field.
+            let el = el;
             let p: IUIAutomationTogglePattern = pattern(&el.0, UIA_TogglePatternId)
                 .ok_or_else(|| err("NO_PATTERN", "toggle went away"))?;
             unsafe { p.Toggle()? };
@@ -400,6 +403,8 @@ fn run_leaf(leaf: &El) -> DResult<Value> {
         ("toggle", done)
     } else if has::<IUIAutomationSelectionItemPattern>(leaf, UIA_SelectionItemPatternId) {
         let done = run_bounded(2000, move || {
+            // The whole El moves in, not its non-Send field.
+            let el = el;
             let p: IUIAutomationSelectionItemPattern =
                 pattern(&el.0, UIA_SelectionItemPatternId)
                     .ok_or_else(|| err("NO_PATTERN", "select went away"))?;
@@ -409,9 +414,10 @@ fn run_leaf(leaf: &El) -> DResult<Value> {
         ("select", done)
     } else if has::<IUIAutomationExpandCollapsePattern>(leaf, UIA_ExpandCollapsePatternId) {
         let done = run_bounded(2000, move || {
-            let p: IUIAutomationExpandCollapsePattern =
-                pattern(&el.0, UIA_ExpandCollapsePatternId)
-                    .ok_or_else(|| err("NO_PATTERN", "expand went away"))?;
+            // The whole El moves in, not its non-Send field.
+            let el = el;
+            let p: IUIAutomationExpandCollapsePattern = pattern(&el.0, UIA_ExpandCollapsePatternId)
+                .ok_or_else(|| err("NO_PATTERN", "expand went away"))?;
             unsafe { p.Expand()? };
             Ok(())
         })?;
@@ -463,9 +469,10 @@ fn uia_menu_invoke(h: isize, path: &[String]) -> DResult<Value> {
     if out.is_err() && path.len() > 1 {
         let el = first.clone();
         let _ = run_bounded(1000, move || {
-            let p: IUIAutomationExpandCollapsePattern =
-                pattern(&el.0, UIA_ExpandCollapsePatternId)
-                    .ok_or_else(|| err("NO_PATTERN", "no collapse"))?;
+            // The whole El moves in, not its non-Send field.
+            let el = el;
+            let p: IUIAutomationExpandCollapsePattern = pattern(&el.0, UIA_ExpandCollapsePatternId)
+                .ok_or_else(|| err("NO_PATTERN", "no collapse"))?;
             unsafe { p.Collapse()? };
             Ok(())
         });

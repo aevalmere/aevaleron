@@ -665,7 +665,10 @@ mod tests {
         assert_eq!(parse_handle(Some(&json!(42))).unwrap(), 42);
         assert_eq!(parse_handle(Some(&json!(""))).unwrap(), 0);
         assert_eq!(parse_handle(None).unwrap(), 0);
-        assert_eq!(parse_handle(Some(&json!("nope"))).unwrap_err().code, "BAD_ARGS");
+        assert_eq!(
+            parse_handle(Some(&json!("nope"))).unwrap_err().code,
+            "BAD_ARGS"
+        );
         assert_eq!(handle_str(0x1a2b), "w1A2B");
     }
 

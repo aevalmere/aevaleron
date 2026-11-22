@@ -22,8 +22,8 @@ use super::wins::{
     win_info, window_at, window_rect,
 };
 use super::{
-    arg, check_cancel, clip, err, handle_str, int_arg, intersects, parse_ref, rect_arg,
-    rect_json, ref_str, require_int, sleep_ms, str_arg, take_u16, u16len, DResult, Rect,
+    arg, check_cancel, clip, err, handle_str, int_arg, intersects, parse_ref, rect_arg, rect_json,
+    ref_str, require_int, sleep_ms, str_arg, take_u16, u16len, DResult, Rect,
 };
 
 // Control type ids (UIA_*ControlTypeId).
@@ -784,11 +784,17 @@ unsafe extern "system" fn bumper_query(
 }
 
 unsafe extern "system" fn bumper_add_ref(this: *mut c_void) -> u32 {
-    (*(this as *const Bumper)).refs.fetch_add(1, Ordering::SeqCst) + 1
+    (*(this as *const Bumper))
+        .refs
+        .fetch_add(1, Ordering::SeqCst)
+        + 1
 }
 
 unsafe extern "system" fn bumper_release(this: *mut c_void) -> u32 {
-    let left = (*(this as *const Bumper)).refs.fetch_sub(1, Ordering::SeqCst) - 1;
+    let left = (*(this as *const Bumper))
+        .refs
+        .fetch_sub(1, Ordering::SeqCst)
+        - 1;
     if left == 0 {
         drop(Box::from_raw(this as *mut Bumper));
     }
@@ -801,7 +807,9 @@ unsafe extern "system" fn bumper_handle(
     _change: i32,
     _runtime_id: *const c_void,
 ) -> HRESULT {
-    (*(this as *const Bumper)).gen.fetch_add(1, Ordering::SeqCst);
+    (*(this as *const Bumper))
+        .gen
+        .fetch_add(1, Ordering::SeqCst);
     HRESULT(0)
 }
 
@@ -833,6 +841,8 @@ const MAX_WATCHED: usize = 6;
 
 fn unsubscribe(w: Watched) {
     let _ = super::spawn_op(None, move || {
+        // The whole Watched moves in, not its non-Send fields.
+        let w = w;
         if let Ok(u) = uia() {
             let _ = unsafe { u.a.RemoveStructureChangedEventHandler(&w.el.0, &w.handler) };
         }
@@ -1127,7 +1137,9 @@ fn bounding_rects(r: &IUIAutomationTextRange) -> Vec<[f64; 4]> {
         if !sa.is_null() {
             windows_sys::Win32::System::Ole::SafeArrayDestroy(sa as *const _);
         }
-        d.chunks_exact(4).map(|c| [c[0], c[1], c[2], c[3]]).collect()
+        d.chunks_exact(4)
+            .map(|c| [c[0], c[1], c[2], c[3]])
+            .collect()
     }
 }
 
@@ -1154,7 +1166,11 @@ fn span(text: &str, rect: Option<Rect>, r: i32, source: &str) -> Map<String, Val
     let mut d = Map::new();
     d.insert("text".into(), json!(text));
     d.insert("rect".into(), rect_json(rect));
-    let rv = if r > 0 { json!(ref_str(r)) } else { Value::Null };
+    let rv = if r > 0 {
+        json!(ref_str(r))
+    } else {
+        Value::Null
+    };
     d.insert("ref".into(), rv);
     d.insert("source".into(), json!(source));
     d
@@ -1222,12 +1238,19 @@ fn span_rect(s: &Map<String, Value>) -> Option<Rect> {
     if a.len() != 4 {
         return None;
     }
-    let v: Vec<i32> = a.iter().filter_map(|x| x.as_i64()).map(|x| x as i32).collect();
+    let v: Vec<i32> = a
+        .iter()
+        .filter_map(|x| x.as_i64())
+        .map(|x| x as i32)
+        .collect();
     (v.len() == 4).then(|| [v[0], v[1], v[2], v[3]])
 }
 
 fn span_text(s: &Map<String, Value>) -> String {
-    s.get("text").and_then(Value::as_str).unwrap_or("").to_string()
+    s.get("text")
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .to_string()
 }
 
 /// One span per visible line, with that line's rectangle, so Find can draw
@@ -1325,14 +1348,18 @@ fn missed_lines(
     }
     let doc = doc.replace("\r\n", "\n").replace('\r', "\n");
     let lines: Vec<&str> = doc.split('\n').collect();
-    let line_h = first.as_ref().map_or(16, |f| if f.0[3] > 0 { f.0[3] } else { 16 });
+    let line_h = first
+        .as_ref()
+        .map_or(16, |f| if f.0[3] > 0 { f.0[3] } else { 16 });
     let mut first_idx = 0;
     if let Some((_, ft)) = &first {
         if let Some(k) = lines.iter().position(|l| l.trim() == ft) {
             first_idx = k as i32;
         }
     }
-    let top = first.as_ref().map_or(bx[1], |f| f.0[1] - first_idx * line_h);
+    let top = first
+        .as_ref()
+        .map_or(bx[1], |f| f.0[1] - first_idx * line_h);
     let mut added = 0;
     for (i, line) in lines.iter().enumerate() {
         if *chars >= max_chars {
@@ -1681,7 +1708,10 @@ pub(crate) fn doc_text_cmd(mut a: Value) -> DResult<Value> {
             };
             let room = max_chars - total;
             // One character more than fits shows that there was more.
-            let text = unsafe { tp.DocumentRange().and_then(|d| range_text(&d, room as i32 + 1)) };
+            let text = unsafe {
+                tp.DocumentRange()
+                    .and_then(|d| range_text(&d, room as i32 + 1))
+            };
             let Ok(mut text) = text else {
                 return true;
             };
@@ -1986,8 +2016,7 @@ pub(crate) fn focus_element(el: &El) -> DResult<&'static str> {
 pub(crate) fn point_for(e: &RefEntry) -> DResult<([i32; 2], Info)> {
     let mut info = read(&e.el.0, false)?;
     if info.offscreen && info.scroll_item {
-        let p: Option<IUIAutomationScrollItemPattern> =
-            pattern(&e.el.0, UIA_ScrollItemPatternId);
+        let p: Option<IUIAutomationScrollItemPattern> = pattern(&e.el.0, UIA_ScrollItemPatternId);
         if let Some(p) = p {
             if unsafe { p.ScrollIntoView() }.is_ok() {
                 sleep_ms(150);
@@ -2020,7 +2049,9 @@ pub(crate) fn at(a: &Value) -> DResult<Value> {
         ));
     }
     let u = uia()?;
-    let el = unsafe { u.a.ElementFromPointBuildCache(POINT { x, y }, &u.el_cache)? };
+    let el = unsafe {
+        u.a.ElementFromPointBuildCache(POINT { x, y }, &u.el_cache)?
+    };
     let i = read(&el, true)?;
     if is_excluded_pid(i.pid as u32) {
         return Err(err(
@@ -2103,8 +2134,7 @@ pub(crate) fn menu_info(el: &IUIAutomationElement) -> MenuInfo {
             Ok(Var::Bool(false))
         ),
         sub: pbool(el, UIA_IsExpandCollapsePatternAvailablePropertyId, true).unwrap_or(false),
-        selectable: pbool(el, UIA_IsSelectionItemPatternAvailablePropertyId, true)
-            .unwrap_or(false),
+        selectable: pbool(el, UIA_IsSelectionItemPatternAvailablePropertyId, true).unwrap_or(false),
     }
 }
 
@@ -2122,14 +2152,12 @@ pub(crate) const WINDOW: i32 = CT_WINDOW;
 pub(crate) fn menu_child(under: &IUIAutomationElement, name: &str, deep: bool) -> Option<El> {
     let u = uia().ok()?;
     unsafe {
-        let ct = u
-            .a
-            .CreatePropertyCondition(UIA_ControlTypePropertyId, &VARIANT::from(CT_MENUITEM))
-            .ok()?;
-        let nm = u
-            .a
-            .CreatePropertyCondition(UIA_NamePropertyId, &VARIANT::from(name))
-            .ok()?;
+        let ct =
+            u.a.CreatePropertyCondition(UIA_ControlTypePropertyId, &VARIANT::from(CT_MENUITEM))
+                .ok()?;
+        let nm =
+            u.a.CreatePropertyCondition(UIA_NamePropertyId, &VARIANT::from(name))
+                .ok()?;
         let both = u.a.CreateAndCondition(&ct, &nm).ok()?;
         let scope = if deep {
             TreeScope_Descendants

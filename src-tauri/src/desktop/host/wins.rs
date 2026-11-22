@@ -29,8 +29,8 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{
 
 use super::input;
 use super::{
-    bool_arg, check_cancel, err, handle_str, own, parse_handle, rect_json, require_int,
-    sleep_ms, str_arg, DResult, Rect,
+    bool_arg, check_cancel, err, handle_str, own, parse_handle, rect_json, require_int, sleep_ms,
+    str_arg, DResult, Rect,
 };
 
 const GA_ROOT: u32 = 2;
@@ -131,7 +131,8 @@ pub(crate) fn window_rect(h: isize) -> Option<Rect> {
     unsafe {
         let size = std::mem::size_of::<RECT>() as u32;
         let ptr: *mut RECT = &mut r;
-        if DwmGetWindowAttribute(hw(h), 9, ptr.cast(), size) != 0 && GetWindowRect(hw(h), &mut r) == 0
+        if DwmGetWindowAttribute(hw(h), 9, ptr.cast(), size) != 0
+            && GetWindowRect(hw(h), &mut r) == 0
         {
             return None;
         }
@@ -159,7 +160,13 @@ pub(crate) fn integrity(pid: u32) -> i32 {
         let mut out = -1;
         if opened {
             let mut len = 0u32;
-            GetTokenInformation(token, TokenIntegrityLevel, std::ptr::null_mut(), 0, &mut len);
+            GetTokenInformation(
+                token,
+                TokenIntegrityLevel,
+                std::ptr::null_mut(),
+                0,
+                &mut len,
+            );
             if len > 0 {
                 // u64 words keep the buffer aligned for the label's pointer.
                 let mut buf = vec![0u64; (len as usize).div_ceil(8)];
@@ -571,7 +578,8 @@ pub(crate) fn focus_window(h: isize) -> DResult<Option<&'static str>> {
         let fg = GetForegroundWindow();
         let fg_thread = GetWindowThreadProcessId(fg, std::ptr::null_mut());
         let me = GetCurrentThreadId();
-        let attached = fg_thread != 0 && fg_thread != me && AttachThreadInput(me, fg_thread, 1) != 0;
+        let attached =
+            fg_thread != 0 && fg_thread != me && AttachThreadInput(me, fg_thread, 1) != 0;
         BringWindowToTop(hw(h));
         SetForegroundWindow(hw(h));
         if attached {
@@ -630,8 +638,7 @@ pub(crate) fn is_excluded_window(h: isize) -> bool {
         top = h;
     }
     let o = own();
-    if o
-        .wins
+    if o.wins
         .iter()
         .any(|w| w.handle == h || w.handle == top || w.handle == owner)
     {
