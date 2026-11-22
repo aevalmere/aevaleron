@@ -1,4 +1,4 @@
-[METRIC] installerKB=8525
+[METRIC] installerKB=8526
 previous installer: Aevaleron_1.1.1_x64-setup.exe from run 44041820735
 previous setup exited 0
 [CHECK] ok previous.install code=0 Aevaleron_1.1.1_x64-setup.exe
@@ -20,17 +20,17 @@ setup over previous exited 0
 [CHECK] ok upgrade.noWebView2Data C:\Users\runneradmin\AppData\Local\aevaleron\WebView2
 [CHECK] ok upgrade.notLaunched processes=0
 [METRIC] upgrade=ok:from-1.1.1
-[CHECK] ok run.started pid=8340 exited=False
+[CHECK] ok run.started pid=7224 exited=False
 [CHECK] ok run.oneProcess Aevaleron.exe processes=1
 [CHECK] ok run.noWebView2 inTree=0 before=0 after=0
 [METRIC] processCount=1
 [METRIC] idlePrivateMB=38.9
-[METRIC] idleWorkingSetMB=130.1
-[METRIC] idleCpuPct=0.23
+[METRIC] idleWorkingSetMB=130.2
+[METRIC] idleCpuPct=0.16
 [METRIC] idleThreads=18
-[CHECK] ok singleInstance.secondExits exited=True after 19ms
+[CHECK] ok singleInstance.secondExits exited=True after 20ms
 [CHECK] ok singleInstance.oneLeft processes=1
-[METRIC] secondLaunchMs=19
+[METRIC] secondLaunchMs=20
 [CHECK] ok uninstall.exe C:\Users\runneradmin\AppData\Local\Aevaleron\Aevaleron.exe
 [CHECK] ok uninstall.uninstaller C:\Users\runneradmin\AppData\Local\Aevaleron\uninstall.exe
 [CHECK] ok uninstall.desktopHelper C:\Users\runneradmin\AppData\Local\Aevaleron\desktop
@@ -40,4 +40,4 @@ setup over previous exited 0
 [CHECK] ok uninstall.noEntries entries=0
 [CHECK] ok uninstall.runValue Run\com.aevaleron.app=
 [CHECK] ok uninstall.userDataKept C:\Users\runneradmin\AppData\Roaming\aevaleron\ci-keep.txt
-::notice title=native install%3A 31 of 31 passed::installerKB=8525 upgrade=ok:from-1.1.1 processCount=1 idlePrivateMB=38.9 idleWorkingSetMB=130.1 idleCpuPct=0.23 idleThreads=18 secondLaunchMs=19
+::notice title=native install%3A 31 of 31 passed::installerKB=8526 upgrade=ok:from-1.1.1 processCount=1 idlePrivateMB=38.9 idleWorkingSetMB=130.2 idleCpuPct=0.16 idleThreads=18 secondLaunchMs=20

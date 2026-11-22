@@ -289,3 +289,9 @@ warning: linker stdout: LINK : warning LNK4098: defaultlib 'libvcruntime.lib' co
 
 warning: `aevaleron` (bin "aevaleron") generated 1 warning
 
+
+== smoke.log ==
+[SMOKE] uiaTree=FAIL:TIMEOUT:readTree did not finish in 12000ms (the target app may be hung)
+[SMOKE] failed: uiaTree
+[GATE] fail uiaTree=FAIL:TIMEOUT:readTree did not finish in 12000ms (the target app may be hung)
+[GATE] verdict=FAIL:1 FAIL line(s); no "done" line; failed: uiaTree; 1 listed label(s) never printed
