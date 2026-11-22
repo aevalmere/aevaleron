@@ -1,7 +1,7 @@
 [DESKTOP] ownProbeShown=ok
 [DESKTOP] ownHandles=3
 [DESKTOP] desktopReady=ok
-[DESKTOP] desktopReadyMs=4
+[DESKTOP] desktopReadyMs=3
 [DESKTOP] desktopDpi=per-monitor-v2
 [DESKTOP] desktopInProcess=ok
 [DESKTOP] desktopWindows=ok
@@ -9,37 +9,37 @@
 [DESKTOP] desktopOwnExcluded=ok
 [DESKTOP] ownWindowBlocked=ok
 [DESKTOP] desktopNotepadIncluded=ok
-[DESKTOP] notepadWindow=w40224:notepad:Notepad
+[DESKTOP] notepadWindow=w602C8:notepad:Notepad
 [DESKTOP] focusMethod=already
 [DESKTOP] uiaTree=ok
 [DESKTOP] uiaTreeNodes=19
-[DESKTOP] uiaTreeMs=1095
+[DESKTOP] uiaTreeMs=1101
 [DESKTOP] uiaTreeRoles=window,edit,scrollbar,button,statusbar,titlebar,menuitem
 [DESKTOP] editorCandidates=ref_2:edit:Text Editor:value+scroll:focused:752x437
 [DESKTOP] editor=ref_2:edit:Text Editor
-[DESKTOP] ocrMs=121
+[DESKTOP] ocrMs=89
 [DESKTOP] ocrWords=ok
 [DESKTOP] ocrDetail=hits=invoice|total|due words=23 inWindow=true lang=en-US
 [DESKTOP] typeFocus=element
 [DESKTOP] typeReadText="File\nEdit\nFormat\nView\nHelp\nInvoice total due 42.00\r\n Aevaleron smoke 4271\n  Ln 2, Col 22\n 100%\n Windows (CRLF)\n UTF-8\n"
 [DESKTOP] uiaTypeRead=ok
-[DESKTOP] uiaSetValueMs=14
+[DESKTOP] uiaSetValueMs=17
 [DESKTOP] uiaSetValueVia=value
 [DESKTOP] uiaSetValue=ok
 [DESKTOP] getTextSpans=10
 [DESKTOP] findEditor=ok
 [DESKTOP] findTop=edit:Text Editor:100
 [DESKTOP] elementAt=edit:ref_2
-[DESKTOP] desktopOpMs={"click":{"last":0,"max":0,"n":1},"config":{"last":0,"max":0,"n":21},"elementAt":{"last":3,"max":3,"n":1},"focusWindow":{"last":0,"max":0,"n":1},"getText":{"last":30,"max":30,"n":2},"key":{"last":16,"max":127,"n":3},"listWindows":{"last":0,"max":0,"n":4},"ocr":{"last":117,"max":117,"n":1},"ping":{"last":0,"max":0,"n":1},"readTree":{"last":30,"max":1087,"n":3},"restoreCursor":{"last":0,"max":0,"n":1},"setValue":{"last":11,"max":11,"n":1},"type":{"last":56,"max":56,"n":1}}
+[DESKTOP] desktopOpMs={"click":{"last":0,"max":0,"n":1},"config":{"last":0,"max":0,"n":19},"elementAt":{"last":5,"max":5,"n":1},"focusWindow":{"last":0,"max":0,"n":1},"getText":{"last":28,"max":28,"n":2},"key":{"last":16,"max":128,"n":3},"listWindows":{"last":0,"max":0,"n":4},"ocr":{"last":85,"max":85,"n":1},"ping":{"last":0,"max":0,"n":1},"readTree":{"last":41,"max":1096,"n":3},"restoreCursor":{"last":0,"max":0,"n":1},"setValue":{"last":13,"max":13,"n":1},"type":{"last":60,"max":60,"n":1}}
 [DESKTOP] dontSave=button:Don't Save
 [DESKTOP] notepadClosed=ok
-[DESKTOP] desktopStatus={"ready":true,"disabled":false,"deaths":0,"pid":7208,"inProcess":true,"dpi":"per-monitor-v2","watching":false,"stderr":""}
+[DESKTOP] desktopStatus={"ready":true,"disabled":false,"deaths":0,"pid":2160,"inProcess":true,"dpi":"per-monitor-v2","watching":false,"stderr":""}
 [DESKTOP] done
 
 --- stderr ---
 whisper: weights memory-mapped: 59.0 MiB in CPU_Mapped
-[1122/144347.030:ERROR:ui\gfx\win\window_impl.cc:172] Failed to unregister class Chrome_WidgetWin_0. Error = 1412
+[1122/151756.973:ERROR:ui\gfx\win\window_impl.cc:172] Failed to unregister class Chrome_WidgetWin_0. Error = 1412
 children seen:
-msedgewebview2.exe [7396] "C:\Program Files (x86)\Microsoft\EdgeWebView\Application\157.0.4341.46\msedgewebview2.exe" --embedded-browser-webview=1 --webview-exe-name=Aevaleron.exe --webview-exe-version=1.1.1 --user-data-dir="D:\a\_temp\aeval-desktop\WebView2\EBWebView" --noerrdialogs --embedded-browser-webview-dpi-awareness=2 --autoplay-policy=no-user-gesture-required --disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --lang=en-US --mojo-named-platform-channel-pipe=7208.1560.13994025409475654676 /pfhostedapp:9ae0cac2edc3e22a2c5fef5c52638a8d036dc515
-notepad.exe [7384] "notepad.exe" C:\Users\RUNNER~1\AppData\Local\Temp\aeval-desktop-check-7208-1a203b68535.txt
+msedgewebview2.exe [5076] "C:\Program Files (x86)\Microsoft\EdgeWebView\Application\157.0.4341.46\msedgewebview2.exe" --embedded-browser-webview=1 --webview-exe-name=Aevaleron.exe --webview-exe-version=1.1.1 --user-data-dir="D:\a\_temp\aeval-desktop\WebView2\EBWebView" --noerrdialogs --embedded-browser-webview-dpi-awareness=2 --autoplay-policy=no-user-gesture-required --disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --lang=en-US --mojo-named-platform-channel-pipe=2160.9192.6495045765146765701 /pfhostedapp:9ae0cac2edc3e22a2c5fef5c52638a8d036dc515
+notepad.exe [4656] "notepad.exe" C:\Users\RUNNER~1\AppData\Local\Temp\aeval-desktop-check-2160-1a203d5cc7f.txt
 unexpected:

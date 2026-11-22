@@ -1,16 +1,16 @@
 {
   "workflow": "rust",
   "workflow_name": "rust",
-  "run_id": 45031541330,
+  "run_id": 45034456425,
   "run_attempt": 1,
-  "run_url": "https://github.com/aevalmere/aevaleron/actions/runs/45031541330",
+  "run_url": "https://github.com/aevalmere/aevaleron/actions/runs/45034456425",
   "event": "push",
-  "sha": "7a417c8c6cca530905296f1ea3bc744ebe75de22",
+  "sha": "59296a2b9ae43a530cc1167fc17eb7936286f3f8",
   "ref": "rust/native-helper",
   "ref_dir": "rust-native-helper",
   "conclusion": "success",
   "failed": [],
-  "finished": "2026-11-22T14:43:49Z",
+  "finished": "2026-11-22T15:17:58Z",
   "error_lines": 0,
   "steps": [
     {
