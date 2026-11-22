@@ -1,0 +1,417 @@
+diff --git a/src-tauri/src/desktop/host/input.rs b/src-tauri/src/desktop/host/input.rs
+index df1fdca..fcb8c78 100644
+--- a/src-tauri/src/desktop/host/input.rs
++++ b/src-tauri/src/desktop/host/input.rs
+@@ -16,13 +16,12 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{GetCursorPos, GetSystemMetrics
+ 
+ use super::uia::{self, El, Info, RefEntry};
+ use super::wins::{
+-    focus_window, foreground_root, is_excluded_window, is_window, pid_of,
+-    refuse_elevated, refuse_excluded, refuse_own_point, refuse_secure_desktop, root, title,
+-    window_at,
++    focus_window, foreground_root, is_excluded_window, is_window, pid_of, refuse_elevated,
++    refuse_excluded, refuse_own_point, refuse_secure_desktop, root, title, window_at,
+ };
+ use super::{
+-    arg, bool_arg, check_cancel, current_req, err, handle_str, int_arg, parse_handle, parse_ref, require_int,
+-    sleep_ms, spawn_op, str_arg, to_text, u16len, DResult,
++    arg, bool_arg, check_cancel, current_req, err, handle_str, int_arg, parse_handle, parse_ref,
++    require_int, sleep_ms, spawn_op, str_arg, to_text, u16len, DResult,
+ };
+ 
+ const INPUT_MOUSE: u32 = 0;
+@@ -309,10 +308,7 @@ pub(crate) fn parse_chord(chord: &str) -> DResult<Vec<u16>> {
+                 continue;
+             }
+         }
+-        return Err(err(
+-            "BAD_ARGS",
+-            format!("unknown key '{p}' in '{chord}'"),
+-        ));
++        return Err(err("BAD_ARGS", format!("unknown key '{p}' in '{chord}'")));
+     }
+     if keys.is_empty() {
+         return Err(err("BAD_ARGS", "empty key chord"));
+@@ -509,12 +505,7 @@ pub(crate) fn click(a: &Value) -> DResult<Value> {
+         "left" => (0x2, 0x4),
+         "right" => (0x8, 0x10),
+         "middle" => (0x20, 0x40),
+-        _ => {
+-            return Err(err(
+-                "BAD_ARGS",
+-                "button must be left, right or middle",
+-            ))
+-        }
++        _ => return Err(err("BAD_ARGS", "button must be left, right or middle")),
+     };
+     let hit_top = check_point(p[0], p[1], e.as_ref(), force)?;
+     // A click at a point that names its window lands in that window (or
+@@ -525,10 +516,7 @@ pub(crate) fn click(a: &Value) -> DResult<Value> {
+         if hit_top != want && pid_of(hit_top) != pid_of(want) {
+             return Err(err(
+                 "OCCLUDED",
+-                format!(
+-                    "another window (\"{}\") covers that spot",
+-                    title(hit_top)
+-                ),
++                format!("another window (\"{}\") covers that spot", title(hit_top)),
+             ));
+         }
+     }
+@@ -693,10 +681,7 @@ pub(crate) fn scroll_cmd(a: &Value) -> DResult<Value> {
+         _ => 0,
+     };
+     if dx == 0 && dy == 0 {
+-        return Err(err(
+-            "BAD_ARGS",
+-            "direction must be up, down, left or right",
+-        ));
++        return Err(err("BAD_ARGS", "direction must be up, down, left or right"));
+     }
+     let (p, e, info) = target_point(a)?;
+     if let (Some(e), Some(info)) = (&e, &info) {
+@@ -861,8 +846,8 @@ pub(crate) fn set_value_cmd(a: &Value) -> DResult<Value> {
+                 }
+                 via = "toggle";
+             } else {
+-                let sp: IUIAutomationSelectionItemPattern = pattern(el, UIA_SelectionItemPatternId)
+-                    .ok_or_else(|| no_pattern("select"))?;
++                let sp: IUIAutomationSelectionItemPattern =
++                    pattern(el, UIA_SelectionItemPatternId).ok_or_else(|| no_pattern("select"))?;
+                 if want {
+                     sp.Select()?;
+                 } else {
+@@ -918,10 +903,9 @@ pub(crate) fn set_value_cmd(a: &Value) -> DResult<Value> {
+ fn select_option(el: &El, i: &Info, text: &str) -> DResult<()> {
+     let mut ec: Option<IUIAutomationExpandCollapsePattern> = None;
+     if i.expand {
+-        if let Some(p) = pattern::<IUIAutomationExpandCollapsePattern>(
+-            &el.0,
+-            UIA_ExpandCollapsePatternId,
+-        ) {
++        if let Some(p) =
++            pattern::<IUIAutomationExpandCollapsePattern>(&el.0, UIA_ExpandCollapsePatternId)
++        {
+             if unsafe { p.Expand() }.is_ok() {
+                 sleep_ms(120);
+                 ec = Some(p);
+diff --git a/src-tauri/src/desktop/host/menus.rs b/src-tauri/src/desktop/host/menus.rs
+index 5824bec..3173e4d 100644
+--- a/src-tauri/src/desktop/host/menus.rs
++++ b/src-tauri/src/desktop/host/menus.rs
+@@ -315,10 +315,7 @@ fn opened_menu_child(parent: &El, h: isize, name: &str) -> Option<El> {
+     let pid = pid_of(h);
+     let mut popups = Vec::new();
+     enum_windows(|w| {
+-        if w != h
+-            && unsafe { IsWindowVisible(hw(w)) } != 0
+-            && pid_of(w) == pid
+-            && popups.len() < 12
++        if w != h && unsafe { IsWindowVisible(hw(w)) } != 0 && pid_of(w) == pid && popups.len() < 12
+         {
+             popups.push(w);
+         }
+@@ -409,9 +406,8 @@ fn run_leaf(leaf: &El) -> DResult<Value> {
+         ("select", done)
+     } else if has::<IUIAutomationExpandCollapsePattern>(leaf, UIA_ExpandCollapsePatternId) {
+         let done = run_bounded(2000, move || {
+-            let p: IUIAutomationExpandCollapsePattern =
+-                pattern(&el.0, UIA_ExpandCollapsePatternId)
+-                    .ok_or_else(|| err("NO_PATTERN", "expand went away"))?;
++            let p: IUIAutomationExpandCollapsePattern = pattern(&el.0, UIA_ExpandCollapsePatternId)
++                .ok_or_else(|| err("NO_PATTERN", "expand went away"))?;
+             unsafe { p.Expand()? };
+             Ok(())
+         })?;
+@@ -463,9 +459,8 @@ fn uia_menu_invoke(h: isize, path: &[String]) -> DResult<Value> {
+     if out.is_err() && path.len() > 1 {
+         let el = first.clone();
+         let _ = run_bounded(1000, move || {
+-            let p: IUIAutomationExpandCollapsePattern =
+-                pattern(&el.0, UIA_ExpandCollapsePatternId)
+-                    .ok_or_else(|| err("NO_PATTERN", "no collapse"))?;
++            let p: IUIAutomationExpandCollapsePattern = pattern(&el.0, UIA_ExpandCollapsePatternId)
++                .ok_or_else(|| err("NO_PATTERN", "no collapse"))?;
+             unsafe { p.Collapse()? };
+             Ok(())
+         });
+diff --git a/src-tauri/src/desktop/host/mod.rs b/src-tauri/src/desktop/host/mod.rs
+index a86664c..e3a0d25 100644
+--- a/src-tauri/src/desktop/host/mod.rs
++++ b/src-tauri/src/desktop/host/mod.rs
+@@ -665,7 +665,10 @@ mod tests {
+         assert_eq!(parse_handle(Some(&json!(42))).unwrap(), 42);
+         assert_eq!(parse_handle(Some(&json!(""))).unwrap(), 0);
+         assert_eq!(parse_handle(None).unwrap(), 0);
+-        assert_eq!(parse_handle(Some(&json!("nope"))).unwrap_err().code, "BAD_ARGS");
++        assert_eq!(
++            parse_handle(Some(&json!("nope"))).unwrap_err().code,
++            "BAD_ARGS"
++        );
+         assert_eq!(handle_str(0x1a2b), "w1A2B");
+     }
+ 
+diff --git a/src-tauri/src/desktop/host/uia.rs b/src-tauri/src/desktop/host/uia.rs
+index 65f7dea..2746ccd 100644
+--- a/src-tauri/src/desktop/host/uia.rs
++++ b/src-tauri/src/desktop/host/uia.rs
+@@ -22,8 +22,8 @@ use super::wins::{
+     win_info, window_at, window_rect,
+ };
+ use super::{
+-    arg, check_cancel, clip, err, handle_str, int_arg, intersects, parse_ref, rect_arg,
+-    rect_json, ref_str, require_int, sleep_ms, str_arg, take_u16, u16len, DResult, Rect,
++    arg, check_cancel, clip, err, handle_str, int_arg, intersects, parse_ref, rect_arg, rect_json,
++    ref_str, require_int, sleep_ms, str_arg, take_u16, u16len, DResult, Rect,
+ };
+ 
+ // Control type ids (UIA_*ControlTypeId).
+@@ -784,11 +784,17 @@ unsafe extern "system" fn bumper_query(
+ }
+ 
+ unsafe extern "system" fn bumper_add_ref(this: *mut c_void) -> u32 {
+-    (*(this as *const Bumper)).refs.fetch_add(1, Ordering::SeqCst) + 1
++    (*(this as *const Bumper))
++        .refs
++        .fetch_add(1, Ordering::SeqCst)
++        + 1
+ }
+ 
+ unsafe extern "system" fn bumper_release(this: *mut c_void) -> u32 {
+-    let left = (*(this as *const Bumper)).refs.fetch_sub(1, Ordering::SeqCst) - 1;
++    let left = (*(this as *const Bumper))
++        .refs
++        .fetch_sub(1, Ordering::SeqCst)
++        - 1;
+     if left == 0 {
+         drop(Box::from_raw(this as *mut Bumper));
+     }
+@@ -801,7 +807,9 @@ unsafe extern "system" fn bumper_handle(
+     _change: i32,
+     _runtime_id: *const c_void,
+ ) -> HRESULT {
+-    (*(this as *const Bumper)).gen.fetch_add(1, Ordering::SeqCst);
++    (*(this as *const Bumper))
++        .gen
++        .fetch_add(1, Ordering::SeqCst);
+     HRESULT(0)
+ }
+ 
+@@ -1127,7 +1135,9 @@ fn bounding_rects(r: &IUIAutomationTextRange) -> Vec<[f64; 4]> {
+         if !sa.is_null() {
+             windows_sys::Win32::System::Ole::SafeArrayDestroy(sa as *const _);
+         }
+-        d.chunks_exact(4).map(|c| [c[0], c[1], c[2], c[3]]).collect()
++        d.chunks_exact(4)
++            .map(|c| [c[0], c[1], c[2], c[3]])
++            .collect()
+     }
+ }
+ 
+@@ -1154,7 +1164,11 @@ fn span(text: &str, rect: Option<Rect>, r: i32, source: &str) -> Map<String, Val
+     let mut d = Map::new();
+     d.insert("text".into(), json!(text));
+     d.insert("rect".into(), rect_json(rect));
+-    let rv = if r > 0 { json!(ref_str(r)) } else { Value::Null };
++    let rv = if r > 0 {
++        json!(ref_str(r))
++    } else {
++        Value::Null
++    };
+     d.insert("ref".into(), rv);
+     d.insert("source".into(), json!(source));
+     d
+@@ -1222,12 +1236,19 @@ fn span_rect(s: &Map<String, Value>) -> Option<Rect> {
+     if a.len() != 4 {
+         return None;
+     }
+-    let v: Vec<i32> = a.iter().filter_map(|x| x.as_i64()).map(|x| x as i32).collect();
++    let v: Vec<i32> = a
++        .iter()
++        .filter_map(|x| x.as_i64())
++        .map(|x| x as i32)
++        .collect();
+     (v.len() == 4).then(|| [v[0], v[1], v[2], v[3]])
+ }
+ 
+ fn span_text(s: &Map<String, Value>) -> String {
+-    s.get("text").and_then(Value::as_str).unwrap_or("").to_string()
++    s.get("text")
++        .and_then(Value::as_str)
++        .unwrap_or("")
++        .to_string()
+ }
+ 
+ /// One span per visible line, with that line's rectangle, so Find can draw
+@@ -1325,14 +1346,18 @@ fn missed_lines(
+     }
+     let doc = doc.replace("\r\n", "\n").replace('\r', "\n");
+     let lines: Vec<&str> = doc.split('\n').collect();
+-    let line_h = first.as_ref().map_or(16, |f| if f.0[3] > 0 { f.0[3] } else { 16 });
++    let line_h = first
++        .as_ref()
++        .map_or(16, |f| if f.0[3] > 0 { f.0[3] } else { 16 });
+     let mut first_idx = 0;
+     if let Some((_, ft)) = &first {
+         if let Some(k) = lines.iter().position(|l| l.trim() == ft) {
+             first_idx = k as i32;
+         }
+     }
+-    let top = first.as_ref().map_or(bx[1], |f| f.0[1] - first_idx * line_h);
++    let top = first
++        .as_ref()
++        .map_or(bx[1], |f| f.0[1] - first_idx * line_h);
+     let mut added = 0;
+     for (i, line) in lines.iter().enumerate() {
+         if *chars >= max_chars {
+@@ -1681,7 +1706,10 @@ pub(crate) fn doc_text_cmd(mut a: Value) -> DResult<Value> {
+             };
+             let room = max_chars - total;
+             // One character more than fits shows that there was more.
+-            let text = unsafe { tp.DocumentRange().and_then(|d| range_text(&d, room as i32 + 1)) };
++            let text = unsafe {
++                tp.DocumentRange()
++                    .and_then(|d| range_text(&d, room as i32 + 1))
++            };
+             let Ok(mut text) = text else {
+                 return true;
+             };
+@@ -1986,8 +2014,7 @@ pub(crate) fn focus_element(el: &El) -> DResult<&'static str> {
+ pub(crate) fn point_for(e: &RefEntry) -> DResult<([i32; 2], Info)> {
+     let mut info = read(&e.el.0, false)?;
+     if info.offscreen && info.scroll_item {
+-        let p: Option<IUIAutomationScrollItemPattern> =
+-            pattern(&e.el.0, UIA_ScrollItemPatternId);
++        let p: Option<IUIAutomationScrollItemPattern> = pattern(&e.el.0, UIA_ScrollItemPatternId);
+         if let Some(p) = p {
+             if unsafe { p.ScrollIntoView() }.is_ok() {
+                 sleep_ms(150);
+@@ -2020,7 +2047,9 @@ pub(crate) fn at(a: &Value) -> DResult<Value> {
+         ));
+     }
+     let u = uia()?;
+-    let el = unsafe { u.a.ElementFromPointBuildCache(POINT { x, y }, &u.el_cache)? };
++    let el = unsafe {
++        u.a.ElementFromPointBuildCache(POINT { x, y }, &u.el_cache)?
++    };
+     let i = read(&el, true)?;
+     if is_excluded_pid(i.pid as u32) {
+         return Err(err(
+@@ -2103,8 +2132,7 @@ pub(crate) fn menu_info(el: &IUIAutomationElement) -> MenuInfo {
+             Ok(Var::Bool(false))
+         ),
+         sub: pbool(el, UIA_IsExpandCollapsePatternAvailablePropertyId, true).unwrap_or(false),
+-        selectable: pbool(el, UIA_IsSelectionItemPatternAvailablePropertyId, true)
+-            .unwrap_or(false),
++        selectable: pbool(el, UIA_IsSelectionItemPatternAvailablePropertyId, true).unwrap_or(false),
+     }
+ }
+ 
+@@ -2122,14 +2150,12 @@ pub(crate) const WINDOW: i32 = CT_WINDOW;
+ pub(crate) fn menu_child(under: &IUIAutomationElement, name: &str, deep: bool) -> Option<El> {
+     let u = uia().ok()?;
+     unsafe {
+-        let ct = u
+-            .a
+-            .CreatePropertyCondition(UIA_ControlTypePropertyId, &VARIANT::from(CT_MENUITEM))
+-            .ok()?;
+-        let nm = u
+-            .a
+-            .CreatePropertyCondition(UIA_NamePropertyId, &VARIANT::from(name))
+-            .ok()?;
++        let ct =
++            u.a.CreatePropertyCondition(UIA_ControlTypePropertyId, &VARIANT::from(CT_MENUITEM))
++                .ok()?;
++        let nm =
++            u.a.CreatePropertyCondition(UIA_NamePropertyId, &VARIANT::from(name))
++                .ok()?;
+         let both = u.a.CreateAndCondition(&ct, &nm).ok()?;
+         let scope = if deep {
+             TreeScope_Descendants
+diff --git a/src-tauri/src/desktop/host/watch.rs b/src-tauri/src/desktop/host/watch.rs
+index ae011dc..0c3dc23 100644
+--- a/src-tauri/src/desktop/host/watch.rs
++++ b/src-tauri/src/desktop/host/watch.rs
+@@ -241,4 +241,3 @@ pub(crate) fn stop() {
+         });
+     let _ = rx.recv_timeout(Duration::from_millis(1000));
+ }
+-
+diff --git a/src-tauri/src/desktop/host/wins.rs b/src-tauri/src/desktop/host/wins.rs
+index 7f98e3c..679502a 100644
+--- a/src-tauri/src/desktop/host/wins.rs
++++ b/src-tauri/src/desktop/host/wins.rs
+@@ -29,8 +29,8 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{
+ 
+ use super::input;
+ use super::{
+-    bool_arg, check_cancel, err, handle_str, own, parse_handle, rect_json, require_int,
+-    sleep_ms, str_arg, DResult, Rect,
++    bool_arg, check_cancel, err, handle_str, own, parse_handle, rect_json, require_int, sleep_ms,
++    str_arg, DResult, Rect,
+ };
+ 
+ const GA_ROOT: u32 = 2;
+@@ -131,7 +131,8 @@ pub(crate) fn window_rect(h: isize) -> Option<Rect> {
+     unsafe {
+         let size = std::mem::size_of::<RECT>() as u32;
+         let ptr: *mut RECT = &mut r;
+-        if DwmGetWindowAttribute(hw(h), 9, ptr.cast(), size) != 0 && GetWindowRect(hw(h), &mut r) == 0
++        if DwmGetWindowAttribute(hw(h), 9, ptr.cast(), size) != 0
++            && GetWindowRect(hw(h), &mut r) == 0
+         {
+             return None;
+         }
+@@ -159,7 +160,13 @@ pub(crate) fn integrity(pid: u32) -> i32 {
+         let mut out = -1;
+         if opened {
+             let mut len = 0u32;
+-            GetTokenInformation(token, TokenIntegrityLevel, std::ptr::null_mut(), 0, &mut len);
++            GetTokenInformation(
++                token,
++                TokenIntegrityLevel,
++                std::ptr::null_mut(),
++                0,
++                &mut len,
++            );
+             if len > 0 {
+                 // u64 words keep the buffer aligned for the label's pointer.
+                 let mut buf = vec![0u64; (len as usize).div_ceil(8)];
+@@ -571,7 +578,8 @@ pub(crate) fn focus_window(h: isize) -> DResult<Option<&'static str>> {
+         let fg = GetForegroundWindow();
+         let fg_thread = GetWindowThreadProcessId(fg, std::ptr::null_mut());
+         let me = GetCurrentThreadId();
+-        let attached = fg_thread != 0 && fg_thread != me && AttachThreadInput(me, fg_thread, 1) != 0;
++        let attached =
++            fg_thread != 0 && fg_thread != me && AttachThreadInput(me, fg_thread, 1) != 0;
+         BringWindowToTop(hw(h));
+         SetForegroundWindow(hw(h));
+         if attached {
+@@ -630,8 +638,7 @@ pub(crate) fn is_excluded_window(h: isize) -> bool {
+         top = h;
+     }
+     let o = own();
+-    if o
+-        .wins
++    if o.wins
+         .iter()
+         .any(|w| w.handle == h || w.handle == top || w.handle == owner)
+     {
+diff --git a/src-tauri/src/desktop/protocol.rs b/src-tauri/src/desktop/protocol.rs
+index 7b87288..8401440 100644
+--- a/src-tauri/src/desktop/protocol.rs
++++ b/src-tauri/src/desktop/protocol.rs
+@@ -330,12 +330,7 @@ mod tests {
+         assert_eq!(type_timeout(1000), 4000);
+         assert_eq!(type_timeout(5000), 12000);
+         assert_eq!(
+-            (
+-                OP_TIMEOUT,
+-                UIA_COLD_TIMEOUT,
+-                OCR_TIMEOUT,
+-                CAPTURE_TIMEOUT
+-            ),
++            (OP_TIMEOUT, UIA_COLD_TIMEOUT, OCR_TIMEOUT, CAPTURE_TIMEOUT),
+             (4000, 12000, 15000, 8000)
+         );
+         assert_eq!(CODES.len(), 16);
