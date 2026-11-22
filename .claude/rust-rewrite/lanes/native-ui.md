@@ -69,24 +69,25 @@ Branch `rust/native-ui`, cut from `rust/next`; `origin/rust/cli-providers` merge
 
 ## Measurements (runner)
 
-CI run 45041909944 on a795bec7: every step green (fmt, clippy, 656 unit tests, release build, installer, smoke, capture, desktop selfcheck, install check).
+CI run 45041909944 on a795bec7: every step green (fmt, clippy, 656 unit tests, release build, installer, smoke, capture, desktop selfcheck, install check). Later runs on bdecdcd7 and d07b3b94 match it within noise; the ranges below cover all three.
 
 | Measure | Target | Value | Where |
 |---|---|---|---|
 | Installer | report | 8525 KB | install check |
-| Exe | report | 28387 KB | install check |
-| Idle private memory, fresh install | ≤ 40 MB | 38.9 MB | install check |
-| Idle working set | report | 130.1 MB (it includes shared, mapped pages) | install check |
-| Idle CPU | ≈ 0 | 0.23 % (install), 0.00 % (smoke) | both |
+| Exe | report | 28388 KB | install check |
+| Idle private memory, fresh install | ≤ 40 MB | 38.9–39.4 MB | install check |
+| Idle working set | report | 130 MB (it includes shared, mapped pages) | install check |
+| Idle CPU | ≈ 0 | 0.16–0.23 % (install), 0.00 % (smoke) | both |
 | Process count | 1 | 1 (install); 2 in the smoke | both |
-| Hotkey to focused input | ≤ 30 ms | 12 ms | smoke |
-| Second launch hands off | report | 19 ms | install check |
-| Threads at idle | report | 18 | install check |
+| Hotkey to focused input | ≤ 30 ms | 10–20 ms | smoke |
+| Second launch hands off | report | 19–28 ms | install check |
+| Threads at idle | report | 18–19 | install check |
 | Upgrade over the Tauri build | in place | ok, from 1.1.1 | install check |
 | WebView2 | none | none loaded (noWebView2=ok) | smoke |
 
 - The smoke's processCount of 2 is the PowerShell desktop helper child. That goes away when the native-helper lane (in-process Rust) merges.
 - The smoke's idle private memory (85.4 MB) is measured after every probe lane has opened its windows. Hidden windows free their pixels, but the heap does not shrink back. The fresh-install figure is the idle target.
+- Two one-off runner flakes, each green on the run before and after: `uiaTree` timed out reading Notepad (d07b3b94), and the cli-providers lane's timing test `a_silent_cli_times_out_and_is_killed` failed (bdecdcd7).
 - The step that brought memory under 40 MB was drawing straight into each window's DIB instead of into a second buffer (c3e962ab). The first run measured 42.1 MB.
 
 ## Unverified on a real desktop
