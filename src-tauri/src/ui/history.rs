@@ -29,6 +29,17 @@ use super::{bridge, HistRow, HistoryWindow};
 use crate::shell::platform::{self, KeyPress};
 
 const MIN: f64 = 60_000.0;
+
+/// The answer's opening as words: markdown marks (`**`, `#`, list
+/// numbers) are not shown in the list.
+fn plain_reply(raw: &str) -> String {
+    let words: Vec<String> = super::markdown::lines(raw)
+        .iter()
+        .map(super::markdown::plain)
+        .filter(|t| !t.trim().is_empty())
+        .collect();
+    words.join(" ")
+}
 const HOUR: f64 = 60.0 * MIN;
 const DAY: f64 = 24.0 * HOUR;
 
@@ -244,7 +255,7 @@ impl HistoryPage {
                 header: false,
                 id: id_of(e).into(),
                 title: str_of(e, "title").into(),
-                reply: str_of(e, "reply").into(),
+                reply: plain_reply(&str_of(e, "reply")).into(),
                 meta: meta.into(),
             });
             ids.push(Some(id_of(e)));

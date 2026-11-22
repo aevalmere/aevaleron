@@ -1360,7 +1360,19 @@ pub fn run_loop() -> i32 {
     loop {
         slint::platform::update_timers_and_animations();
         drain_queue();
-        render_dirty();
+        // Slint's `changed` handlers run inside update_timers_and_animations:
+        // once for what the tasks just set, and again after drawing, for
+        // the ones that read a size the layout only worked out then. What
+        // they change is drawn before the loop sleeps (a page reports its
+        // height that way), a few rounds at most so nothing can spin.
+        for _ in 0..3 {
+            slint::platform::update_timers_and_animations();
+            render_dirty();
+            slint::platform::update_timers_and_animations();
+            if !all_windows().iter().any(|w| w.dirty.get() && w.visible()) {
+                break;
+            }
+        }
         if EXIT.load(Ordering::SeqCst) {
             return EXIT_CODE.load(Ordering::SeqCst);
         }
