@@ -76,7 +76,7 @@ Checked against the help of the versions installed on the dev PC on 2026-11-21. 
 
 ## Verified
 
-- CI (rust.yml) on the branch: fmt, clippy, tests. Unit tests with a fake CLI (`src/llm/cli/fake_cli.js`, run with node, playing each of the three CLIs by its command line): streaming parse for each CLI, whole replies for the agent/reader, the screenshot reaching each CLI (stdin block for Claude, file for Codex and Gemini, deleted after), Gemini's system prompt file, cancel killing the CLI and its child process, a silent CLI timing out as 408 and being killed, not signed in and usage limit mapped to the app's errors and copy, a missing program, version and sign-in detection. Parsers are also tested on recorded-shape lines.
+- CI (rust.yml) on the branch: fmt, clippy, the 644 unit tests, the installer build, capture check and desktop selfcheck pass. One smoke run (ffd37248) timed out at its 360 s cap while `voiceSpareFetch` waited on the 190 MB Whisper small download; every label before it matched the base run (2c2bb4dd) and no CLI code is on that path. Unit tests with a fake CLI (`src/llm/cli/fake_cli.js`, run with node, playing each of the three CLIs by its command line): streaming parse for each CLI, whole replies for the agent/reader, the screenshot reaching each CLI (stdin block for Claude, file for Codex and Gemini, deleted after), Gemini's system prompt file, cancel killing the CLI and its child process, a silent CLI timing out as 408 and being killed, not signed in and usage limit mapped to the app's errors and copy, a missing program, version and sign-in detection. Parsers are also tested on recorded-shape lines.
 
 ## Not verified
 
