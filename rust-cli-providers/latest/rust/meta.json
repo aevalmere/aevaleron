@@ -1,18 +1,20 @@
 {
   "workflow": "rust",
   "workflow_name": "rust",
-  "run_id": 44979550594,
+  "run_id": 44979611594,
   "run_attempt": 1,
-  "run_url": "https://github.com/aevalmere/aevaleron/actions/runs/44979550594",
+  "run_url": "https://github.com/aevalmere/aevaleron/actions/runs/44979611594",
   "event": "push",
-  "sha": "2f6be157bdae8100c5af86ff05e66c2cc3b6a44b",
+  "sha": "091937f15080aeeba585e51874332d88725eb005",
   "ref": "rust/cli-providers",
   "ref_dir": "rust-cli-providers",
-  "conclusion": "cancelled",
+  "conclusion": "failure",
   "failed": [
-    "Format"
+    "Format",
+    "Capture check",
+    "Desktop selfcheck"
   ],
-  "finished": "2026-11-22T03:13:09Z",
+  "finished": "2026-11-22T03:27:46Z",
   "error_lines": 150,
   "steps": [
     {
@@ -62,13 +64,13 @@
     },
     {
       "name": "Clippy",
-      "outcome": "cancelled",
+      "outcome": "success",
       "log": "clippy.log"
     },
     {
       "name": "Unit tests",
-      "outcome": "skipped",
-      "log": ""
+      "outcome": "success",
+      "log": "test.log"
     },
     {
       "name": "Restore NSIS toolset",
@@ -97,13 +99,13 @@
     },
     {
       "name": "Capture check",
-      "outcome": "skipped",
-      "log": ""
+      "outcome": "failure",
+      "log": "capture.log"
     },
     {
       "name": "Desktop selfcheck",
-      "outcome": "skipped",
-      "log": ""
+      "outcome": "failure",
+      "log": "desktop.log"
     },
     {
       "name": "Upload installer",

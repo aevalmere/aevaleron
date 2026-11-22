@@ -1,0 +1,213 @@
+diff --git a/src-tauri/src/llm/cli/args.rs b/src-tauri/src/llm/cli/args.rs
+index fc8b57b..bb9e040 100644
+--- a/src-tauri/src/llm/cli/args.rs
++++ b/src-tauri/src/llm/cli/args.rs
+@@ -295,7 +295,12 @@ mod tests {
+         let tools = a.iter().position(|x| x == "--tools").unwrap();
+         assert_eq!(a[tools + 1], "");
+         assert!(a.get(tools + 2).is_some_and(|x| x.starts_with("--")));
+-        for want in ["-p", "--no-session-persistence", "--model=sonnet", "--safe-mode"] {
++        for want in [
++            "-p",
++            "--no-session-persistence",
++            "--model=sonnet",
++            "--safe-mode",
++        ] {
+             assert!(a.iter().any(|x| x == want), "{want}");
+         }
+         assert!(a.iter().any(|x| x == "--system-prompt=Be brief."));
+@@ -330,8 +335,12 @@ mod tests {
+         assert_eq!(std::fs::read(&p.files[0]).unwrap(), b"ABC");
+         let image = format!("--image={}", d.join("t2-1.jpg").display());
+         assert_eq!(a.last(), Some(&image));
+-        assert!(a.windows(2).any(|w| w[0] == "--sandbox" && w[1] == "read-only"));
+-        assert!(a.windows(2).any(|w| w[0] == "--disable" && w[1] == "shell_tool"));
++        assert!(a
++            .windows(2)
++            .any(|w| w[0] == "--sandbox" && w[1] == "read-only"));
++        assert!(a
++            .windows(2)
++            .any(|w| w[0] == "--disable" && w[1] == "shell_tool"));
+         let text = String::from_utf8(p.stdin).unwrap();
+         assert!(text.starts_with("<instructions>\nBe brief.\n</instructions>"));
+         assert!(text.ends_with("(Image 1 is attached.)\n\nwhat is this?"));
+diff --git a/src-tauri/src/llm/cli/find.rs b/src-tauri/src/llm/cli/find.rs
+index b51b7cc..11f172f 100644
+--- a/src-tauri/src/llm/cli/find.rs
++++ b/src-tauri/src/llm/cli/find.rs
+@@ -113,7 +113,11 @@ fn registry_paths() -> Vec<String> {
+     use winreg::enums::{HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE};
+     use winreg::RegKey;
+     let read = |root, at: &str| -> Option<String> {
+-        RegKey::predef(root).open_subkey(at).ok()?.get_value("Path").ok()
++        RegKey::predef(root)
++            .open_subkey(at)
++            .ok()?
++            .get_value("Path")
++            .ok()
+     };
+     let machine = r"SYSTEM\CurrentControlSet\Control\Session Manager\Environment";
+     [
+diff --git a/src-tauri/src/llm/cli/input.rs b/src-tauri/src/llm/cli/input.rs
+index 3c70896..ac8e1b9 100644
+--- a/src-tauri/src/llm/cli/input.rs
++++ b/src-tauri/src/llm/cli/input.rs
+@@ -202,7 +202,10 @@ mod tests {
+         assert_eq!(r.system, "Be brief.");
+         assert_eq!(r.parts.len(), 3);
+         let img = r.images().next().unwrap();
+-        assert_eq!((img.mime.as_str(), img.base64.as_str()), ("image/png", "QUJD"));
++        assert_eq!(
++            (img.mime.as_str(), img.base64.as_str()),
++            ("image/png", "QUJD")
++        );
+         assert_eq!(img.ext(), "png");
+         let text = text_with(&r, |i| format!("@shot-{i}.png"));
+         assert_eq!(text, "Exact text.\n\n@shot-1.png\n\nwhat is this?");
+diff --git a/src-tauri/src/llm/cli/mod.rs b/src-tauri/src/llm/cli/mod.rs
+index aefc6dc..64986f8 100644
+--- a/src-tauri/src/llm/cli/mod.rs
++++ b/src-tauri/src/llm/cli/mod.rs
+@@ -150,7 +150,8 @@ fn version_of(text: &str) -> Option<String> {
+         .find(|w| {
+             w.contains('.')
+                 && w.starts_with(|c: char| c.is_ascii_digit())
+-                && w.chars().all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '-')
++                && w.chars()
++                    .all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '-')
+         })
+         .map(str::to_string)
+ }
+diff --git a/src-tauri/src/llm/cli/parse.rs b/src-tauri/src/llm/cli/parse.rs
+index 31f3573..534fd1a 100644
+--- a/src-tauri/src/llm/cli/parse.rs
++++ b/src-tauri/src/llm/cli/parse.rs
+@@ -99,7 +99,9 @@ impl Decoder {
+                 let text = e["delta"]["text"].as_str();
+                 if e["type"] == "content_block_delta" && e["delta"]["type"] == "text_delta" {
+                     self.saw_delta = true;
+-                    return text.map(|t| vec![Event::Text(t.to_string())]).unwrap_or_default();
++                    return text
++                        .map(|t| vec![Event::Text(t.to_string())])
++                        .unwrap_or_default();
+                 }
+                 Vec::new()
+             }
+@@ -308,7 +310,10 @@ mod tests {
+             Event::Failed(s) => Some(s.clone()),
+             _ => None,
+         });
+-        assert_eq!(failed.as_deref(), Some("Invalid API key · Please run /login"));
++        assert_eq!(
++            failed.as_deref(),
++            Some("Invalid API key · Please run /login")
++        );
+         assert_eq!(d.notes, ["authentication_failed"]);
+         let max = [r#"{"type":"result","subtype":"error_max_turns","is_error":true}"#];
+         let ev = run(Provider::ClaudeCli, &max);
+diff --git a/src-tauri/src/llm/cli/run.rs b/src-tauri/src/llm/cli/run.rs
+index e35195b..5268e25 100644
+--- a/src-tauri/src/llm/cli/run.rs
++++ b/src-tauri/src/llm/cli/run.rs
+@@ -448,7 +448,11 @@ async fn pump(provider: Provider, run: &mut Running, tx: &UnboundedSender<Msg>)
+     }
+     let notes = decoder.notes.join("\n");
+     let msg = match state.failed {
+-        Some(f) => Msg::Fail(classify(provider, exit, &[f.as_str(), notes.as_str(), said.as_str()])),
++        Some(f) => Msg::Fail(classify(
++            provider,
++            exit,
++            &[f.as_str(), notes.as_str(), said.as_str()],
++        )),
+         None if exit == Some(0) => Msg::End,
+         None => Msg::Fail(classify(provider, exit, &[notes.as_str(), said.as_str()])),
+     };
+@@ -542,7 +546,13 @@ pub fn classify(p: Provider, exit: Option<i32>, parts: &[&str]) -> ApiError {
+     let model_gone = all.contains("model")
+         && has(
+             &all,
+-            &["not found", "does not exist", "not supported", "unknown model", "invalid model"],
++            &[
++                "not found",
++                "does not exist",
++                "not supported",
++                "unknown model",
++                "invalid model",
++            ],
+         );
+     if model_gone {
+         return ApiError::http(404, said);
+@@ -630,9 +640,9 @@ fn said_signed_in(text: &str) -> Option<bool> {
+ #[cfg(test)]
+ mod tests {
+     use super::*;
++    use crate::llm::catalogue::Kind;
+     use crate::llm::client::{ChatTurn, Llm, QueryOpts, Transport};
+     use crate::llm::errors::{explain, About};
+-    use crate::llm::catalogue::Kind;
+     use crate::llm::sse::Meter;
+     use crate::llm::wire::HttpRequest;
+     use async_trait::async_trait;
+@@ -758,7 +768,10 @@ mod tests {
+         assert_eq!(image["source"]["data"], "QUJD");
+         let last = content.last().unwrap()["text"].as_str().unwrap();
+         assert!(last.ends_with("what is this?"));
+-        assert!(content[0]["text"].as_str().unwrap().contains("User: before"));
++        assert!(content[0]["text"]
++            .as_str()
++            .unwrap()
++            .contains("User: before"));
+         assert!(has_arg(&r, "--tools") && has_arg(&r, "--no-session-persistence"));
+         assert!(r["argv"].as_array().unwrap().iter().any(|a| a
+             .as_str()
+@@ -828,7 +841,10 @@ mod tests {
+         assert_eq!(e.message, "Error: model claude-x not found");
+         assert!(classify(c, Some(1), &["getaddrinfo ENOTFOUND api.anthropic.com"]).is_network());
+         let e = classify(c, Some(3), &["", ""]);
+-        assert_eq!((e.status, e.message.as_str()), (Some(500), "Claude Code stopped with exit code 3"));
++        assert_eq!(
++            (e.status, e.message.as_str()),
++            (Some(500), "Claude Code stopped with exit code 3")
++        );
+         assert_eq!(said_signed_in("Logged in using ChatGPT"), Some(true));
+         assert_eq!(said_signed_in("Not logged in"), Some(false));
+         assert_eq!(said_signed_in("?"), None);
+@@ -909,7 +925,10 @@ mod tests {
+             return;
+         };
+         let path = PathBuf::from(&script);
+-        let info = block(super::super::inspect(Provider::ClaudeCli, Some(path.clone())));
++        let info = block(super::super::inspect(
++            Provider::ClaudeCli,
++            Some(path.clone()),
++        ));
+         assert!(info.installed);
+         assert_eq!(info.version.as_deref(), Some("9.8.7"));
+         assert_eq!(info.signed_in, Some(true));
+diff --git a/src-tauri/src/llm/settings.rs b/src-tauri/src/llm/settings.rs
+index 1f69151..c52222d 100644
+--- a/src-tauri/src/llm/settings.rs
++++ b/src-tauri/src/llm/settings.rs
+@@ -456,7 +456,10 @@ mod tests {
+         let s = MemorySettings::with_key("sk-or-v1-x");
+         let t = Table::default();
+         // Installed or not, a CLI that is off is never a candidate.
+-        assert_eq!(ids(&candidates_with(&s, Kind::Vision, &t, 0)), [Provider::OpenRouter]);
++        assert_eq!(
++            ids(&candidates_with(&s, Kind::Vision, &t, 0)),
++            [Provider::OpenRouter]
++        );
+         assert!(!order(&s).contains(&Provider::ClaudeCli));
+         // On, with a program that exists: after the HTTP providers.
+         let exe = std::env::current_exe().unwrap();
+@@ -476,7 +479,9 @@ mod tests {
+         *s.order.lock() = vec![Provider::ClaudeCli];
+         assert_eq!(active(&s).unwrap().provider, Provider::ClaudeCli);
+         // A stored path that is gone is not used.
+-        s.cli.lock().insert(Provider::ClaudeCli, r"C:\nope\claude.exe".into());
++        s.cli
++            .lock()
++            .insert(Provider::ClaudeCli, r"C:\nope\claude.exe".into());
+         assert_eq!(usable_key(&s, Provider::ClaudeCli), None);
+         assert_eq!(active(&s).unwrap().provider, Provider::OpenRouter);
+     }

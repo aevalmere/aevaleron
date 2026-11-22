@@ -85,7 +85,7 @@ Diff in \\?\D:\a\aevaleron\aevaleron\src-tauri\src\llm\cli\parse.rs:308:
          assert_eq!(d.notes, ["authentication_failed"]);
          let max = [r#"{"type":"result","subtype":"error_max_turns","is_error":true}"#];
          let ev = run(Provider::ClaudeCli, &max);
-Diff in \\?\D:\a\aevaleron\aevaleron\src-tauri\src\llm\cli\run.rs:442:
+Diff in \\?\D:\a\aevaleron\aevaleron\src-tauri\src\llm\cli\run.rs:448:
      }
      let notes = decoder.notes.join("\n");
      let msg = match state.failed {
@@ -98,7 +98,7 @@ Diff in \\?\D:\a\aevaleron\aevaleron\src-tauri\src\llm\cli\run.rs:442:
          None if exit == Some(0) => Msg::End,
          None => Msg::Fail(classify(provider, exit, &[notes.as_str(), said.as_str()])),
      };
-Diff in \\?\D:\a\aevaleron\aevaleron\src-tauri\src\llm\cli\run.rs:536:
+Diff in \\?\D:\a\aevaleron\aevaleron\src-tauri\src\llm\cli\run.rs:542:
      let model_gone = all.contains("model")
          && has(
              &all,
@@ -113,7 +113,7 @@ Diff in \\?\D:\a\aevaleron\aevaleron\src-tauri\src\llm\cli\run.rs:536:
          );
      if model_gone {
          return ApiError::http(404, said);
-Diff in \\?\D:\a\aevaleron\aevaleron\src-tauri\src\llm\cli\run.rs:624:
+Diff in \\?\D:\a\aevaleron\aevaleron\src-tauri\src\llm\cli\run.rs:630:
  #[cfg(test)]
  mod tests {
      use super::*;
@@ -124,7 +124,7 @@ Diff in \\?\D:\a\aevaleron\aevaleron\src-tauri\src\llm\cli\run.rs:624:
      use crate::llm::sse::Meter;
      use crate::llm::wire::HttpRequest;
      use async_trait::async_trait;
-Diff in \\?\D:\a\aevaleron\aevaleron\src-tauri\src\llm\cli\run.rs:752:
+Diff in \\?\D:\a\aevaleron\aevaleron\src-tauri\src\llm\cli\run.rs:758:
          assert_eq!(image["source"]["data"], "QUJD");
          let last = content.last().unwrap()["text"].as_str().unwrap();
          assert!(last.ends_with("what is this?"));
@@ -136,7 +136,7 @@ Diff in \\?\D:\a\aevaleron\aevaleron\src-tauri\src\llm\cli\run.rs:752:
          assert!(has_arg(&r, "--tools") && has_arg(&r, "--no-session-persistence"));
          assert!(r["argv"].as_array().unwrap().iter().any(|a| a
              .as_str()
-Diff in \\?\D:\a\aevaleron\aevaleron\src-tauri\src\llm\cli\run.rs:822:
+Diff in \\?\D:\a\aevaleron\aevaleron\src-tauri\src\llm\cli\run.rs:828:
          assert_eq!(e.message, "Error: model claude-x not found");
          assert!(classify(c, Some(1), &["getaddrinfo ENOTFOUND api.anthropic.com"]).is_network());
          let e = classify(c, Some(3), &["", ""]);
@@ -148,7 +148,7 @@ Diff in \\?\D:\a\aevaleron\aevaleron\src-tauri\src\llm\cli\run.rs:822:
          assert_eq!(said_signed_in("Logged in using ChatGPT"), Some(true));
          assert_eq!(said_signed_in("Not logged in"), Some(false));
          assert_eq!(said_signed_in("?"), None);
-Diff in \\?\D:\a\aevaleron\aevaleron\src-tauri\src\llm\cli\run.rs:903:
+Diff in \\?\D:\a\aevaleron\aevaleron\src-tauri\src\llm\cli\run.rs:909:
              return;
          };
          let path = PathBuf::from(&script);
