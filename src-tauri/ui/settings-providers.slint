@@ -4,8 +4,8 @@
 // actions and the order buttons. Press a head and move it to reorder.
 
 import { Theme, Glyph, Button } from "theme.slint";
-import { SettingsState, SetProvRow } from "settings-state.slint";
-import { PageTitle, Group, Note, SwitchRow, ChoiceOption, Segments, TextField, TextButton, Disclosure, Combo } from "settings-widgets.slint";
+import { SettingsState, SetProvRow, SetCliRow, SetRoleRow } from "settings-state.slint";
+import { PageTitle, Group, Note, Switch, SwitchRow, ChoiceOption, Segments, TextField, TextButton, Disclosure, Combo } from "settings-widgets.slint";
 
 component ProvRowView inherits Rectangle {
     in property <SetProvRow> it;
@@ -294,6 +294,332 @@ component ProvRowView inherits Rectangle {
     }
 }
 
+// A command-line tool: its head (name, what was found, the switch) and,
+// while open, the program, Test, Use first and the path field. A tool
+// that is not installed says how to get it and keeps only the path field.
+component CliRowView inherits Rectangle {
+    in property <SetCliRow> it;
+    property <bool> open: SettingsState.open-row == "prov-" + root.it.id;
+    property <int> epoch: root.it.epoch;
+
+    changed epoch => {
+        path-field.set-text(root.it.field-text);
+    }
+    init => {
+        path-field.set-text(root.it.field-text);
+    }
+
+    border-radius: Theme.r-row;
+
+    VerticalLayout {
+        Rectangle {
+            min-height: 56px * Theme.text-scale;
+            border-radius: Theme.r-row;
+            background: head-touch.has-hover ? Theme.fill-1 : transparent;
+            head-touch := TouchArea {
+                mouse-cursor: pointer;
+                clicked => {
+                    SettingsState.combo-open = "";
+                    SettingsState.role-open = "";
+                    SettingsState.open-row = root.open ? "" : "prov-" + root.it.id;
+                }
+            }
+            HorizontalLayout {
+                padding-left: Theme.sp-3;
+                padding-right: Theme.sp-3;
+                spacing: Theme.sp-3;
+                VerticalLayout {
+                    alignment: center;
+                    horizontal-stretch: 1;
+                    spacing: 2px;
+                    Text {
+                        text: root.it.name;
+                        font-size: Theme.row;
+                        font-weight: 600;
+                        color: Theme.label;
+                        overflow: elide;
+                    }
+                    Text {
+                        text: root.it.status;
+                        font-size: Theme.meta;
+                        color: root.it.status-danger ? Theme.danger : Theme.label-3;
+                        overflow: elide;
+                    }
+                }
+                if root.it.installed: VerticalLayout {
+                    alignment: center;
+                    Switch {
+                        checked: root.it.enabled;
+                        enabled: !root.it.busy;
+                        toggled(v) => {
+                            SettingsState.cli-toggle(root.it.id, v);
+                        }
+                    }
+                }
+                Text {
+                    text: root.open ? Glyph.up : Glyph.down;
+                    font-family: Theme.icons;
+                    font-size: 10px * Theme.text-scale;
+                    color: Theme.label-3;
+                    vertical-alignment: center;
+                }
+            }
+        }
+
+        Rectangle {
+            clip: true;
+            height: root.open ? body.preferred-height : 0px;
+            body := VerticalLayout {
+                padding-left: Theme.sp-3;
+                padding-right: Theme.sp-3;
+                padding-bottom: Theme.sp-4;
+                spacing: Theme.sp-3;
+
+                if root.it.how != "": Note {
+                    text: root.it.how;
+                    font-size: Theme.row;
+                    color: Theme.label-2;
+                }
+
+                if root.it.path != "": Text {
+                    text: root.it.path;
+                    font-size: Theme.caption;
+                    font-family: Theme.mono;
+                    color: Theme.label-2;
+                    overflow: elide;
+                }
+
+                if root.it.msg != "": Note {
+                    text: root.it.msg;
+                    tone: root.it.msg-danger ? "danger" : "";
+                    font-size: Theme.row;
+                    color: root.it.msg-danger ? Theme.danger : Theme.label-2;
+                }
+
+                if root.it.installed: HorizontalLayout {
+                    spacing: Theme.sp-2;
+                    alignment: start;
+                    Button {
+                        text: root.it.testing ? "Testing…" : "Test";
+                        enabled: !root.it.busy;
+                        clicked => {
+                            SettingsState.cli-act(root.it.id, "test", "");
+                        }
+                    }
+                    if root.it.show-first: TextButton {
+                        text: "Use first";
+                        enabled: !root.it.busy;
+                        clicked => {
+                            SettingsState.cli-act(root.it.id, "first", "");
+                        }
+                    }
+                }
+
+                // The field lives as long as the row, so a re-render never
+                // takes what is being typed.
+                VerticalLayout {
+                    spacing: Theme.sp-1;
+                    Text {
+                        text: "Program path";
+                        font-size: Theme.caption;
+                        color: Theme.label-2;
+                    }
+                    HorizontalLayout {
+                        spacing: Theme.sp-2;
+                        path-field := TextField {
+                            placeholder: "Found on its own when empty";
+                            mono: true;
+                            enabled: !root.it.busy;
+                            accepted(t) => {
+                                SettingsState.cli-act(root.it.id, "path", t);
+                            }
+                        }
+                        Button {
+                            text: "Save";
+                            enabled: !root.it.busy;
+                            clicked => {
+                                SettingsState.cli-act(root.it.id, "path", path-field.text);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// One job and the provider it tries first: a picker that opens in place.
+component RolePick inherits Rectangle {
+    in property <SetRoleRow> it;
+    property <bool> open: SettingsState.role-open == root.it.role;
+    border-radius: Theme.r-row;
+
+    VerticalLayout {
+        padding-left: Theme.sp-3;
+        padding-right: Theme.sp-3;
+        padding-top: Theme.sp-2;
+        padding-bottom: Theme.sp-2;
+        spacing: Theme.sp-1;
+        HorizontalLayout {
+            spacing: Theme.sp-3;
+            VerticalLayout {
+                alignment: center;
+                horizontal-stretch: 1;
+                spacing: 2px;
+                Text {
+                    text: root.it.title;
+                    font-size: Theme.row;
+                    color: Theme.label;
+                    wrap: word-wrap;
+                }
+                if root.it.note != "": Text {
+                    text: root.it.note;
+                    font-size: Theme.meta;
+                    color: Theme.label-3;
+                    wrap: word-wrap;
+                }
+            }
+            Rectangle {
+                min-width: 200px * Theme.text-scale;
+                min-height: 40px * Theme.text-scale;
+                border-radius: Theme.r-plate;
+                background: face-touch.has-hover || root.open ? Theme.fill-2 : Theme.fill-1;
+                face-touch := TouchArea {
+                    mouse-cursor: pointer;
+                    clicked => {
+                        SettingsState.combo-open = "";
+                        SettingsState.role-open = root.open ? "" : root.it.role;
+                    }
+                }
+                HorizontalLayout {
+                    padding-left: Theme.sp-3;
+                    padding-right: Theme.sp-3;
+                    spacing: Theme.sp-2;
+                    Text {
+                        text: root.it.label;
+                        font-size: Theme.row;
+                        color: Theme.label;
+                        vertical-alignment: center;
+                        horizontal-stretch: 1;
+                        overflow: elide;
+                    }
+                    Text {
+                        text: root.open ? Glyph.up : Glyph.down;
+                        font-family: Theme.icons;
+                        font-size: 10px * Theme.text-scale;
+                        color: Theme.label-3;
+                        vertical-alignment: center;
+                    }
+                }
+            }
+        }
+        if root.open: Rectangle {
+            background: Theme.raised;
+            border-radius: Theme.r-card;
+            VerticalLayout {
+                padding: Theme.sp-1;
+                for r in root.it.rows: Rectangle {
+                    min-height: 40px * Theme.text-scale;
+                    border-radius: Theme.r-row;
+                    background: opt-touch.has-hover ? Theme.fill-2 : transparent;
+                    opt-touch := TouchArea {
+                        mouse-cursor: pointer;
+                        clicked => {
+                            SettingsState.role-open = "";
+                            SettingsState.role-pick(root.it.role, r.id);
+                        }
+                    }
+                    HorizontalLayout {
+                        padding-left: Theme.sp-3;
+                        padding-right: Theme.sp-3;
+                        padding-top: Theme.sp-1;
+                        padding-bottom: Theme.sp-1;
+                        spacing: Theme.sp-2;
+                        VerticalLayout {
+                            alignment: center;
+                            horizontal-stretch: 1;
+                            Text {
+                                text: r.name;
+                                font-size: Theme.row;
+                                color: Theme.label;
+                                overflow: elide;
+                            }
+                            if r.detail != "": Text {
+                                text: r.detail;
+                                font-size: Theme.meta;
+                                color: Theme.label-3;
+                                overflow: elide;
+                            }
+                        }
+                        Text {
+                            text: r.checked ? Glyph.check : "";
+                            font-family: Theme.icons;
+                            font-size: 12px * Theme.text-scale;
+                            color: Theme.accent-text;
+                            vertical-alignment: center;
+                            width: 14px * Theme.text-scale;
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// The command-line tools (Claude Code, Codex, Gemini CLI) and the
+// provider each job tries first.
+component CliPicker inherits VerticalLayout {
+    spacing: Theme.sp-3;
+    HorizontalLayout {
+        padding-top: Theme.sp-3;
+        spacing: Theme.sp-3;
+        Text {
+            text: "Command-line tools";
+            font-size: Theme.title;
+            font-weight: 600;
+            color: Theme.label;
+            vertical-alignment: center;
+            horizontal-stretch: 1;
+        }
+        TextButton {
+            text: SettingsState.cli-checking ? "Checking…" : "Check again";
+            enabled: !SettingsState.cli-checking;
+            clicked => {
+                SettingsState.cli-act("", "check", "");
+            }
+        }
+    }
+    Note {
+        text: "These answer through the program on this PC, signed in with your own account. No key needed.";
+        font-size: Theme.row;
+        color: Theme.label-2;
+    }
+    if SettingsState.clis.length > 0: Group {
+        for c in SettingsState.clis: CliRowView {
+            it: c;
+        }
+    }
+    if SettingsState.clis.length == 0: Note {
+        text: SettingsState.cli-checking ? "Looking for them…" : "None found.";
+    }
+    Text {
+        text: "Provider for each job";
+        font-size: Theme.title;
+        font-weight: 600;
+        color: Theme.label;
+    }
+    Note {
+        text: "Automatic follows the order above. A job with its own pick tries that provider first.";
+        font-size: Theme.row;
+        color: Theme.label-2;
+    }
+    Group {
+        for r in SettingsState.roles: RolePick {
+            it: r;
+        }
+    }
+}
+
 export component ProvidersPage inherits VerticalLayout {
     spacing: Theme.sp-3;
     PageTitle {
@@ -307,8 +633,7 @@ export component ProvidersPage inherits VerticalLayout {
             count: SettingsState.providers.length;
         }
     }
-    // CLI provider picker (lane cli-providers): wire here
-    if SettingsState.cli-picker-shown: Rectangle { }
+    if SettingsState.cli-picker-shown: CliPicker { }
     if SettingsState.prov-live != "": Note {
         text: SettingsState.prov-live;
         font-size: Theme.row;

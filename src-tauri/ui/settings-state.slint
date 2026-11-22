@@ -70,6 +70,38 @@ export struct SetComboView {
     rows: [SetComboRow],
 }
 
+// A command-line tool that can answer (Claude Code, Codex, Gemini CLI):
+// `status` is the line under its name, `path` the program found, `how`
+// how to get it while it is not installed. The path field takes
+// field-text whenever epoch changes.
+export struct SetCliRow {
+    id: string,
+    name: string,
+    installed: bool,
+    enabled: bool,
+    status: string,
+    status-danger: bool,
+    path: string,
+    how: string,
+    show-first: bool,
+    busy: bool,
+    testing: bool,
+    msg: string,
+    msg-danger: bool,
+    field-text: string,
+    epoch: int,
+}
+
+// One job and the provider it tries first; `rows` are "Automatic" and
+// every provider that is set up.
+export struct SetRoleRow {
+    role: string,
+    title: string,
+    note: string,
+    label: string,
+    rows: [SetComboRow],
+}
+
 // A switch in a list (the coding agents found on this PC).
 export struct SetToggle {
     id: string,
@@ -114,8 +146,13 @@ export global SettingsState {
     in property <bool> failover-ask: true;
     in property <string> key-storage;
     in property <bool> key-storage-warn;
-    // CLI provider picker (lane cli-providers): wire here
+    // The command-line tools and the provider each job tries first.
     in property <bool> cli-picker-shown: false;
+    in property <[SetCliRow]> clis;
+    in property <bool> cli-checking;
+    in property <[SetRoleRow]> roles;
+    // The job whose list is open, "" for none.
+    in-out property <string> role-open;
 
     // Models.
     in property <string> models-mode: "auto";
@@ -260,4 +297,11 @@ export global SettingsState {
     callback prov-act(string, string, string);
     callback prov-edited(string, string);
     callback prov-move(string, int);
+    // `cli-act(tool, act, field)`: "test", "first", "path" (Save beside
+    // the path field, with what it holds) or "check" (Check again);
+    // `cli-toggle(tool, on)`; `role-pick(job, provider)`, "" for
+    // Automatic.
+    callback cli-act(string, string, string);
+    callback cli-toggle(string, bool);
+    callback role-pick(string, string);
 }

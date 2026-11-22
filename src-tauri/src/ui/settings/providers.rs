@@ -3,12 +3,16 @@
 //! receives the screen, the models and their three pickers).
 
 use std::collections::HashMap;
+use std::rc::Rc;
 
 use serde_json::{json, Value};
 use slint::{Model, ModelRc, SharedString, VecModel};
 
 use super::{ago, ask, clock, flag, now_ms, num, said_no, text, Reply, SettingsPage};
-use crate::ui::{SetChoice, SetComboRow, SetComboView, SetProvAction, SetProvRow};
+use crate::shell::AppHandle;
+use crate::ui::{
+    SetChoice, SetCliRow, SetComboRow, SetComboView, SetProvAction, SetProvRow, SetRoleRow,
+};
 
 const DEFAULT_ORDER: [&str; 4] = ["openrouter", "anthropic", "openai", "gemini"];
 const PRIVACY_URL: &str = "https://openrouter.ai/settings/privacy";
@@ -178,6 +182,133 @@ pub(super) struct Providers {
     mode: String,
     provider: String,
     pickers: HashMap<&'static str, Picker>,
+    /// The command-line tools: the last check's rows (until one comes
+    /// back, `settings:get`'s), and what each row is in the middle of.
+    clis: Vec<Value>,
+    cli_ui: HashMap<String, CliUi>,
+    cli_model: Rc<VecModel<SetCliRow>>,
+    role_model: Rc<VecModel<SetRoleRow>>,
+    cli_wired: bool,
+    /// The tools are looked for once per opening, and on "Check again".
+    cli_checked: bool,
+    cli_checking: bool,
+}
+
+/// What a command-line tool's row is doing, on this page only.
+#[derive(Clone, Default)]
+struct CliUi {
+    busy: bool,
+    testing: bool,
+    msg: String,
+    danger: bool,
+    epoch: i32,
+}
+
+/// The jobs a provider can be picked for: role, title, note.
+const ROLES: [(&str, &str, &str); 4] = [
+    ("vision", "Answers about the screen", ""),
+    ("text", "Text answers", ""),
+    ("agent", "Tasks", ""),
+    (
+        "voice",
+        "Voice cleanup",
+        "A command-line tool cleans up dictation only when it is picked here.",
+    ),
+];
+
+fn cli_known_name(id: &str) -> Option<&'static str> {
+    match id {
+        "claude-cli" => Some("Claude Code"),
+        "codex-cli" => Some("Codex"),
+        "gemini-cli" => Some("Gemini CLI"),
+        _ => None,
+    }
+}
+
+/// How to get a tool that is not on this PC, in one line.
+fn cli_how(id: &str) -> &'static str {
+    match id {
+        "claude-cli" => {
+            "Not on this PC. Install Claude Code from claude.com/claude-code, then run claude once to sign in."
+        }
+        "codex-cli" => {
+            "Not on this PC. Install it with npm install -g @openai/codex, then run codex once to sign in."
+        }
+        "gemini-cli" => {
+            "Not on this PC. Install it with npm install -g @google/gemini-cli, then run gemini once to sign in."
+        }
+        _ => "Not on this PC.",
+    }
+}
+
+/// A provider's name, CLI or HTTP.
+fn provider_name(id: &str, clis: &[Value]) -> String {
+    clis.iter()
+        .find(|c| c["id"] == id)
+        .map(|c| text(c, "name"))
+        .filter(|n| !n.is_empty())
+        .or_else(|| cli_known_name(id).map(str::to_string))
+        .unwrap_or_else(|| name_of(id))
+}
+
+/// The tools to show: the last check's, else `settings:get`'s.
+fn cli_list(data: &Value, clis: &[Value]) -> Vec<Value> {
+    if clis.is_empty() {
+        data["clis"].as_array().cloned().unwrap_or_default()
+    } else {
+        clis.to_vec()
+    }
+}
+
+/// The providers that are set up (CLIs that are on included), first
+/// tried first.
+fn set_up(data: &Value) -> Vec<String> {
+    let mut ps: Vec<&Value> = data["providers"]
+        .as_array()
+        .map(|l| l.iter().filter(|p| flag(p, "hasKey")).collect())
+        .unwrap_or_default();
+    ps.sort_by(|a, b| num(a, "order").total_cmp(&num(b, "order")));
+    ps.into_iter()
+        .map(|p| text(p, "id"))
+        .filter(|id| !id.is_empty())
+        .collect()
+}
+
+/// The line under a tool's name, and whether it is a problem.
+fn cli_status(c: &Value, first: bool) -> (String, bool) {
+    if !flag(c, "installed") {
+        return ("Not installed".into(), false);
+    }
+    let v = text(c, "version");
+    let mut parts = vec![if v.is_empty() {
+        "Installed".to_string()
+    } else {
+        format!("Version {v}")
+    }];
+    let signed = c["signedIn"].as_bool();
+    match signed {
+        Some(true) => parts.push("Signed in".into()),
+        Some(false) => parts.push("Not signed in".into()),
+        None => {}
+    }
+    if first && flag(c, "enabled") {
+        parts.push("Tried first".into());
+    }
+    (parts.join(" · "), signed == Some(false))
+}
+
+fn sync_model<T: Clone + 'static>(m: &VecModel<T>, rows: Vec<T>) {
+    let n = rows.len();
+    for (i, r) in rows.into_iter().enumerate() {
+        if i < m.row_count() {
+            m.set_row_data(i, r);
+        } else {
+            m.push(r);
+        }
+    }
+    while m.row_count() > n {
+        m.remove(m.row_count() - 1);
+    }
 }
 
 fn answers(p: &Prov) -> bool {
@@ -627,6 +758,8 @@ impl SettingsPage {
                     "failover",
                     "recipients",
                     "hasKey",
+                    "clis",
+                    "roleProviders",
                 ] {
                     st.data[k] = d[k].clone();
                 }
@@ -691,11 +824,19 @@ impl SettingsPage {
 
     pub(super) fn render_providers(&self) {
         let (rows, ordered) = {
-            let mut st = self.st.borrow_mut();
+            let mut guard = self.st.borrow_mut();
+            let st = &mut *guard;
+            // A command-line tool tried first is the default, not a row here.
+            let cli_first = set_up(&st.data)
+                .first()
+                .is_some_and(|id| cli_known_name(id).is_some());
             let pv = &mut st.prov;
             let list = pv.list.clone();
             let n = list.len();
-            let def = list.iter().find(|p| answers(p)).map(|p| p.id.clone());
+            let def = list
+                .iter()
+                .find(|p| answers(p) && !cli_first)
+                .map(|p| p.id.clone());
             let mut rows = Vec::with_capacity(n);
             for (i, p) in list.iter().enumerate() {
                 // A row that now shows another provider takes that one's
@@ -782,10 +923,405 @@ impl SettingsPage {
         self.render_model_providers();
     }
 
-    // CLI provider picker (lane cli-providers): wire here
-    // It renders nothing yet; that lane fills the slot in ProvidersPage.
+    // ------------------------------------------------ command-line tools
+
+    /// The command-line tools and the provider each job tries first, under
+    /// the provider rows. The first render wires the controls and looks
+    /// for the tools (once per opening; "Check again" looks again).
     fn cli_provider_picker(&self) {
-        self.s().set_cli_picker_shown(false);
+        let (wire, check) = {
+            let mut st = self.st.borrow_mut();
+            let pv = &mut st.prov;
+            let w = !pv.cli_wired;
+            let c = !pv.cli_checked;
+            pv.cli_wired = true;
+            pv.cli_checked = true;
+            (w, c)
+        };
+        if wire {
+            self.wire_cli();
+        }
+        self.render_cli();
+        if check {
+            self.cli_detect(false);
+        }
+    }
+
+    fn wire_cli(&self) {
+        let s = self.s();
+        let (clis, roles) = {
+            let st = self.st.borrow();
+            (st.prov.cli_model.clone(), st.prov.role_model.clone())
+        };
+        s.set_clis(ModelRc::from(clis));
+        s.set_roles(ModelRc::from(roles));
+        s.set_cli_picker_shown(true);
+        let me = self.me.clone();
+        s.on_cli_act(move |id, what, field| {
+            if let Some(p) = me.upgrade() {
+                p.touched();
+                p.cli_act(&id, &what, &field);
+            }
+        });
+        let me = self.me.clone();
+        s.on_cli_toggle(move |id, on| {
+            if let Some(p) = me.upgrade() {
+                p.touched();
+                p.cli_set(&id, json!({ "provider": id.as_str(), "enabled": on }));
+            }
+        });
+        let me = self.me.clone();
+        s.on_role_pick(move |role, id| {
+            if let Some(p) = me.upgrade() {
+                p.touched();
+                p.role_pick(&role, &id);
+            }
+        });
+    }
+
+    fn render_cli(&self) {
+        let (rows, roles, checking) = {
+            let st = self.st.borrow();
+            let pv = &st.prov;
+            let list = cli_list(&st.data, &pv.clis);
+            let ready = set_up(&st.data);
+            let first = ready.first().cloned().unwrap_or_default();
+            let rows: Vec<SetCliRow> = list
+                .iter()
+                .filter(|c| !text(c, "id").is_empty())
+                .map(|c| {
+                    let id = text(c, "id");
+                    let u = pv.cli_ui.get(&id).cloned().unwrap_or_default();
+                    let installed = flag(c, "installed");
+                    let enabled = flag(c, "enabled");
+                    let (status, danger) = cli_status(c, first == id);
+                    SetCliRow {
+                        name: provider_name(&id, &list).into(),
+                        installed,
+                        enabled,
+                        status: status.into(),
+                        status_danger: danger && enabled,
+                        path: text(c, "path").into(),
+                        how: if installed { "" } else { cli_how(&id) }.into(),
+                        show_first: installed && enabled && first != id,
+                        busy: u.busy,
+                        testing: u.testing,
+                        msg: u.msg.as_str().into(),
+                        msg_danger: u.danger,
+                        field_text: text(c, "customPath").into(),
+                        epoch: u.epoch,
+                        id: id.as_str().into(),
+                    }
+                })
+                .collect();
+            let picks = &st.data["roleProviders"];
+            let roles: Vec<SetRoleRow> = ROLES
+                .iter()
+                .map(|(role, title, note)| {
+                    let current = text(picks, role);
+                    let mut opts = vec![SetComboRow {
+                        header: false,
+                        id: SharedString::new(),
+                        name: "Automatic".into(),
+                        detail: "The first ready provider in the order above".into(),
+                        checked: current.is_empty(),
+                    }];
+                    for id in &ready {
+                        opts.push(SetComboRow {
+                            header: false,
+                            id: id.as_str().into(),
+                            name: provider_name(id, &list).into(),
+                            detail: SharedString::new(),
+                            checked: *id == current,
+                        });
+                    }
+                    // A pick that is no longer set up still shows as picked.
+                    if !current.is_empty() && !ready.contains(&current) {
+                        opts.push(SetComboRow {
+                            header: false,
+                            id: current.as_str().into(),
+                            name: provider_name(&current, &list).into(),
+                            detail: "Not set up".into(),
+                            checked: true,
+                        });
+                    }
+                    let label = if current.is_empty() {
+                        "Automatic".to_string()
+                    } else {
+                        provider_name(&current, &list)
+                    };
+                    SetRoleRow {
+                        role: (*role).into(),
+                        title: (*title).into(),
+                        note: (*note).into(),
+                        label: label.into(),
+                        rows: ModelRc::new(VecModel::from(opts)),
+                    }
+                })
+                .collect();
+            (rows, roles, pv.cli_checking)
+        };
+        let (clis, role_model) = {
+            let st = self.st.borrow();
+            (st.prov.cli_model.clone(), st.prov.role_model.clone())
+        };
+        sync_model(&clis, rows);
+        sync_model(&role_model, roles);
+        self.s().set_cli_checking(checking);
+    }
+
+    /// Runs a host call on the runtime and hands its answer to `then` on
+    /// the UI thread. The CLI channels are not open to pages, so they are
+    /// called here directly.
+    fn host_call<F>(&self, job: F, then: impl FnOnce(&SettingsPage, Option<Value>) + 'static)
+    where
+        F: std::future::Future<Output = Value> + Send + 'static,
+    {
+        let task = crate::shell::async_runtime::spawn(job);
+        let me = self.me.clone();
+        let _ = slint::spawn_local(async move {
+            let r = task.await.ok();
+            if let Some(p) = me.upgrade() {
+                then(&p, r);
+            }
+        });
+    }
+
+    fn set_cli_ui(&self, id: &str, f: impl FnOnce(&mut CliUi)) {
+        let mut st = self.st.borrow_mut();
+        f(st.prov.cli_ui.entry(id.to_string()).or_default());
+    }
+
+    fn cli_name(&self, id: &str) -> String {
+        let st = self.st.borrow();
+        provider_name(id, &cli_list(&st.data, &st.prov.clis))
+    }
+
+    fn cli_act(&self, id: &str, what: &str, field: &str) {
+        match what {
+            "check" => self.cli_detect(true),
+            "test" => self.cli_test(id),
+            "first" => self.cli_set(id, json!({ "provider": id, "makeDefault": true })),
+            "path" => self.cli_set(id, json!({ "provider": id, "path": field.trim() })),
+            _ => {}
+        }
+    }
+
+    /// Looks for the tools: path, version and sign-in (nothing goes to a
+    /// model). `said` speaks what was found.
+    fn cli_detect(&self, said: bool) {
+        self.st.borrow_mut().prov.cli_checking = true;
+        self.s().set_cli_checking(true);
+        if said {
+            self.say("Looking for command-line tools…");
+        }
+        self.host_call(crate::host::settings::cli_detect(), move |p, r| {
+            let found = r.and_then(|v| v["clis"].as_array().cloned());
+            let installed = found
+                .as_ref()
+                .map(|l| l.iter().filter(|c| flag(c, "installed")).count());
+            {
+                let mut st = p.st.borrow_mut();
+                st.prov.cli_checking = false;
+                if let Some(list) = found {
+                    st.prov.clis = list;
+                }
+            }
+            p.render_cli();
+            if said {
+                let t = match installed {
+                    None => "Couldn't look for command-line tools.".to_string(),
+                    Some(0) => "No command-line tools found.".into(),
+                    Some(1) => "Found 1 command-line tool.".into(),
+                    Some(n) => format!("Found {n} command-line tools."),
+                };
+                p.say(&t);
+            }
+        });
+    }
+
+    /// `settings:set-cli` for one tool: on or off, first, or its path.
+    fn cli_set(&self, id: &str, payload: Value) {
+        self.set_cli_ui(id, |u| {
+            u.busy = true;
+            u.msg.clear();
+            u.danger = false;
+        });
+        self.render_cli();
+        let sent = payload.clone();
+        let id = id.to_string();
+        self.host_call(
+            async move {
+                let app = AppHandle::get();
+                crate::host::settings::set_cli(&app, &payload).await
+            },
+            move |p, r| p.after_cli_set(&id, &sent, r),
+        );
+    }
+
+    fn after_cli_set(&self, id: &str, sent: &Value, r: Option<Value>) {
+        self.set_cli_ui(id, |u| u.busy = false);
+        let name = self.cli_name(id);
+        let Some(v) = r.filter(|v| flag(v, "ok")) else {
+            self.set_cli_ui(id, |u| {
+                u.msg = "Couldn't save that change. Try again.".into();
+                u.danger = true;
+            });
+            self.render_cli();
+            self.unsaved(None);
+            return;
+        };
+        let row = v["cli"].clone();
+        let path = sent.get("path").and_then(Value::as_str);
+        {
+            let mut guard = self.st.borrow_mut();
+            let st = &mut *guard;
+            if st.prov.clis.is_empty() {
+                st.prov.clis = st.data["clis"].as_array().cloned().unwrap_or_default();
+            }
+            if row.is_object() {
+                match st.prov.clis.iter_mut().find(|c| c["id"] == id) {
+                    Some(c) => *c = row.clone(),
+                    None => st.prov.clis.push(row.clone()),
+                }
+            }
+            if path.is_some() {
+                // The field shows the path that was stored.
+                st.prov.next += 1;
+                let n = st.prov.next;
+                st.prov.cli_ui.entry(id.to_string()).or_default().epoch = n;
+            }
+        }
+        let installed = flag(&row, "installed");
+        let signed_out = row["signedIn"] == json!(false);
+        let command = text(&row, "command");
+        let mut danger = false;
+        let said = if let Some(on) = sent.get("enabled").and_then(Value::as_bool) {
+            if !on {
+                format!("{name} is off.")
+            } else if signed_out {
+                danger = true;
+                format!(
+                    "{name} is on, but it isn't signed in. Run {command} in a terminal to sign in."
+                )
+            } else {
+                format!("{name} is on.")
+            }
+        } else if path.is_some_and(|t| !t.is_empty()) {
+            if installed {
+                format!("{name} uses the program at that path.")
+            } else {
+                danger = true;
+                format!("Aevaleron can't find {name} at that path.")
+            }
+        } else if path.is_some() {
+            format!("{name} uses the program it finds.")
+        } else {
+            format!("{name} is tried first now.")
+        };
+        if danger {
+            let msg = said.clone();
+            self.set_cli_ui(id, |u| {
+                u.msg = msg;
+                u.danger = true;
+            });
+        }
+        self.render_cli();
+        self.say(&said);
+        self.refresh_from_rust();
+    }
+
+    /// `settings:test-key` for a tool: its version and sign-in, never a
+    /// prompt.
+    fn cli_test(&self, id: &str) {
+        self.set_cli_ui(id, |u| {
+            u.busy = true;
+            u.testing = true;
+            u.msg.clear();
+            u.danger = false;
+        });
+        self.render_cli();
+        let name = self.cli_name(id);
+        self.say(&format!("Checking {name}…"));
+        let me = self.me.clone();
+        let fut = ask(
+            self.label.clone(),
+            "settings:test-key",
+            json!({ "provider": id }),
+            15000,
+        );
+        let id = id.to_string();
+        let _ = slint::spawn_local(async move {
+            let r = fut.await;
+            let Some(p) = me.upgrade() else {
+                return;
+            };
+            let (msg, ok) = match r.value() {
+                Some(v) => {
+                    let m = Some(text(v, "message"))
+                        .filter(|m| !m.is_empty())
+                        .unwrap_or_else(|| text(v, "error"));
+                    (m, flag(v, "ok"))
+                }
+                None if matches!(r, Reply::TimedOut) => {
+                    (format!("{name} took too long to answer."), false)
+                }
+                None => (String::new(), false),
+            };
+            let msg = match (msg.is_empty(), ok) {
+                (false, _) => msg,
+                (true, true) => format!("{name} is ready."),
+                (true, false) => format!("Couldn't check {name}."),
+            };
+            let shown = msg.clone();
+            p.set_cli_ui(&id, |u| {
+                u.busy = false;
+                u.testing = false;
+                u.msg = shown;
+                u.danger = !ok;
+            });
+            p.render_cli();
+            p.say(&msg);
+            p.refresh_from_rust();
+        });
+    }
+
+    /// `settings:set-role`: the provider a job tries first, or back to the
+    /// order (`id` empty).
+    fn role_pick(&self, role: &str, id: &str) {
+        let provider = if id.is_empty() {
+            Value::Null
+        } else {
+            json!(id)
+        };
+        let payload = json!({ "role": role, "provider": provider });
+        let title = ROLES
+            .iter()
+            .find(|(r, _, _)| *r == role)
+            .map_or(role, |(_, t, _)| *t)
+            .to_string();
+        let chosen = if id.is_empty() {
+            "Automatic".to_string()
+        } else {
+            self.cli_name(id)
+        };
+        self.host_call(
+            async move {
+                let app = AppHandle::get();
+                crate::host::settings::set_role(&app, &payload)
+            },
+            move |p, r| {
+                let Some(v) = r.filter(|v| flag(v, "ok")) else {
+                    p.render_cli();
+                    p.unsaved(None);
+                    return;
+                };
+                p.st.borrow_mut().data["roleProviders"] = v["roleProviders"].clone();
+                p.render_cli();
+                p.say(&format!("{title}: {chosen}."));
+                p.refresh_from_rust();
+            },
+        );
     }
 
     fn announce_status(&self, id: &str) {
@@ -1476,6 +2012,14 @@ impl SettingsPage {
     }
 
     pub(super) fn go_to_provider(&self, pid: &str) {
+        // A command-line tool (an answer's "Open Settings" when it would
+        // not start) has its own row under the providers.
+        if cli_known_name(pid).is_some() {
+            self.open_row(&format!("prov-{pid}"));
+            self.ui.invoke_jump("pg-providers".into());
+            self.render_providers();
+            return;
+        }
         let Some(p) = self.prov(pid) else {
             return;
         };

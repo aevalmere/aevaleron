@@ -181,7 +181,6 @@ const LISTEN_CHANNELS = new Set([
   'bar:open',
   'bar:context',
   'bar:submit',
-  'glass:frame',
   'glass:tier',
   // ---- lane: windows (do not edit outside your lane) ----
   'output:meta',

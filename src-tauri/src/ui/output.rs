@@ -1234,11 +1234,12 @@ fn fault_row(id: u32, f: &Fault, cx: &Cx) -> Row {
             ));
         } else {
             let b = btn(bid, or(label, &aid));
-            r.buttons.push(if aid == "hop" || aid == "fix-key" {
-                b.prominent()
-            } else {
-                b
-            });
+            r.buttons
+                .push(if aid == "hop" || aid == "fix-key" || aid == "fix-cli" {
+                    b.prominent()
+                } else {
+                    b
+                });
         }
     }
     if f.actions.is_empty() && !f.question.is_empty() {
@@ -3048,6 +3049,12 @@ impl OutputPage {
             }
             "fix-key" => {
                 let section = format!("prov-{}", or(&ap, "openrouter"));
+                self.send("overlay:open-settings", json!({ "section": section }));
+            }
+            // A command-line tool that is gone or will not start: its row.
+            "fix-cli" => {
+                let row = format!("prov-{ap}");
+                let section = or(s(&a, "section"), &row);
                 self.send("overlay:open-settings", json!({ "section": section }));
             }
             "choose-model" => {
