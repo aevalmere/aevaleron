@@ -1,0 +1,41 @@
+[DESKTOP] ownProbeShown=ok
+[DESKTOP] ownHandles=3
+[DESKTOP] desktopReady=ok
+[DESKTOP] desktopReadyMs=3
+[DESKTOP] desktopDpi=per-monitor-v2
+[DESKTOP] desktopInProcess=ok
+[DESKTOP] desktopWindows=ok
+[DESKTOP] desktopWindowCount=2
+[DESKTOP] desktopOwnExcluded=ok
+[DESKTOP] ownWindowBlocked=ok
+[DESKTOP] desktopNotepadIncluded=ok
+[DESKTOP] notepadWindow=wB00B6:notepad:Notepad
+[DESKTOP] focusMethod=already
+[DESKTOP] uiaTree=ok
+[DESKTOP] uiaTreeNodes=19
+[DESKTOP] uiaTreeMs=1076
+[DESKTOP] uiaTreeRoles=window,edit,scrollbar,button,statusbar,titlebar,menuitem
+[DESKTOP] editorCandidates=ref_2:edit:Text Editor:value+scroll:focused:752x437
+[DESKTOP] editor=ref_2:edit:Text Editor
+[DESKTOP] ocrMs=97
+[DESKTOP] ocrWords=ok
+[DESKTOP] ocrDetail=hits=invoice|total|due words=23 inWindow=true lang=en-US
+[DESKTOP] typeFocus=element
+[DESKTOP] typeReadText="File\nEdit\nFormat\nView\nHelp\nInvoice total due 42.00\r\n Aevaleron smoke 4271\n  Ln 2, Col 22\n 100%\n Windows (CRLF)\n UTF-8\n"
+[DESKTOP] uiaTypeRead=ok
+[DESKTOP] uiaSetValueMs=11
+[DESKTOP] uiaSetValueVia=value
+[DESKTOP] uiaSetValue=ok
+[DESKTOP] getTextSpans=10
+[DESKTOP] findEditor=ok
+[DESKTOP] findTop=edit:Text Editor:100
+[DESKTOP] elementAt=edit:ref_2
+[DESKTOP] desktopOpMs={"click":{"last":0,"max":0,"n":1},"config":{"last":0,"max":0,"n":21},"elementAt":{"last":2,"max":2,"n":1},"focusWindow":{"last":0,"max":0,"n":1},"getText":{"last":18,"max":19,"n":2},"key":{"last":16,"max":124,"n":3},"listWindows":{"last":0,"max":0,"n":4},"ocr":{"last":93,"max":93,"n":1},"ping":{"last":0,"max":0,"n":1},"readTree":{"last":18,"max":1070,"n":3},"restoreCursor":{"last":0,"max":0,"n":1},"setValue":{"last":8,"max":8,"n":1},"type":{"last":55,"max":55,"n":1}}
+[DESKTOP] dontSave=button:Don't Save
+[DESKTOP] notepadClosed=ok
+[DESKTOP] desktopStatus={"ready":true,"disabled":false,"deaths":0,"pid":8420,"inProcess":true,"dpi":"per-monitor-v2","watching":false,"stderr":""}
+[DESKTOP] done
+
+--- stderr ---
+whisper: weights memory-mapped: 59.0 MiB in CPU_Mapped
+[1122/041833.669:ERROR:ui\gfx\win\window_impl.cc:172] Failed to unregister class Chrome_WidgetWin_0. Error = 1412

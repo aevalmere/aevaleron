@@ -1,0 +1,4 @@
+children seen:
+msedgewebview2.exe [3132] "C:\Program Files (x86)\Microsoft\EdgeWebView\Application\157.0.4341.46\msedgewebview2.exe" --embedded-browser-webview=1 --webview-exe-name=Aevaleron.exe --webview-exe-version=1.1.1 --user-data-dir="D:\a\_temp\aeval-desktop\WebView2\EBWebView" --noerrdialogs --embedded-browser-webview-dpi-awareness=2 --autoplay-policy=no-user-gesture-required --disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --lang=en-US --mojo-named-platform-channel-pipe=8420.7788.13154338306890648809 /pfhostedapp:9ae0cac2edc3e22a2c5fef5c52638a8d036dc515
+notepad.exe [8468] "notepad.exe" C:\Users\RUNNER~1\AppData\Local\Temp\aeval-desktop-check-8420-1a2017a1d58.txt
+unexpected:
