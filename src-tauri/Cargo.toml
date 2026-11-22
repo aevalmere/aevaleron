@@ -184,6 +184,8 @@ windows = { version = "0.62", features = [
   "Storage_Streams",
   "Win32_Security",
   "Win32_System_Com",
+  # A CLI provider's process tree dies with its job object (llm/cli/run.rs).
+  "Win32_System_JobObjects",
   "Win32_System_Ole",
   "Win32_System_Threading",
   "Win32_System_Variant",

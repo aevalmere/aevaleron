@@ -909,7 +909,9 @@ mod tests {
         };
         let file = beat_file("timeout");
         let mut llm = llm();
-        llm.set_timeouts(Duration::from_millis(3000), Duration::from_millis(3000));
+        // Long enough for two node starts (the fake and its child) while the
+        // whole suite runs in parallel; at 3 s the kill could land first.
+        llm.set_timeouts(Duration::from_millis(8000), Duration::from_millis(8000));
         let cancel = CancellationToken::new();
         let msgs = vec![json!({ "role": "user", "content": format!("beat:{}", file.display()) })];
         let meta = Meta::purpose("agent");
