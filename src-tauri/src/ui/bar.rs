@@ -24,7 +24,8 @@
 //! notice and the status, one per line), `input` (the field), `focused-input`
 //! (bool), `visible` (bool), `mode`, `intent` ("ask" or "do"), `locked`
 //! (bool), `notice`, `status`, `menu` (`{open, inside}`), `examples` (the
-//! chips shown), `mic`, `target`, `model`.
+//! chips shown), `mic`, `target`, `model`, `field-at` (`[x, y]`: the
+//! field's middle on screen in physical pixels, Null while it is closed).
 
 use std::cell::{Cell, RefCell};
 use std::rc::{Rc, Weak};
@@ -1988,6 +1989,17 @@ impl Bar {
         }
     }
 
+    /// The middle of `#id` on screen, in physical pixels.
+    fn screen_px(&self, id: &str) -> Option<(i32, i32)> {
+        let (x, y, w, h) = self.rect_of(id)?;
+        let win = crate::shell::Window::from_parts(&self.label, self.hwnd);
+        let scale = win.scale_factor().unwrap_or(1.0);
+        let at = win.outer_position().ok()?;
+        let px = f64::from(at.x) + f64::from(x + w / 2.0) * scale;
+        let py = f64::from(at.y) + f64::from(y + h / 2.0) * scale;
+        Some((px.round() as i32, py.round() as i32))
+    }
+
     fn resolve(&self, selector: &str) {
         let found = selector.split(',').find_map(|id| self.rect_of(id.trim()));
         let Some((x, y, w, h)) = found else {
@@ -2126,6 +2138,9 @@ impl super::Page for Bar {
             "mic" => json!(self.st.borrow().mic),
             "target" => json!(ui.get_target_text().to_string()),
             "model" => json!(ui.get_model_name().to_string()),
+            "field-at" => self
+                .screen_px("#query-input")
+                .map_or(Value::Null, |(x, y)| json!([x, y])),
             "text" => {
                 let mut parts = Vec::new();
                 if !ui.get_token_rest() {

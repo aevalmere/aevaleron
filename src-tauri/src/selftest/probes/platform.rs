@@ -660,10 +660,7 @@ fn menu_for(cx: &Cx, open: impl FnOnce() -> Result<(), String>) -> Result<bool, 
 
 /// The middle of the bar's field, in physical pixels.
 fn bar_field(cx: &Cx) -> (i32, i32) {
-    let r = windows::screen::dip_to_px(windows::bar_rect(&cx.app));
-    let x = (r.x + r.width / 2.0).round() as i32;
-    let y = (r.y + r.height / 2.0).round() as i32;
-    (x, y)
+    crate::selftest::bar_field_px(cx)
 }
 
 /// WIN-14, B-077: a text field and a selection each get a native menu, with

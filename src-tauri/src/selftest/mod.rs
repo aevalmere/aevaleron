@@ -243,3 +243,17 @@ impl Cx {
         }
     }
 }
+
+/// The middle of the bar's field in physical pixels (the page says where it
+/// is); the middle of the bar's rect if the page cannot say.
+pub fn bar_field_px(cx: &Cx) -> (i32, i32) {
+    if let Ok(v) = cx.probe(crate::windows::OVERLAY, "field-at") {
+        if let (Some(x), Some(y)) = (v[0].as_i64(), v[1].as_i64()) {
+            return (x as i32, y as i32);
+        }
+    }
+    let r = crate::windows::screen::dip_to_px(crate::windows::bar_rect(&cx.app));
+    let x = (r.x + r.width / 2.0).round() as i32;
+    let y = (r.y + r.height / 2.0).round() as i32;
+    (x, y)
+}

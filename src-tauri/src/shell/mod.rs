@@ -141,6 +141,10 @@ pub(crate) fn forget_label(label: &str, hwnd: isize) {
     let mut l = labels().lock();
     if l.get(label) == Some(&hwnd) {
         l.remove(label);
+        // LIFE-09: the last window closing quits (window-all-closed).
+        if l.is_empty() {
+            platform::request_exit(0);
+        }
     }
 }
 

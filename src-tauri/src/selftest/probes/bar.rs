@@ -186,10 +186,7 @@ fn open_by_hotkey(cx: &Cx, chord: &str) -> bool {
 
 /// The middle of the bar, in physical pixels: inside the field.
 fn bar_point(cx: &Cx) -> (i32, i32) {
-    let r = windows::screen::dip_to_px(windows::bar_rect(&cx.app));
-    let x = (r.x + r.width / 2.0).round() as i32;
-    let y = (r.y + r.height / 2.0).round() as i32;
-    (x, y)
+    crate::selftest::bar_field_px(cx)
 }
 
 /// Puts the keyboard in the bar's field: a real click on it when it does

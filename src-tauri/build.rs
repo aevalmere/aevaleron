@@ -32,6 +32,16 @@ fn main() {
 
     // Images (the style's icons) are decoded here, at build time, into the
     // software renderer's own format: no image decoder in the exe.
+    // The VC runtime is linked statically, as tauri-build did, so the exe
+    // starts on a PC without the Visual C++ redistributable; the UCRT comes
+    // with Windows.
+    if std::env::var("CARGO_CFG_TARGET_ENV").as_deref() == Ok("msvc") {
+        for lib in ["libvcruntimed.lib", "vcruntime.lib", "vcruntimed.lib"] {
+            println!("cargo:rustc-link-arg=/NODEFAULTLIB:{lib}");
+        }
+        println!("cargo:rustc-link-arg=/DEFAULTLIB:libvcruntime.lib");
+    }
+
     let config = slint_build::CompilerConfiguration::new()
         .with_style("fluent".into())
         .embed_resources(slint_build::EmbedResourcesKind::EmbedForSoftwareRenderer);
