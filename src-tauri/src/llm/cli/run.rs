@@ -146,9 +146,9 @@ impl Drop for Files {
 
 /// Everything one run owns, killed and cleaned up in this order on drop.
 struct Running {
-    job: Job,
+    _job: Job,
     child: Child,
-    files: Files,
+    _files: Files,
     stdin: Vec<u8>,
 }
 
@@ -240,9 +240,9 @@ pub async fn send(
     let job = Job::new();
     job.assign(&child);
     let run = Running {
-        job,
+        _job: job,
         child,
-        files,
+        _files: files,
         stdin: plan.stdin,
     };
     let (tx, rx) = unbounded_channel();
@@ -319,12 +319,15 @@ async fn collect(
 
 /// The rest of a streamed answer, as SSE lines. Dropping it stops the run.
 fn stream_reply(first: Vec<Vec<u8>>, rx: UnboundedReceiver<Msg>) -> Reply {
-    let head = futures_util::stream::iter(first.into_iter().map(Ok));
+    let head = futures_util::stream::iter(first.into_iter().map(Ok::<Vec<u8>, ApiError>));
     let rest = futures_util::stream::unfold((rx, false), |(mut rx, ended)| async move {
         if ended {
             return None;
         }
-        let item = match rx.recv().await? {
+        let Some(msg) = rx.recv().await else {
+            return None;
+        };
+        let item = match msg {
             Msg::Text(t) => Ok(sse_text(&t)),
             Msg::Usage(p, c) => Ok(sse_usage(p, c)),
             Msg::End => return Some((Ok(DONE.to_vec()), (rx, true))),
@@ -439,9 +442,9 @@ async fn pump(provider: Provider, run: &mut Running, tx: &UnboundedSender<Msg>) 
     }
     let notes = decoder.notes.join("\n");
     let msg = match state.failed {
-        Some(f) => Msg::Fail(classify(provider, exit, &[&f, &notes, &said])),
+        Some(f) => Msg::Fail(classify(provider, exit, &[f.as_str(), notes.as_str(), said.as_str()])),
         None if exit == Some(0) => Msg::End,
-        None => Msg::Fail(classify(provider, exit, &[&notes, &said])),
+        None => Msg::Fail(classify(provider, exit, &[notes.as_str(), said.as_str()])),
     };
     let _ = tx.send(msg);
 }
