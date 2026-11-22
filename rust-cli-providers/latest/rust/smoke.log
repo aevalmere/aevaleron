@@ -15,28 +15,28 @@
 [SMOKE] selftest.input=ok
 [SMOKE] pillCentre=Some((986, 38))
 [SMOKE] desktopReady=ok
-[SMOKE] desktopReadyMs=1666
+[SMOKE] desktopReadyMs=1797
 [SMOKE] desktopDpi=per-monitor-v2
 [SMOKE] desktopWindows=ok
-[SMOKE] desktopWindowCount=2
+[SMOKE] desktopWindowCount=1
 [SMOKE] desktopOwnExcluded=ok
 [SMOKE] ownWindowBlocked=ok
 [SMOKE] desktopNotepadIncluded=ok
-[SMOKE] notepadWindow=w10240:notepad:Notepad
+[SMOKE] notepadWindow=w10218:notepad:Notepad
 [SMOKE] focusMethod=already
 [SMOKE] uiaTree=ok
 [SMOKE] uiaTreeNodes=20
-[SMOKE] uiaTreeMs=1734
+[SMOKE] uiaTreeMs=1686
 [SMOKE] uiaTreeRoles=window,document,button,edit,menuitem
 [SMOKE] editorCandidates=ref_2:document:Text Editor:scroll+text:focused:752x437 | ref_7:edit::value:readonly:322x21 | ref_8:edit:  Ln 1, Col 1:value:readonly:138x21 | ref_9:edit: 100%:value:readonly:48x21 | ref_10:edit: Windows (CRLF):value:readonly:118x21 | ref_11:edit: UTF-8:value:readonly:102x21
 [SMOKE] editor=ref_2:document:Text Editor
-[SMOKE] ocrMs=971
+[SMOKE] ocrMs=777
 [SMOKE] ocrWords=ok
 [SMOKE] ocrDetail=hits=invoice|total|due words=24 inWindow=true lang=en-US
 [SMOKE] typeFocus=element
 [SMOKE] typeReadText="System\nFile\nEdit\nFormat\nView\nHelp\nInvoice total due 42.00\n Aevaleron smoke 4271\n  Ln 2, Col 22\n 100%\n Windows (CRLF)\n UTF-8\n"
 [SMOKE] uiaTypeRead=ok
-[SMOKE] uiaSetValueMs=126
+[SMOKE] uiaSetValueMs=128
 [SMOKE] uiaSetValueVia=sendinput
 [SMOKE] uiaSetValue=ok
 [SMOKE] getTextSpans=11
@@ -91,7 +91,7 @@
 [SMOKE] quitOnLastClose=ok
 [SMOKE] probe.platform=ok
 [SMOKE] hoverTrail=start_shown=true in_work_area=true wa=0,0,1024,720 sheet:visible=true,sheet=true,through=false,rect=-4,121,460,515 margin:visible=true,sheet=true,through=true,rect=-4,121,460,515 sheet:visible=true,sheet=true,through=false,rect=-4,121,460,515 margin:visible=true,sheet=true,through=true,rect=-4,121,460,515 outside:visible=true,sheet=true,through=true,rect=-4,121,460,515 after-hotkey:visible=true,sheet=true,rect=-4,121,460,515
-[SMOKE] hoverTrail=start_shown=true in_work_area=true wa=0,0,1024,720 sheet:visible=true,sheet=true,through=false,rect=388,121,460,515 margin:visible=true,sheet=true,through=true,rect=388,121,460,515 sheet:visible=true,sheet=true,through=false,rect=388,121,460,515 margin:visible=true,sheet=true,through=true,rect=388,121,460,515 outside:visible=true,sheet=true,through=true,rect=388,121,460,515 after-hotkey:visible=true,sheet=true,rect=388,121,460,515
+[SMOKE] hoverTrail=start_shown=true in_work_area=true wa=0,0,1024,720 sheet:visible=true,sheet=true,through=false,rect=388,-20,460,335 margin:visible=true,sheet=true,through=true,rect=388,-20,460,335 sheet:visible=true,sheet=true,through=false,rect=388,-20,460,335 margin:visible=true,sheet=true,through=true,rect=388,-20,460,335 outside:visible=true,sheet=true,through=true,rect=388,-20,460,335 after-hotkey:visible=true,sheet=true,rect=388,-26,460,200
 [SMOKE] hoverTrail=start_shown=true in_work_area=true wa=0,0,1024,720 sheet:visible=true,sheet=true,through=false,rect=-4,84,460,515 margin:visible=true,sheet=true,through=true,rect=-4,84,460,515 sheet:visible=true,sheet=true,through=false,rect=-4,84,460,515 margin:visible=true,sheet=true,through=true,rect=-4,84,460,515 outside:visible=true,sheet=true,through=true,rect=-4,84,460,515 after-hotkey:visible=true,sheet=true,rect=-4,84,460,515
 [SMOKE] hoverTrail=start_shown=true in_work_area=true wa=0,0,1024,720 sheet:visible=true,sheet=true,through=false,rect=192,84,460,515 margin:visible=true,sheet=true,through=true,rect=192,84,460,515 sheet:visible=true,sheet=true,through=false,rect=192,84,460,515 margin:visible=true,sheet=true,through=true,rect=192,84,460,515 outside:visible=true,sheet=true,through=true,rect=192,84,460,515 after-hotkey:visible=true,sheet=true,rect=192,84,460,515
 [SMOKE] hoverKeepsAnswer=ok
@@ -100,7 +100,7 @@
 [SMOKE] windowsAfter=shown=overlay active= mode=Pill (answer shown at start: true)
 [SMOKE] probe.windows=ok
 [SMOKE] helperNotAtBoot=ok
-[SMOKE] capture=ok:315084bytes:1024x768
+[SMOKE] capture=ok:311180bytes:1024x768
 [SMOKE] captureActiveDisplay=0,0 1024x768
 [SMOKE] regionCapture=320x200:tagged
 [SMOKE] regionSharper=1.00x->1.00x
@@ -111,26 +111,26 @@
 [SMOKE] dpiRoundTrip=ok:5 rects within 1px
 [SMOKE] glassTier=live reasons=none canHide=true
 [SMOKE] glassLoaded=ok
-[SMOKE] snapCost=n=50 wallP50=27.9ms wallP95=44ms encodeP95=2.5ms blockP95=0.2ms
+[SMOKE] snapCost=n=50 wallP50=29.8ms wallP95=47.5ms encodeP95=3ms blockP95=0.2ms
 [SMOKE] snapCost=ok
 [SMOKE] glassCost=live total=0.0% | solid total=0.0% (percent of one core over 3 s, the app process; solid is glassIntensity 0)
 [SMOKE] lensFirstDraw=frame:chip=true:smoke
 [SMOKE] lensFirstDraw=ok
 [SMOKE] lensReady=said=true ready=true
-[SMOKE] backdropIdle=fast=true slow=true after 50ms shown=[]
+[SMOKE] backdropIdle=fast=true slow=true after 54ms shown=[]
 [SMOKE] pointResolved=true
 [SMOKE] buddyPoints=true
 [SMOKE] buddyPointsDone=true
 [SMOKE] walkthrough=true
 [SMOKE] onboardingSteps=0>1>2
-[SMOKE] buddyReuse=points in 17ms, agent waited 5ms
-[SMOKE] buddyReload=shown=true crash=Ok(()) back=true in 1467ms (clickThrough=true ready=true freshPage=true cursor=(422, 306))
+[SMOKE] buddyReuse=points in 33ms, agent waited 3ms
+[SMOKE] buddyReload=shown=true crash=Ok(()) back=true in 407ms (clickThrough=true ready=true freshPage=true cursor=(422, 306))
 [SMOKE] probe.capture=ok
 [SMOKE] intentTable=50/50
 [SMOKE] intentTable=ok
 [SMOKE] intentOffersDo=ok
 [SMOKE] intentPrefixes=ok
-[SMOKE] intentWorstMs=0.40
+[SMOKE] intentWorstMs=0.90
 [SMOKE] intentFast=ok
 [SMOKE] intentDoNeedsMargin=ok
 [SMOKE] keySwallow=ok
@@ -140,8 +140,8 @@
 [SMOKE] barKeys=ok
 [SMOKE] tokenReply=ok
 [SMOKE] earlyKeys=ok
-[SMOKE] barOpenMs=[32]
-[SMOKE] barOpenStages=32(fg=0,display=0,top=4,state=6,placed=10,focus=25,shown=25,page=22,via=focus)
+[SMOKE] barOpenMs=[63]
+[SMOKE] barOpenStages=63(fg=0,display=0,top=8,state=13,placed=20,focus=42,shown=43,page=45,via=focus)
 [SMOKE] barMultiline=ok
 [SMOKE] suggestionsOnce=ok
 [SMOKE] textEntryDecides=ok
@@ -192,11 +192,11 @@
 [SMOKE] regionTextEscape=ok
 [SMOKE] regionTextNotepad=ok
 [SMOKE] regionTextExact=ok
-[SMOKE] regionTextReadMs=exact 35
+[SMOKE] regionTextReadMs=exact 51
 [SMOKE] regionTextNote=ok
 [SMOKE] regionTextNoteLeaves=ok
 [SMOKE] regionTextPicture=ok
-[SMOKE] regionTextOcrMs=1158
+[SMOKE] regionTextOcrMs=1191
 [SMOKE] regionTextNothing=ok
 [SMOKE] probe.region-text=ok
 [SMOKE] voiceNoCppRuntime=ok
@@ -207,29 +207,63 @@
 [SMOKE] voicePill=ok
 [SMOKE] voiceDictation=ok
 [SMOKE] voiceClipboard=ok
-[SMOKE] voiceSpeedAfter=load=51ms (once) trim=0ms (7.5s of 7.9s kept) transcribe=860ms mel=28ms encode=589ms decode=243ms text=Ok("Umm, so I think we should meet at 3, no, 4pm tomorrow, to go over the budget.")
+[SMOKE] voiceSpeedAfter=load=59ms (once) trim=0ms (7.5s of 7.9s kept) transcribe=967ms mel=32ms encode=706ms decode=228ms text=Ok("Umm, so I think we should meet at 3, no, 4pm tomorrow, to go over the budget.")
 [SMOKE] voiceSpeedWhisperTidy="So I think we should meet at 3, no, 4pm tomorrow, to go over the budget."
-[SMOKE] voiceSpeedShort=transcribe=709ms mel=27ms encode=562ms decode=119ms text=Ok("So I think we should meet at three.")
-[SMOKE] voiceSpeedTiny=transcribe=437ms mel=28ms encode=293ms decode=116ms text=Ok("Um, so I think we should meet at 3, no, 4pm tomorrow, to go over the budget.")
-[SMOKE] voiceSpeedThreads=1=890ms 2=505ms 4=426ms
-[SMOKE] voiceSpeedParakeet=load=68ms transcribe=246ms mel=4ms encode=229ms decode=10ms text=Ok("Um, so I think we should meet at three no, four PM tomorrow, to go over the budget") again=228ms
+[SMOKE] voiceSpeedShort=transcribe=852ms mel=31ms encode=683ms decode=136ms text=Ok("So I think we should meet at three.")
+[SMOKE] voiceSpeedTiny=transcribe=551ms mel=32ms encode=372ms decode=147ms text=Ok("Um, so I think we should meet at 3, no, 4pm tomorrow, to go over the budget.")
+[SMOKE] voiceSpeedThreads=1=1036ms 2=602ms 4=505ms
+[SMOKE] voiceSpeedParakeet=load=75ms transcribe=296ms mel=4ms encode=270ms decode=17ms text=Ok("Um, so I think we should meet at three no, four PM tomorrow, to go over the budget") again=274ms
 [SMOKE] voiceSpeedParakeetTidy="So I think we should meet at three no, four PM tomorrow, to go over the budget."
 [SMOKE] voiceSpeed=ok
-[SMOKE] voiceSpeedParakeetShort=transcribe=99ms mel=2ms encode=91ms decode=4ms text=Ok("Um so I think we should meet at three")
-[SMOKE] voiceSpeedParakeetTrimmed=transcribe=192ms mel=3ms encode=177ms decode=8ms text=Ok("Um so I think we should meet at three no four PM to morrow to go over the budget")
-[SMOKE] voiceSpeedParakeetPadded=transcribe=226ms mel=4ms encode=210ms decode=8ms text=Ok("Um so I think we should meet at three no four PM tomorrow, to go over the budget")
+[SMOKE] voiceSpeedParakeetShort=transcribe=125ms mel=2ms encode=116ms decode=5ms text=Ok("Um so I think we should meet at three")
+[SMOKE] voiceSpeedParakeetTrimmed=transcribe=238ms mel=4ms encode=221ms decode=9ms text=Ok("Um so I think we should meet at three no four PM to morrow to go over the budget")
+[SMOKE] voiceSpeedParakeetPadded=transcribe=283ms mel=5ms encode=262ms decode=10ms text=Ok("Um so I think we should meet at three no four PM tomorrow, to go over the budget")
 [SMOKE] voiceParakeet=ok
-[SMOKE] voiceLegacyBin=load=35ms transcribe=667ms text=Ok("Um, so I think we should meet at 3, no, 4pm tomorrow, to go over the budget.")
-[SMOKE] voiceCalibrate=165ms
-[SMOKE] voiceSystem=threads=4 transcribe.cpp 0.4.2 on cpu: AMD EPYC 9V74 80-Core Processor
+[SMOKE] voiceLegacyBin=load=38ms transcribe=902ms text=Ok("Um, so I think we should meet at 3, no, 4pm tomorrow, to go over the budget.")
+[SMOKE] voiceCalibrate=188ms
+[SMOKE] voiceSystem=threads=4 transcribe.cpp 0.4.2 on cpu: AMD EPYC 7763 64-Core Processor
 [SMOKE] voiceSpeedWhisper=ok
-[SMOKE] voiceSpeedTimings={"audioS":16.86,"earlyS":8.04,"pieces":1,"earlyMs":827,"stopMs":0,"waitMs":0,"transcribeMs":828,"cleanupMs":0,"insertMs":0,"totalMs":829,"model":"whisper-base.en-Q5_K_M.gguf","threads":4}
+[SMOKE] voiceSpeedTimings={"audioS":16.86,"earlyS":8.04,"pieces":1,"earlyMs":988,"stopMs":1,"waitMs":0,"transcribeMs":986,"cleanupMs":0,"insertMs":0,"totalMs":987,"model":"whisper-base.en-Q5_K_M.gguf","threads":4}
 [SMOKE] voiceSpeedHeard="So I think we should meet at 3, no, 4pm tomorrow, to go over the budget. So I think we should meet at 3, no, 4pm tomorrow, to go over the budget."
 [SMOKE] voiceSpeedE2e=ok
-[SMOKE] voiceSpeedParakeetTimings={"audioS":16.86,"earlyS":8.04,"pieces":1,"earlyMs":237,"stopMs":1,"waitMs":0,"transcribeMs":236,"cleanupMs":0,"insertMs":0,"totalMs":238,"model":"parakeet-tdt_ctc-110m-Q5_K_M.gguf","threads":4}
+[SMOKE] voiceSpeedParakeetTimings={"audioS":16.86,"earlyS":8.04,"pieces":1,"earlyMs":298,"stopMs":1,"waitMs":0,"transcribeMs":297,"cleanupMs":0,"insertMs":0,"totalMs":299,"model":"parakeet-tdt_ctc-110m-Q5_K_M.gguf","threads":4}
 [SMOKE] voiceSpeedParakeetHeard="So I think we should meet at three no, four PM tomorrow, to go over the budget so I think we should meet at three no four PM tomorrow to go over the budget."
-[SMOKE] voiceSpareTimings={"audioS":16.86,"earlyS":8.04,"pieces":1,"earlyMs":227,"stopMs":1,"waitMs":0,"transcribeMs":249,"cleanupMs":0,"insertMs":0,"totalMs":251,"model":"parakeet-tdt_ctc-110m-Q5_K_M.gguf","threads":4}
+[SMOKE] voiceSpareTimings={"audioS":16.86,"earlyS":8.04,"pieces":1,"earlyMs":284,"stopMs":1,"waitMs":0,"transcribeMs":478,"cleanupMs":0,"insertMs":0,"totalMs":480,"model":"parakeet-tdt_ctc-110m-Q5_K_M.gguf","threads":4}
 [SMOKE] voiceSpare=ok
+[SMOKE] voiceSpareFetch=ok
+[SMOKE] voiceTunedPass=transcribe=935ms mel=31ms encode=682ms decode=220ms text=Ok("Umm, so I think we should meet at 3, no, 4pm tomorrow, to go over the budget.")
+[SMOKE] voiceTuned=ok
+[SMOKE] voiceWakeBenchBase=load=48ms name=855ms Ok("Aevaleron") Ok(Yes { rest: "" }) head=842ms Ok("What is the website?") Ok(No)
+[SMOKE] voiceWakeBenchTiny=load=45ms name=469ms Ok("Aevaleron") Ok(Yes { rest: "" }) head=451ms Ok("Aevaleron") Ok(Yes { rest: "" })
+[SMOKE] voiceWakeBenchParakeet=load=62ms name=54ms Ok("Evelloran.") Ok(Yes { rest: "" }) head=78ms Ok("Evelloron, what is the wait?") Ok(Yes { rest: "what is the wait?" })
+[SMOKE] voiceWakeListens=ok
+[SMOKE] voiceWakeIdleCost=cpu=0.00% of one core, 2us a pass, checks=0
+[SMOKE] voiceWakeIdle=ok
+[SMOKE] voiceWakeTimings=nameToPill=220ms check=66ms (parakeet-tdt_ctc-110m-Q5_K_M.gguf) transcribe=876ms speechEndToSent=1776ms heard="Evelloron."
+[SMOKE] voiceWakeOneBreath=ok
+[SMOKE] voiceWakePause=ok
+[SMOKE] voiceWakeIgnores=ok
+[SMOKE] voiceWakeBare=ok
+[SMOKE] voiceWakeYields=ok
+[SMOKE] voiceWakeOff=ok
+[SMOKE] probe.voice=ok
+SUCCESS: The process with PID 5640 (child process of PID 5684) has been terminated.
+SUCCESS: The process with PID 5684 (child process of PID 5040) has been terminated.
+[SMOKE] privateAppsAdded=Ok(("notepad.exe", true)) front=true ours=Some("overlay")
+[SMOKE] privateAppsCapture=ok
+[SMOKE] privateAppsAsk=ok
+[SMOKE] privateAppsBar=ok
+[SMOKE] privateAppsAgain=ok
+[SMOKE] privateAppsRestored=ok
+[SMOKE] privateAppsMs=gate=75us readAgain=1164ms
+[SMOKE] probe.private-apps=ok
+[SMOKE] dontSave=button:Don't Save
+[SMOKE] v2NotepadClosed=true
+[SMOKE] v2basics=ok
+[SMOKE] v21basics=ok
+[SMOKE] glassGates=ok
+[SMOKE] v2desktop=ok
+[SMOKE] done
 --- stderr ---
 [aevaleron] panic: smoke: deliberate task panic
     at src\selftest\probes\platform.rs:580
@@ -318,9 +352,9 @@
 whisper: weights memory-mapped: 40.4 MiB in CPU_Mapped
 whisper@637: sched buffer CPU -> 13.8 MB
 whisper@637: sched buffer CPU -> 13.8 MB
-[voice] timings {"audioS":7.93,"earlyS":0.0,"pieces":0,"earlyMs":0,"stopMs":0,"waitMs":0,"transcribeMs":516,"cleanupMs":0,"insertMs":0,"totalMs":519,"model":"whisper-tiny.en-Q5_K_M.gguf","threads":4}
+[voice] timings {"audioS":7.93,"earlyS":0.0,"pieces":0,"earlyMs":0,"stopMs":1,"waitMs":0,"transcribeMs":561,"cleanupMs":0,"insertMs":0,"totalMs":566,"model":"whisper-tiny.en-Q5_K_M.gguf","threads":4}
 whisper@637: sched buffer CPU -> 13.8 MB
-[voice] timings {"audioS":7.93,"earlyS":0.0,"pieces":0,"earlyMs":0,"stopMs":1,"waitMs":0,"transcribeMs":471,"cleanupMs":0,"insertMs":3,"totalMs":476,"model":"whisper-tiny.en-Q5_K_M.gguf","threads":4}
+[voice] timings {"audioS":7.93,"earlyS":0.0,"pieces":0,"earlyMs":0,"stopMs":1,"waitMs":0,"transcribeMs":630,"cleanupMs":0,"insertMs":3,"totalMs":635,"model":"whisper-tiny.en-Q5_K_M.gguf","threads":4}
 whisper: weights memory-mapped: 59.0 MiB in CPU_Mapped
 whisper@637: sched buffer CPU -> 21.5 MB
 whisper@637: sched buffer CPU -> 21.5 MB
@@ -333,55 +367,71 @@ parakeet: full-attention checkpoint; using local attention [256, 256]
 parakeet: weights memory-mapped: 96.6 MiB in CPU_Mapped
 parakeet: promoted 34 conv pointwise weights from F16 → F32 for CPU backend
 parakeet@1175: sched buffer CPU -> 21.3 MB (extent 100)
-decoder: 61 iters, 30 tokens, T_enc=100  enc_proj=0.5 ms  pred=5.5 ms  joint=2.7 ms  conf=0.3 ms  total=9.0 ms  per_iter=134 us
+decoder: 61 iters, 30 tokens, T_enc=100  enc_proj=0.6 ms  pred=8.8 ms  joint=5.8 ms  conf=0.4 ms  total=15.7 ms  per_iter=240 us
 parakeet@1175: sched buffer CPU -> 21.3 MB (extent 100)
-decoder: 61 iters, 30 tokens, T_enc=100  enc_proj=0.4 ms  pred=3.9 ms  joint=2.0 ms  conf=0.3 ms  total=6.6 ms  per_iter=96 us
+decoder: 61 iters, 30 tokens, T_enc=100  enc_proj=0.6 ms  pred=6.0 ms  joint=3.4 ms  conf=0.5 ms  total=10.5 ms  per_iter=154 us
 parakeet@1175: sched buffer CPU -> 8.0 MB (extent 38)
-decoder: 26 iters, 11 tokens, T_enc=38  enc_proj=0.3 ms  pred=1.7 ms  joint=1.0 ms  conf=0.1 ms  total=3.1 ms  per_iter=105 us
+decoder: 26 iters, 11 tokens, T_enc=38  enc_proj=0.3 ms  pred=2.3 ms  joint=1.4 ms  conf=0.2 ms  total=4.2 ms  per_iter=143 us
 parakeet@1175: sched buffer CPU -> 20.0 MB (extent 94)
-decoder: 58 iters, 27 tokens, T_enc=94  enc_proj=0.4 ms  pred=4.3 ms  joint=2.1 ms  conf=0.3 ms  total=7.1 ms  per_iter=110 us
+decoder: 58 iters, 27 tokens, T_enc=94  enc_proj=0.5 ms  pred=4.6 ms  joint=2.6 ms  conf=0.4 ms  total=8.2 ms  per_iter=126 us
 parakeet@1175: sched buffer CPU -> 22.6 MB (extent 106)
-decoder: 63 iters, 28 tokens, T_enc=106  enc_proj=0.6 ms  pred=3.9 ms  joint=2.2 ms  conf=0.3 ms  total=7.0 ms  per_iter=97 us
+decoder: 63 iters, 28 tokens, T_enc=106  enc_proj=0.7 ms  pred=5.1 ms  joint=3.0 ms  conf=0.4 ms  total=9.1 ms  per_iter=128 us
 whisper@637: sched buffer CPU -> 13.8 MB
 whisper: weights memory-mapped: 59.0 MiB in CPU_Mapped
 whisper@637: sched buffer CPU -> 21.5 MB
 whisper@637: sched buffer CPU -> 21.5 MB
-[voice] timings {"audioS":16.86,"earlyS":8.04,"pieces":1,"earlyMs":827,"stopMs":0,"waitMs":0,"transcribeMs":828,"cleanupMs":0,"insertMs":0,"totalMs":829,"model":"whisper-base.en-Q5_K_M.gguf","threads":4}
+[voice] timings {"audioS":16.86,"earlyS":8.04,"pieces":1,"earlyMs":988,"stopMs":1,"waitMs":0,"transcribeMs":986,"cleanupMs":0,"insertMs":0,"totalMs":987,"model":"whisper-base.en-Q5_K_M.gguf","threads":4}
 parakeet: full-attention checkpoint; using local attention [256, 256]
 parakeet: weights memory-mapped: 96.6 MiB in CPU_Mapped
 parakeet: promoted 34 conv pointwise weights from F16 → F32 for CPU backend
 parakeet@1175: sched buffer CPU -> 21.5 MB (extent 101)
-decoder: 62 iters, 30 tokens, T_enc=101  enc_proj=0.5 ms  pred=4.2 ms  joint=2.1 ms  conf=0.3 ms  total=7.1 ms  per_iter=102 us
+decoder: 62 iters, 30 tokens, T_enc=101  enc_proj=0.9 ms  pred=8.3 ms  joint=5.0 ms  conf=0.4 ms  total=14.7 ms  per_iter=215 us
 parakeet@1175: sched buffer CPU -> 23.6 MB (extent 111)
-decoder: 63 iters, 27 tokens, T_enc=111  enc_proj=0.7 ms  pred=4.0 ms  joint=2.2 ms  conf=0.3 ms  total=7.3 ms  per_iter=99 us
-[voice] timings {"audioS":16.86,"earlyS":8.04,"pieces":1,"earlyMs":237,"stopMs":1,"waitMs":0,"transcribeMs":236,"cleanupMs":0,"insertMs":0,"totalMs":238,"model":"parakeet-tdt_ctc-110m-Q5_K_M.gguf","threads":4}
+decoder: 63 iters, 27 tokens, T_enc=111  enc_proj=0.6 ms  pred=7.3 ms  joint=5.0 ms  conf=0.4 ms  total=13.3 ms  per_iter=195 us
+[voice] timings {"audioS":16.86,"earlyS":8.04,"pieces":1,"earlyMs":298,"stopMs":1,"waitMs":0,"transcribeMs":297,"cleanupMs":0,"insertMs":0,"totalMs":299,"model":"parakeet-tdt_ctc-110m-Q5_K_M.gguf","threads":4}
 parakeet@1175: sched buffer CPU -> 21.5 MB (extent 101)
-decoder: 62 iters, 30 tokens, T_enc=101  enc_proj=0.4 ms  pred=4.6 ms  joint=2.1 ms  conf=0.3 ms  total=7.5 ms  per_iter=109 us
+decoder: 62 iters, 30 tokens, T_enc=101  enc_proj=0.5 ms  pred=8.3 ms  joint=6.1 ms  conf=0.4 ms  total=15.3 ms  per_iter=232 us
 parakeet@1175: sched buffer CPU -> 23.6 MB (extent 111)
-decoder: 63 iters, 27 tokens, T_enc=111  enc_proj=0.7 ms  pred=4.4 ms  joint=2.2 ms  conf=0.3 ms  total=7.7 ms  per_iter=106 us
-[voice] timings {"audioS":16.86,"earlyS":8.04,"pieces":1,"earlyMs":227,"stopMs":1,"waitMs":0,"transcribeMs":249,"cleanupMs":0,"insertMs":0,"totalMs":251,"model":"parakeet-tdt_ctc-110m-Q5_K_M.gguf","threads":4}
---- exit code: timeout
-[GATE] SMOKE lines=224 listed=175
-[GATE] missing harness:v2basics
-[GATE] missing harness:v21basics
-[GATE] missing harness:glassGates
-[GATE] missing harness:v2desktop
-[GATE] missing harness:v2NotepadClosed
-[GATE] missing harness:done
-[GATE] missing private-apps:privateAppsCapture
-[GATE] missing private-apps:privateAppsAsk
-[GATE] missing private-apps:privateAppsBar
-[GATE] missing private-apps:privateAppsAgain
-[GATE] missing private-apps:privateAppsRestored
-[GATE] missing voice:voiceSpareFetch
-[GATE] missing voice:voiceTuned
-[GATE] missing voice:voiceWakeListens
-[GATE] missing voice:voiceWakeIdle
-[GATE] missing voice:voiceWakeOneBreath
-[GATE] missing voice:voiceWakePause
-[GATE] missing voice:voiceWakeIgnores
-[GATE] missing voice:voiceWakeBare
-[GATE] missing voice:voiceWakeYields
-[GATE] missing voice:voiceWakeOff
-[GATE] verdict=FAIL:no "done" line; 21 listed label(s) never printed
-smoke failed: exit code timeout, gate exit code 1
+decoder: 63 iters, 27 tokens, T_enc=111  enc_proj=1.7 ms  pred=42.9 ms  joint=112.9 ms  conf=0.4 ms  total=157.9 ms  per_iter=2473 us
+[voice] timings {"audioS":16.86,"earlyS":8.04,"pieces":1,"earlyMs":284,"stopMs":1,"waitMs":0,"transcribeMs":478,"cleanupMs":0,"insertMs":0,"totalMs":480,"model":"parakeet-tdt_ctc-110m-Q5_K_M.gguf","threads":4}
+whisper: weights memory-mapped: 59.0 MiB in CPU_Mapped
+whisper@637: sched buffer CPU -> 21.5 MB
+whisper@637: sched buffer CPU -> 21.5 MB
+whisper@637: sched buffer CPU -> 21.5 MB
+whisper@637: sched buffer CPU -> 21.5 MB
+whisper@637: sched buffer CPU -> 21.5 MB
+whisper: weights memory-mapped: 59.0 MiB in CPU_Mapped
+whisper@637: sched buffer CPU -> 21.5 MB
+whisper@637: sched buffer CPU -> 21.5 MB
+whisper@637: sched buffer CPU -> 21.5 MB
+whisper: weights memory-mapped: 40.4 MiB in CPU_Mapped
+whisper@637: sched buffer CPU -> 13.8 MB
+whisper@637: sched buffer CPU -> 13.8 MB
+whisper@637: sched buffer CPU -> 13.8 MB
+parakeet: full-attention checkpoint; using local attention [256, 256]
+parakeet: weights memory-mapped: 96.6 MiB in CPU_Mapped
+parakeet: promoted 34 conv pointwise weights from F16 → F32 for CPU backend
+parakeet@1175: sched buffer CPU -> 3.2 MB (extent 15)
+decoder: 15 iters, 6 tokens, T_enc=15  enc_proj=0.1 ms  pred=1.8 ms  joint=1.2 ms  conf=0.1 ms  total=3.2 ms  per_iter=200 us
+parakeet@1175: sched buffer CPU -> 3.2 MB (extent 15)
+decoder: 15 iters, 6 tokens, T_enc=15  enc_proj=0.2 ms  pred=1.6 ms  joint=0.9 ms  conf=0.1 ms  total=2.8 ms  per_iter=166 us
+parakeet@1175: sched buffer CPU -> 4.8 MB (extent 23)
+decoder: 24 iters, 13 tokens, T_enc=23  enc_proj=0.3 ms  pred=2.4 ms  joint=1.2 ms  conf=0.2 ms  total=4.0 ms  per_iter=150 us
+parakeet: full-attention checkpoint; using local attention [256, 256]
+parakeet: weights memory-mapped: 96.6 MiB in CPU_Mapped
+parakeet: promoted 34 conv pointwise weights from F16 → F32 for CPU backend
+parakeet@1175: sched buffer CPU -> 3.0 MB (extent 14)
+decoder: 12 iters, 6 tokens, T_enc=14  enc_proj=0.1 ms  pred=2.0 ms  joint=0.9 ms  conf=0.1 ms  total=3.1 ms  per_iter=241 us
+whisper@637: sched buffer CPU -> 21.5 MB
+parakeet@1175: sched buffer CPU -> 3.0 MB (extent 14)
+decoder: 13 iters, 6 tokens, T_enc=14  enc_proj=0.2 ms  pred=1.8 ms  joint=1.0 ms  conf=0.1 ms  total=3.1 ms  per_iter=215 us
+whisper@637: sched buffer CPU -> 21.5 MB
+parakeet@1175: sched buffer CPU -> 5.6 MB (extent 27)
+decoder: 22 iters, 15 tokens, T_enc=27  enc_proj=0.2 ms  pred=3.4 ms  joint=1.3 ms  conf=0.2 ms  total=5.2 ms  per_iter=216 us
+parakeet@1175: sched buffer CPU -> 3.0 MB (extent 14)
+decoder: 13 iters, 6 tokens, T_enc=14  enc_proj=0.2 ms  pred=1.9 ms  joint=1.0 ms  conf=0.1 ms  total=3.2 ms  per_iter=225 us
+whisper: weights memory-mapped: 40.4 MiB in CPU_Mapped
+[1122/144423.888:ERROR:ui\gfx\win\window_impl.cc:172] Failed to unregister class Chrome_WidgetWin_0. Error = 1412
+--- exit code: 0
+[GATE] SMOKE lines=256 listed=175
+[GATE] verdict=ok
