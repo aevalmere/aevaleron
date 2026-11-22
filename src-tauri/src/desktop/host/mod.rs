@@ -257,7 +257,9 @@ fn run_one(op: String, args: Value, timeout_ms: u64, req: Arc<Req>) -> Outcome {
 }
 
 /// The last and slowest time of each op, for ping and the selfcheck.
-static OP_MS: Mutex<Option<HashMap<String, (u64, u64, u64)>>> = Mutex::new(None);
+/// Last, slowest and count, by op.
+type OpTimes = HashMap<String, (u64, u64, u64)>;
+static OP_MS: Mutex<Option<OpTimes>> = Mutex::new(None);
 
 fn note_ms(op: &str, ms: u64) {
     let mut g = OP_MS.lock();

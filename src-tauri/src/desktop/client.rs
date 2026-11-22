@@ -1173,11 +1173,9 @@ mod tests {
 
     #[test]
     fn system_tools_use_absolute_paths() {
-        for name in ["cmd.exe"] {
-            let p = system_tool(name);
-            assert!(p.is_absolute(), "{p:?}");
-            assert!(p.ends_with(format!("System32\\{name}")), "{p:?}");
-        }
+        let p = system_tool("cmd.exe");
+        assert!(p.is_absolute(), "{p:?}");
+        assert!(p.ends_with("System32\\cmd.exe"), "{p:?}");
         assert!(powershell().is_absolute());
     }
 

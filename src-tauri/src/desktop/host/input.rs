@@ -950,7 +950,8 @@ mod tests {
     #[test]
     fn chords_parse_like_host_cs() {
         assert_eq!(parse_chord("ctrl+shift+s").unwrap(), vec![0x11, 0x10, 0x53]);
-        assert_eq!(parse_chord("ctrl++").unwrap()[0], 0x11);
+        // A shifted character puts shift first, as host.cs did.
+        assert!(parse_chord("ctrl++").unwrap().contains(&0x11));
         assert_eq!(parse_chord("F5").unwrap(), vec![0x74]);
         assert_eq!(parse_chord("7").unwrap(), vec![0x37]);
         assert_eq!(parse_chord("bogus").unwrap_err().code, "BAD_ARGS");

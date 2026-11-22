@@ -1436,7 +1436,8 @@ pub(crate) fn get_text(mut a: Value) -> DResult<Value> {
     // Reading order: top then left, with spans on one visual line (within
     // half a line height) kept left to right. Spans of one element keep
     // their own order.
-    let mut keyed: Vec<((i32, i32, usize), Map<String, Value>)> = Vec::new();
+    type Keyed = ((i32, i32, usize), Map<String, Value>);
+    let mut keyed: Vec<Keyed> = Vec::new();
     let mut last = (i32::MIN, i32::MIN);
     for (n, s) in spans.into_iter().enumerate() {
         let key = match span_rect(&s) {
