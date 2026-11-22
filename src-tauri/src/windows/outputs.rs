@@ -1082,7 +1082,9 @@ pub fn on_user_resize(app: &AppHandle, label: &str) {
     let Some(h) = hwnd(app, label) else {
         return;
     };
-    if !flags::is_maximized(h) {
+    // Only a shown window can have been sized by a person: the native page
+    // is sized while still hidden, and that must not pin its height.
+    if flags::is_visible(h) && !flags::is_maximized(h) {
         keep_user_rect(app, label, motion::glass(h), true);
     }
 }
@@ -1095,7 +1097,7 @@ pub fn on_user_move(app: &AppHandle, label: &str) {
     let Some(h) = hwnd(app, label) else {
         return;
     };
-    if !flags::is_maximized(h) {
+    if flags::is_visible(h) && !flags::is_maximized(h) {
         let r = refit(app, label, h);
         keep_user_rect(app, label, r, false);
     }
