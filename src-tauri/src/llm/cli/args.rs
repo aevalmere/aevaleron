@@ -295,7 +295,12 @@ mod tests {
         let tools = a.iter().position(|x| x == "--tools").unwrap();
         assert_eq!(a[tools + 1], "");
         assert!(a.get(tools + 2).is_some_and(|x| x.starts_with("--")));
-        for want in ["-p", "--no-session-persistence", "--model=sonnet", "--safe-mode"] {
+        for want in [
+            "-p",
+            "--no-session-persistence",
+            "--model=sonnet",
+            "--safe-mode",
+        ] {
             assert!(a.iter().any(|x| x == want), "{want}");
         }
         assert!(a.iter().any(|x| x == "--system-prompt=Be brief."));
@@ -330,8 +335,12 @@ mod tests {
         assert_eq!(std::fs::read(&p.files[0]).unwrap(), b"ABC");
         let image = format!("--image={}", d.join("t2-1.jpg").display());
         assert_eq!(a.last(), Some(&image));
-        assert!(a.windows(2).any(|w| w[0] == "--sandbox" && w[1] == "read-only"));
-        assert!(a.windows(2).any(|w| w[0] == "--disable" && w[1] == "shell_tool"));
+        assert!(a
+            .windows(2)
+            .any(|w| w[0] == "--sandbox" && w[1] == "read-only"));
+        assert!(a
+            .windows(2)
+            .any(|w| w[0] == "--disable" && w[1] == "shell_tool"));
         let text = String::from_utf8(p.stdin).unwrap();
         assert!(text.starts_with("<instructions>\nBe brief.\n</instructions>"));
         assert!(text.ends_with("(Image 1 is attached.)\n\nwhat is this?"));

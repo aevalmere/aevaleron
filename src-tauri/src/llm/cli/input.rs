@@ -202,7 +202,10 @@ mod tests {
         assert_eq!(r.system, "Be brief.");
         assert_eq!(r.parts.len(), 3);
         let img = r.images().next().unwrap();
-        assert_eq!((img.mime.as_str(), img.base64.as_str()), ("image/png", "QUJD"));
+        assert_eq!(
+            (img.mime.as_str(), img.base64.as_str()),
+            ("image/png", "QUJD")
+        );
         assert_eq!(img.ext(), "png");
         let text = text_with(&r, |i| format!("@shot-{i}.png"));
         assert_eq!(text, "Exact text.\n\n@shot-1.png\n\nwhat is this?");

@@ -456,7 +456,10 @@ mod tests {
         let s = MemorySettings::with_key("sk-or-v1-x");
         let t = Table::default();
         // Installed or not, a CLI that is off is never a candidate.
-        assert_eq!(ids(&candidates_with(&s, Kind::Vision, &t, 0)), [Provider::OpenRouter]);
+        assert_eq!(
+            ids(&candidates_with(&s, Kind::Vision, &t, 0)),
+            [Provider::OpenRouter]
+        );
         assert!(!order(&s).contains(&Provider::ClaudeCli));
         // On, with a program that exists: after the HTTP providers.
         let exe = std::env::current_exe().unwrap();
@@ -476,7 +479,9 @@ mod tests {
         *s.order.lock() = vec![Provider::ClaudeCli];
         assert_eq!(active(&s).unwrap().provider, Provider::ClaudeCli);
         // A stored path that is gone is not used.
-        s.cli.lock().insert(Provider::ClaudeCli, r"C:\nope\claude.exe".into());
+        s.cli
+            .lock()
+            .insert(Provider::ClaudeCli, r"C:\nope\claude.exe".into());
         assert_eq!(usable_key(&s, Provider::ClaudeCli), None);
         assert_eq!(active(&s).unwrap().provider, Provider::OpenRouter);
     }

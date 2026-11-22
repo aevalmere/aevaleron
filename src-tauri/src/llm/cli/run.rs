@@ -448,7 +448,11 @@ async fn pump(provider: Provider, run: &mut Running, tx: &UnboundedSender<Msg>) 
     }
     let notes = decoder.notes.join("\n");
     let msg = match state.failed {
-        Some(f) => Msg::Fail(classify(provider, exit, &[f.as_str(), notes.as_str(), said.as_str()])),
+        Some(f) => Msg::Fail(classify(
+            provider,
+            exit,
+            &[f.as_str(), notes.as_str(), said.as_str()],
+        )),
         None if exit == Some(0) => Msg::End,
         None => Msg::Fail(classify(provider, exit, &[notes.as_str(), said.as_str()])),
     };
@@ -542,7 +546,13 @@ pub fn classify(p: Provider, exit: Option<i32>, parts: &[&str]) -> ApiError {
     let model_gone = all.contains("model")
         && has(
             &all,
-            &["not found", "does not exist", "not supported", "unknown model", "invalid model"],
+            &[
+                "not found",
+                "does not exist",
+                "not supported",
+                "unknown model",
+                "invalid model",
+            ],
         );
     if model_gone {
         return ApiError::http(404, said);
@@ -630,9 +640,9 @@ fn said_signed_in(text: &str) -> Option<bool> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::llm::catalogue::Kind;
     use crate::llm::client::{ChatTurn, Llm, QueryOpts, Transport};
     use crate::llm::errors::{explain, About};
-    use crate::llm::catalogue::Kind;
     use crate::llm::sse::Meter;
     use crate::llm::wire::HttpRequest;
     use async_trait::async_trait;
@@ -758,7 +768,10 @@ mod tests {
         assert_eq!(image["source"]["data"], "QUJD");
         let last = content.last().unwrap()["text"].as_str().unwrap();
         assert!(last.ends_with("what is this?"));
-        assert!(content[0]["text"].as_str().unwrap().contains("User: before"));
+        assert!(content[0]["text"]
+            .as_str()
+            .unwrap()
+            .contains("User: before"));
         assert!(has_arg(&r, "--tools") && has_arg(&r, "--no-session-persistence"));
         assert!(r["argv"].as_array().unwrap().iter().any(|a| a
             .as_str()
@@ -828,7 +841,10 @@ mod tests {
         assert_eq!(e.message, "Error: model claude-x not found");
         assert!(classify(c, Some(1), &["getaddrinfo ENOTFOUND api.anthropic.com"]).is_network());
         let e = classify(c, Some(3), &["", ""]);
-        assert_eq!((e.status, e.message.as_str()), (Some(500), "Claude Code stopped with exit code 3"));
+        assert_eq!(
+            (e.status, e.message.as_str()),
+            (Some(500), "Claude Code stopped with exit code 3")
+        );
         assert_eq!(said_signed_in("Logged in using ChatGPT"), Some(true));
         assert_eq!(said_signed_in("Not logged in"), Some(false));
         assert_eq!(said_signed_in("?"), None);
@@ -909,7 +925,10 @@ mod tests {
             return;
         };
         let path = PathBuf::from(&script);
-        let info = block(super::super::inspect(Provider::ClaudeCli, Some(path.clone())));
+        let info = block(super::super::inspect(
+            Provider::ClaudeCli,
+            Some(path.clone()),
+        ));
         assert!(info.installed);
         assert_eq!(info.version.as_deref(), Some("9.8.7"));
         assert_eq!(info.signed_in, Some(true));

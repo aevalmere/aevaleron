@@ -99,7 +99,9 @@ impl Decoder {
                 let text = e["delta"]["text"].as_str();
                 if e["type"] == "content_block_delta" && e["delta"]["type"] == "text_delta" {
                     self.saw_delta = true;
-                    return text.map(|t| vec![Event::Text(t.to_string())]).unwrap_or_default();
+                    return text
+                        .map(|t| vec![Event::Text(t.to_string())])
+                        .unwrap_or_default();
                 }
                 Vec::new()
             }
@@ -308,7 +310,10 @@ mod tests {
             Event::Failed(s) => Some(s.clone()),
             _ => None,
         });
-        assert_eq!(failed.as_deref(), Some("Invalid API key · Please run /login"));
+        assert_eq!(
+            failed.as_deref(),
+            Some("Invalid API key · Please run /login")
+        );
         assert_eq!(d.notes, ["authentication_failed"]);
         let max = [r#"{"type":"result","subtype":"error_max_turns","is_error":true}"#];
         let ev = run(Provider::ClaudeCli, &max);

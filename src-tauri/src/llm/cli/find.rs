@@ -113,7 +113,11 @@ fn registry_paths() -> Vec<String> {
     use winreg::enums::{HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE};
     use winreg::RegKey;
     let read = |root, at: &str| -> Option<String> {
-        RegKey::predef(root).open_subkey(at).ok()?.get_value("Path").ok()
+        RegKey::predef(root)
+            .open_subkey(at)
+            .ok()?
+            .get_value("Path")
+            .ok()
     };
     let machine = r"SYSTEM\CurrentControlSet\Control\Session Manager\Environment";
     [

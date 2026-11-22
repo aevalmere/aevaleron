@@ -150,7 +150,8 @@ fn version_of(text: &str) -> Option<String> {
         .find(|w| {
             w.contains('.')
                 && w.starts_with(|c: char| c.is_ascii_digit())
-                && w.chars().all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '-')
+                && w.chars()
+                    .all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '-')
         })
         .map(str::to_string)
 }
