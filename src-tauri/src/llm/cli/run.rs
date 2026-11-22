@@ -320,27 +320,33 @@ async fn collect(
 /// The rest of a streamed answer, as SSE lines. Dropping it stops the run.
 fn stream_reply(first: Vec<Vec<u8>>, rx: UnboundedReceiver<Msg>) -> Reply {
     let head = futures_util::stream::iter(first.into_iter().map(Ok::<Vec<u8>, ApiError>));
-    let rest = futures_util::stream::unfold((rx, false), |(mut rx, ended)| async move {
-        if ended {
-            return None;
-        }
-        let Some(msg) = rx.recv().await else {
-            return None;
-        };
-        let item = match msg {
-            Msg::Text(t) => Ok(sse_text(&t)),
-            Msg::Usage(p, c) => Ok(sse_usage(p, c)),
-            Msg::End => return Some((Ok(DONE.to_vec()), (rx, true))),
-            Msg::Fail(e) => return Some((Err(e), (rx, true))),
-        };
-        Some((item, (rx, false)))
-    });
+    let rest = futures_util::stream::unfold((rx, false), |(rx, ended)| next_sse(rx, ended));
     let body: BodyStream = Box::pin(futures_util::StreamExt::chain(head, rest));
     Reply {
         status: 200,
         retry_after: None,
         body,
     }
+}
+
+/// The stream's state between chunks: the channel, and whether it ended.
+type SseState = (UnboundedReceiver<Msg>, bool);
+
+/// The next SSE chunk of a streamed answer.
+async fn next_sse(
+    mut rx: UnboundedReceiver<Msg>,
+    ended: bool,
+) -> Option<(Result<Vec<u8>, ApiError>, SseState)> {
+    if ended {
+        return None;
+    }
+    let item = match rx.recv().await? {
+        Msg::Text(t) => Ok(sse_text(&t)),
+        Msg::Usage(p, c) => Ok(sse_usage(p, c)),
+        Msg::End => return Some((Ok(DONE.to_vec()), (rx, true))),
+        Msg::Fail(e) => return Some((Err(e), (rx, true))),
+    };
+    Some((item, (rx, false)))
 }
 
 /// Runs the process to its end, unless the reader goes away first (cancel,
