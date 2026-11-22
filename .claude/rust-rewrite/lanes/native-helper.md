@@ -64,8 +64,26 @@ virtual-screen pixels). Nothing above `desktop/client.rs` changed.
 
 ## Verified
 
-See the CI section below.
+rust.yml green at `7a417c8c` (run 45031541330): fmt, clippy, unit tests (639, also run locally
+with tools' rust-check.ps1), installer build, smoke, capture check, desktop selfcheck.
+
+- Desktop selfcheck: every must passes, including the new `desktopInProcess` (ping's pid is the
+  app's). desktopReadyMs=4 (was a powershell.exe start), uiaTreeMs=1095 (a cold first read of
+  Notepad, including the retry wait), ocrMs=121. `desktopOpMs`: readTree 30 ms warm, getText 30,
+  type 56, setValue 11, elementAt 3, key 16, listWindows/click/focusWindow under 1 ms.
+- Child processes: the smoke run's children were msedgewebview2, notepad, a second Aevaleron
+  (the platform probe), and powershell.exe only in the `-File` (test forms) and `-Command Add-Type`
+  (voice probe's speech) forms. No `-Command -` helper; nothing outside the allowlist. The
+  desktop selfcheck's children: msedgewebview2 and notepad.
 
 ## Not verified
 
-See the CI section below.
+- On CI the selfcheck and smoke drive Notepad, a WinForms test form and the agent probes, so
+  readTree, getText, setValue, type, key, click (invoke), elementAt, focusWindow, ocr, capture and
+  the input watch are exercised there. menuItems, menuInvoke, findText, docText, scrollToText,
+  selectText, selection, drag and closeWindow have unit coverage of their pure parts only;
+  nothing on the main line calls the Find-only ones any more (see ask-do.md).
+- An elevated target, a locked session and a UAC prompt (the refusals) are not reachable on a
+  runner.
+- A worker that panics and restarts (HELPER_DOWN, three deaths) is covered by the client's state
+  tests, not by a real panic in an op.
