@@ -24,7 +24,7 @@ use std::time::{Duration, Instant};
 
 use parking_lot::Mutex;
 use slint::platform::software_renderer::{
-    PremultipliedRgbaColor, RepaintBufferType, SoftwareRenderer,
+    PremultipliedRgbaColor, RepaintBufferType, SoftwareRenderer, TargetPixel,
 };
 use slint::platform::{
     Clipboard, EventLoopProxy, Key, Platform, PointerEventButton, WindowAdapter, WindowEvent,
@@ -363,6 +363,32 @@ pub struct KeyPress {
 
 pub type KeyHook = Rc<dyn Fn(&KeyPress) -> bool>;
 
+/// One pixel as the DIB holds it: premultiplied alpha, 0xAARRGGBB, which is
+/// what UpdateLayeredWindow and BitBlt read.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[repr(transparent)]
+pub struct Bgra(pub u32);
+
+impl TargetPixel for Bgra {
+    fn blend(&mut self, c: PremultipliedRgbaColor) {
+        let v = self.0;
+        let keep = u32::from(255 - c.alpha);
+        let ch = |shift: u32, add: u8| -> u32 {
+            ((((v >> shift) & 0xFF) * keep + 127) / 255 + u32::from(add)).min(255) << shift
+        };
+        self.0 = ch(24, c.alpha) | ch(16, c.red) | ch(8, c.green) | ch(0, c.blue);
+    }
+
+    fn from_rgb(red: u8, green: u8, blue: u8) -> Self {
+        Bgra(0xFF00_0000 | (u32::from(red) << 16) | (u32::from(green) << 8) | u32::from(blue))
+    }
+
+    /// Clear: a layered window's empty pixels let clicks through.
+    fn background() -> Self {
+        Bgra(0)
+    }
+}
+
 pub struct Win {
     window: slint::Window,
     renderer: SoftwareRenderer,
@@ -372,7 +398,6 @@ pub struct Win {
     size: Cell<slint::PhysicalSize>,
     scale: Cell<f32>,
     dirty: Cell<bool>,
-    pixels: RefCell<Vec<PremultipliedRgbaColor>>,
     surface: RefCell<Option<Surface>>,
     tracking: Cell<bool>,
     buttons: Cell<u8>,
@@ -574,7 +599,6 @@ fn create_adapter() -> std::result::Result<Rc<Win>, PlatformError> {
             size: Cell::new(size),
             scale: Cell::new(scale),
             dirty: Cell::new(true),
-            pixels: RefCell::new(Vec::new()),
             surface: RefCell::new(None),
             tracking: Cell::new(false),
             buttons: Cell::new(0),
@@ -710,12 +734,6 @@ impl Win {
             return;
         }
         self.dirty.set(false);
-        let mut px = self.pixels.borrow_mut();
-        if px.len() != w * h {
-            px.clear();
-            px.resize(w * h, PremultipliedRgbaColor::default());
-        }
-        self.renderer.render(&mut px[..], w);
         let mut surf = self.surface.borrow_mut();
         if surf.as_ref().map(|s| (s.w, s.h)) != Some((w as i32, h as i32)) {
             *surf = Surface::new(w as i32, h as i32);
@@ -723,15 +741,11 @@ impl Win {
         let Some(s) = surf.as_ref() else {
             return;
         };
-        // SAFETY: the DIB holds w*h pixels, as `px` does.
-        let out = unsafe { std::slice::from_raw_parts_mut(s.bits, w * h) };
-        for (d, p) in out.iter_mut().zip(px.iter()) {
-            *d = (u32::from(p.alpha) << 24)
-                | (u32::from(p.red) << 16)
-                | (u32::from(p.green) << 8)
-                | u32::from(p.blue);
-        }
-        drop(px);
+        // Slint draws straight into the DIB the OS reads: one frame in
+        // memory per window, not two, and no copy.
+        // SAFETY: the DIB holds w*h 32-bit pixels, and Bgra is one u32.
+        let out = unsafe { std::slice::from_raw_parts_mut(s.bits.cast::<Bgra>(), w * h) };
+        self.renderer.render(out, w);
         // A resize from another thread since the size was read: draw again
         // at the new size rather than put the old one back.
         if client_size(hwnd) != size {
@@ -785,8 +799,6 @@ impl Win {
 
     /// Frees the pixels of a hidden window; showing it draws them again.
     fn release(&self) {
-        self.pixels.borrow_mut().clear();
-        self.pixels.borrow_mut().shrink_to_fit();
         *self.surface.borrow_mut() = None;
         self.dirty.set(true);
     }
@@ -1388,5 +1400,33 @@ pub fn run_loop() -> i32 {
                 DispatchMessageW(&msg);
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod pixel_tests {
+    use super::*;
+
+    #[test]
+    fn bgra_blends_premultiplied() {
+        let mut p = Bgra::background();
+        p.blend(PremultipliedRgbaColor {
+            red: 128,
+            green: 64,
+            blue: 32,
+            alpha: 128,
+        });
+        assert_eq!(p, Bgra(0x8080_4020));
+        let mut q = Bgra::from_rgb(255, 255, 255);
+        q.blend(PremultipliedRgbaColor {
+            red: 0,
+            green: 0,
+            blue: 0,
+            alpha: 255,
+        });
+        assert_eq!(q, Bgra(0xFF00_0000));
+        let mut r = Bgra::from_rgb(200, 100, 50);
+        r.blend(PremultipliedRgbaColor::default());
+        assert_eq!(r, Bgra::from_rgb(200, 100, 50));
     }
 }
