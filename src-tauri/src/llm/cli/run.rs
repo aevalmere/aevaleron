@@ -858,8 +858,10 @@ mod tests {
     fn assert_stopped(file: &Path) {
         let child = PathBuf::from(format!("{}.child", file.display()));
         std::thread::sleep(Duration::from_millis(800));
+        // Existence, not contents: each beat rewrites (truncates) its file, so
+        // a kill in mid-write can leave it empty for good.
+        assert!(file.exists() && child.exists(), "both processes ran");
         let (a, b) = (beat(file), beat(&child));
-        assert!(!a.is_empty() && !b.is_empty(), "both processes ran");
         std::thread::sleep(Duration::from_millis(600));
         assert_eq!(beat(file), a, "the CLI was killed");
         assert_eq!(beat(&child), b, "the CLI's child was killed");
@@ -909,9 +911,7 @@ mod tests {
         };
         let file = beat_file("timeout");
         let mut llm = llm();
-        // Long enough for two node starts (the fake and its child) while the
-        // whole suite runs in parallel; at 3 s the kill could land first.
-        llm.set_timeouts(Duration::from_millis(8000), Duration::from_millis(8000));
+        llm.set_timeouts(Duration::from_millis(3000), Duration::from_millis(3000));
         let cancel = CancellationToken::new();
         let msgs = vec![json!({ "role": "user", "content": format!("beat:{}", file.display()) })];
         let meta = Meta::purpose("agent");
