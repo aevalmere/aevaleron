@@ -4,15 +4,18 @@ version = "1.1.1"
 description = "Screen-aware AI overlay for Windows"
 authors = ["darkelights"]
 edition = "2021"
-rust-version = "1.77"
+rust-version = "1.85"
 publish = false
 
 [lib]
 name = "aevaleron_lib"
-crate-type = ["staticlib", "cdylib", "rlib"]
+crate-type = ["rlib"]
 
 [build-dependencies]
-tauri-build = { version = "2", features = [] }
+# The .slint files compile to Rust; winresource embeds the icon and version
+# info tauri-build used to.
+slint-build = "1.19"
+winresource = "0.1"
 
 # Dependencies are grouped by the lane whose code needs them
 # (.claude/rust-rewrite/BACKLOG.md, "Hotspots"). A lane adds a dependency, or
@@ -21,12 +24,19 @@ tauri-build = { version = "2", features = [] }
 # change those.
 [dependencies]
 # ---- lane: platform ----
-tauri = { version = "2", features = ["tray-icon", "image-png"] }
+# Native UI (lane native-ui): Slint on its software renderer, driven by our
+# own Win32 platform (src/shell/platform.rs), so there is no winit, no GPU
+# context and no WebView2.
+slint = { version = "1.19", default-features = false, features = [
+  "std",
+  "compat-1-2",
+  "renderer-software",
+  "software-renderer-systemfonts",
+] }
+tray-icon = "0.26"
+global-hotkey = "0.10"
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["preserve_order"] }
-tauri-plugin-global-shortcut = "2"
-tauri-plugin-clipboard-manager = "2"
-tauri-plugin-opener = "2"
 parking_lot = "0.12"
 tokio = { version = "1", features = ["sync", "time", "net", "io-util", "process", "rt", "rt-multi-thread", "macros"] }
 base64 = "0.22"
@@ -40,11 +50,6 @@ semver = "1"
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
 winreg = "0.55"
 tauri-winrt-notification = "0.7"
-# The WebView2 COM types behind PlatformWebview::controller(). Must be the
-# version wry uses; it builds on the same windows 0.62 as the windows crate
-# below, so use windows::core with it (crash::guard_webview, harness Cx::eval
-# and CapturePreview).
-webview2-com = "0.39"
 # ---- end ----
 
 # ---- lane: harness ----
@@ -98,6 +103,8 @@ transcribe-cpp = { version = "=0.4.2", default-features = false }
 windows-sys = { version = "0.59", features = [
   # ---- lane: platform ----
   "Win32_Foundation",
+  # Rounded corners and the dark frame on the native windows (native-ui).
+  "Win32_Graphics_Dwm",
   "Win32_Networking_WinInet",
   "Win32_Security",
   "Win32_Security_Cryptography",

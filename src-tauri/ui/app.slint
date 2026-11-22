@@ -1,0 +1,10 @@
+// Every native page (lane native-ui). slint-build compiles this file; each
+// exported window and struct becomes a Rust type in crate::ui.
+
+export { Theme, Glyph } from "theme.slint";
+export { BarWindow, ModelRow } from "bar.slint";
+export { OutputWindow } from "output.slint";
+export { SettingsWindow } from "settings.slint";
+export { HistoryWindow } from "history.slint";
+export { AgentsWindow, NoteWindow } from "cards.slint";
+export { VoicePillWindow, RegionWindow, LensWindow, BuddyWindow, BlankWindow } from "overlays.slint";

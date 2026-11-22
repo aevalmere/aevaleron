@@ -8,8 +8,11 @@
 //! Rust now (src/ui), and `emit_to` hands the payload to the page's
 //! `on_event` on the UI thread, in order, with no serialisation to text.
 
+mod builder;
 pub mod platform;
 pub mod sys;
+
+pub use builder::{webview, BuildSpec, WebviewUrl, WebviewWindowBuilder};
 
 use std::any::{Any, TypeId};
 use std::collections::HashMap;
@@ -297,16 +300,50 @@ pub fn set_window_event_handler(f: WindowEventHandler) {
     let _ = WINDOW_EVENTS.set(f);
 }
 
+type OwnHandler = Box<dyn Fn(&WindowEvent) + Send + 'static>;
+
+/// Handlers one window registered for itself (`Window::on_window_event`).
+fn own_handlers() -> &'static Mutex<HashMap<isize, Vec<OwnHandler>>> {
+    static H: OnceLock<Mutex<HashMap<isize, Vec<OwnHandler>>>> = OnceLock::new();
+    H.get_or_init(Default::default)
+}
+
+/// Posted, so a handler never runs inside the window procedure.
 pub(crate) fn window_event(label: &str, hwnd: isize, e: WindowEvent) {
-    let Some(f) = WINDOW_EVENTS.get().copied() else {
-        return;
-    };
-    let w = Window {
-        label: label.to_string(),
-        hwnd,
-        app: AppHandle::default(),
-    };
-    let _ = platform::post(Box::new(move || f(&w, &e)));
+    let w = Window::from_parts(label, hwnd);
+    let _ = platform::post(Box::new(move || {
+        // Taken out while they run, so one may register another.
+        let own = own_handlers().lock().remove(&w.hwnd);
+        if let Some(list) = own {
+            for f in &list {
+                f(&e);
+            }
+            if !matches!(e, WindowEvent::Destroyed) {
+                let mut all = own_handlers().lock();
+                let slot = all.entry(w.hwnd).or_default();
+                let added = std::mem::replace(slot, list);
+                slot.extend(added);
+            }
+        }
+        if let Some(f) = WINDOW_EVENTS.get().copied() {
+            f(&w, &e);
+        }
+    }));
+}
+
+/// Called once for every page built (lib.rs: `windows::on_page_loaded`).
+pub type PageLoadedHandler = fn(&Window);
+
+static PAGE_LOADED: OnceLock<PageLoadedHandler> = OnceLock::new();
+
+pub fn set_page_loaded_handler(f: PageLoadedHandler) {
+    let _ = PAGE_LOADED.set(f);
+}
+
+pub(crate) fn page_loaded(w: &Window) {
+    if let Some(f) = PAGE_LOADED.get().copied() {
+        f(w);
+    }
 }
 
 /// One native window, by label. Cheap to clone and usable from any
@@ -326,6 +363,23 @@ fn h(x: isize) -> HWND {
 }
 
 impl Window {
+    pub(crate) fn from_parts(label: &str, hwnd: isize) -> Window {
+        Window {
+            label: label.to_string(),
+            hwnd,
+            app: AppHandle::default(),
+        }
+    }
+
+    /// Hears what happens to this window, until it is destroyed.
+    pub fn on_window_event(&self, f: impl Fn(&WindowEvent) + Send + 'static) {
+        own_handlers()
+            .lock()
+            .entry(self.hwnd)
+            .or_default()
+            .push(Box::new(f));
+    }
+
     pub fn label(&self) -> &str {
         &self.label
     }

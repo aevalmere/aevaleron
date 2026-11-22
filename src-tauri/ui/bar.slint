@@ -1,0 +1,549 @@
+// The bar's window (renderer/index.html): the orb, the open bar with what
+// hangs under it, and the layout editor. The window is see-through: only
+// what is drawn takes clicks. Its size is Rust's; the open bar reports the
+// height it needs (content-height), as the page did with overlay:resize.
+
+import { Theme, Glyph, IconButton, Chip, Button, MenuRow } from "theme.slint";
+
+export struct ModelRow {
+    header: bool,
+    text: string,
+    marked: bool,
+}
+
+component Plate inherits Rectangle {
+    background: Theme.base;
+    border-radius: Theme.r-plate;
+}
+
+export component BarWindow inherits Window {
+    background: transparent;
+    default-font-family: Theme.font;
+    default-font-size: Theme.row;
+
+    // "pill", "panel" or "hud".
+    in property <string> mode: "pill";
+    in property <bool> button: false;
+
+    // The orb.
+    in property <string> pill-state: "idle";
+    in property <string> pill-label: "";
+    in property <bool> pill-alert: false;
+    in property <bool> pill-orbit: false;
+
+    // The token: what Enter does.
+    in property <string> intent: "ask";
+    in property <string> token-name: "Ask";
+    in property <bool> token-rest: true;
+    in property <bool> token-locked: false;
+    in property <bool> token-unsure: false;
+
+    // The field.
+    in-out property <string> text <=> input.text;
+    in property <string> placeholder: "Ask or do";
+    out property <bool> input-focused: input.has-focus;
+    out property <length> caret-x;
+    out property <length> caret-y;
+    out property <length> line-height: Theme.bar-size * 1.34;
+    out property <length> field-height: input.height;
+
+    // Chips on the bar.
+    in property <string> model-name;
+    in property <string> target-text;
+
+    // The mic: "idle", "listening", "working", "preparing" or "error".
+    in property <string> mic-state: "idle";
+    in property <float> mic-level: 0;
+    in property <string> mic-tip: "Speak instead of typing";
+
+    in property <bool> region-active: false;
+
+    // Under the bar.
+    in property <bool> tip-shown: false;
+    in property <bool> menu-open: false;
+    in property <int> menu-mark: 0;
+    in property <bool> model-open: false;
+    in property <[ModelRow]> model-rows;
+    in property <string> model-empty;
+    in property <[string]> examples;
+    in property <string> region-text;
+    in property <string> status-text;
+    in property <string> notice-text;
+    in property <string> notice-button;
+    in property <bool> notice-nudge: false;
+
+    // The layout editor.
+    in property <bool> hud-snapped: false;
+
+    // The height the open bar needs, menus and rows included.
+    out property <length> content-height: col.preferred-height;
+
+    // Where the tour's targets are, in this window (buddy:resolve).
+    out property <length> pill-x: orb.absolute-position.x;
+    out property <length> pill-y: orb.absolute-position.y;
+    out property <length> bar-x: capsule.absolute-position.x;
+    out property <length> bar-y: capsule.absolute-position.y;
+    out property <length> bar-w: capsule.width;
+    out property <length> bar-h: capsule.height;
+    out property <length> token-x: token.absolute-position.x;
+    out property <length> token-y: token.absolute-position.y;
+    out property <length> token-w: token.width;
+    out property <length> token-h: token.height;
+    out property <length> input-x: input.absolute-position.x;
+    out property <length> input-y: input.absolute-position.y;
+    out property <length> input-w: input.width;
+
+    callback pill-clicked();
+    callback token-clicked();
+    callback token-hover(bool);
+    callback intent-picked(int);
+    callback model-picked(int);
+    callback model-chip-clicked();
+    callback target-new();
+    callback mic-down();
+    callback mic-up();
+    callback region-clicked();
+    callback region-clear();
+    callback settings-clicked();
+    callback close-clicked();
+    callback example-clicked(int);
+    callback notice-clicked();
+    callback hud-done();
+    callback hud-drag();
+    callback edited(string);
+    callback clicked-elsewhere();
+
+    public function focus-input() {
+        input.focus();
+    }
+
+    public function select-all-input() {
+        input.select-all();
+    }
+
+    public function set-caret(pos: int) {
+        input.set-selection-offsets(pos, pos);
+    }
+
+    // ------------------------------------------------------------ orb
+    orb := Rectangle {
+        visible: root.mode == "pill" && root.button;
+        x: (root.width - self.width) / 2;
+        y: (root.height - self.height) / 2;
+        width: min(root.width, root.height);
+        height: self.width;
+        border-radius: self.width / 2;
+        background: orb-touch.has-hover ? Theme.raised : Theme.base;
+        border-width: root.pill-orbit ? 2px : 0px;
+        border-color: Theme.accent;
+        animate background { duration: Theme.fast; }
+
+        Text {
+            visible: root.pill-label == "";
+            text: Glyph.pointer;
+            font-family: Theme.icons;
+            font-size: 16px;
+            color: Theme.label;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+        }
+
+        Text {
+            visible: root.pill-label != "";
+            text: root.pill-label;
+            font-size: Theme.row;
+            font-weight: 700;
+            color: Theme.accent-text;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+        }
+
+        Rectangle {
+            visible: root.pill-alert || root.pill-state == "chat";
+            x: parent.width - self.width - 4px;
+            y: 4px;
+            width: 9px;
+            height: 9px;
+            border-radius: 4.5px;
+            background: root.pill-alert ? Theme.danger : Theme.accent;
+        }
+
+        orb-touch := TouchArea {
+            mouse-cursor: pointer;
+            clicked => { root.pill-clicked(); }
+        }
+    }
+
+    // ---------------------------------------------------------- panel
+    panel := Rectangle {
+      visible: root.mode == "panel";
+      x: 0;
+      y: 0;
+      width: root.width;
+      height: col.preferred-height;
+
+      col := VerticalLayout {
+        spacing: Theme.sp-2;
+        alignment: start;
+
+        capsule := Rectangle {
+            min-height: 56px * Theme.text-scale;
+            border-radius: min(self.height / 2, Theme.r-sheet);
+            background: Theme.base;
+
+            HorizontalLayout {
+                padding-left: Theme.sp-2;
+                padding-right: Theme.sp-2;
+                padding-top: Theme.sp-2;
+                padding-bottom: Theme.sp-2;
+                spacing: Theme.sp-1;
+
+                token := Rectangle {
+                    width: token-row.preferred-width;
+                    height: 40px * Theme.text-scale;
+                    border-radius: self.height / 2;
+                    background: root.intent == "do" ? Theme.accent-wash : token-touch.has-hover || root.menu-open ? Theme.fill-2 : Theme.fill-1;
+                    animate background { duration: Theme.fast; }
+
+                    token-row := HorizontalLayout {
+                        padding-left: Theme.sp-3;
+                        padding-right: Theme.sp-3;
+                        spacing: Theme.sp-2;
+                        Text {
+                            text: root.intent == "do" ? Glyph.pointer : Glyph.bubble;
+                            font-family: Theme.icons;
+                            font-size: 14px * Theme.text-scale;
+                            color: root.intent == "do" || root.token-locked ? Theme.accent-text : Theme.label-2;
+                            vertical-alignment: center;
+                        }
+                        if !root.token-rest: Text {
+                            text: root.token-name;
+                            font-size: Theme.row;
+                            font-weight: 600;
+                            color: root.intent == "do" || root.token-locked ? Theme.accent-text : Theme.label;
+                            vertical-alignment: center;
+                        }
+                        if root.token-unsure: Rectangle {
+                            width: 6px;
+                            height: 6px;
+                                    border-radius: 3px;
+                            background: Theme.label-3;
+                        }
+                    }
+
+                    token-touch := TouchArea {
+                        mouse-cursor: pointer;
+                        clicked => { root.token-clicked(); }
+                        changed has-hover => { root.token-hover(self.has-hover); }
+                    }
+                }
+
+                if root.model-name != "": Chip {
+                    text: root.model-name;
+                    trailing: Glyph.close;
+                    clicked => { root.model-chip-clicked(); }
+                    trailing-clicked => { root.model-chip-clicked(); }
+                }
+
+                field := Rectangle {
+                    horizontal-stretch: 1;
+                    min-width: 120px;
+                    min-height: input.height + Theme.sp-2;
+
+                    Text {
+                        visible: root.text == "";
+                        x: input.x;
+                        y: input.y;
+                        width: input.width;
+                        text: root.placeholder;
+                        font-size: Theme.bar-size;
+                        color: Theme.label-3;
+                        overflow: elide;
+                    }
+
+                    input := TextInput {
+                        x: Theme.sp-2;
+                            width: parent.width - 2 * Theme.sp-2;
+                        height: min(max(self.preferred-height, root.line-height), root.line-height * 7);
+                        font-size: Theme.bar-size;
+                        color: Theme.label;
+                        wrap: word-wrap;
+                        single-line: false;
+                        selection-background-color: Theme.selection;
+                        selection-foreground-color: Theme.label;
+                        edited => { root.edited(self.text); }
+                        cursor-position-changed(p) => {
+                            root.caret-x = p.x;
+                            root.caret-y = p.y;
+                        }
+                    }
+                }
+
+                if root.target-text != "": Chip {
+                    text: root.target-text;
+                    trailing: Glyph.add;
+                    trailing-clicked => { root.target-new(); }
+                }
+
+                mic := Rectangle {
+                    width: 36px * Theme.text-scale;
+                    height: self.width;
+                    border-radius: self.width / 2;
+                    background: root.mic-state == "listening" ? Theme.accent-wash : mic-touch.has-hover ? Theme.fill-2 : transparent;
+
+                    // Listening, the icon is a level meter.
+                    Rectangle {
+                        visible: root.mic-state == "listening";
+                        width: parent.width * (0.35 + 0.65 * root.mic-level);
+                        height: self.width;
+                        border-radius: self.width / 2;
+                        background: Theme.accent-wash;
+                    }
+
+                    Text {
+                        text: root.mic-state == "working" || root.mic-state == "preparing" ? Glyph.more : Glyph.mic;
+                        font-family: Theme.icons;
+                        font-size: 14px * Theme.text-scale;
+                        color: root.mic-state == "listening" ? Theme.accent-text : root.mic-state == "error" ? Theme.danger : Theme.label-2;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
+
+                    mic-touch := TouchArea {
+                        mouse-cursor: pointer;
+                        pointer-event(e) => {
+                            if (e.button == PointerEventButton.left && e.kind == PointerEventKind.down) {
+                                root.mic-down();
+                            }
+                            if (e.button == PointerEventButton.left && e.kind == PointerEventKind.up) {
+                                root.mic-up();
+                            }
+                        }
+                    }
+                }
+
+                IconButton {
+                    size: 36px * Theme.text-scale;
+                    glyph: Glyph.area;
+                    active: root.region-active;
+                    clicked => { root.region-clicked(); }
+                }
+
+                IconButton {
+                    size: 36px * Theme.text-scale;
+                    glyph: Glyph.settings;
+                    clicked => { root.settings-clicked(); }
+                }
+
+                IconButton {
+                    size: 36px * Theme.text-scale;
+                    glyph: Glyph.minimize;
+                    clicked => { root.close-clicked(); }
+                }
+            }
+        }
+
+        if root.tip-shown: Plate {
+            height: tip-text.preferred-height + 2 * Theme.sp-2;
+            tip-text := Text {
+                x: Theme.sp-3;
+                width: parent.width - 2 * Theme.sp-3;
+                text: "Ask ? or Ctrl+1 · Do > or Ctrl+2 · Alt+Enter does the other · Alt+Down for this menu";
+                font-size: Theme.caption;
+                color: Theme.label-2;
+                wrap: word-wrap;
+                vertical-alignment: center;
+            }
+        }
+
+        if root.menu-open: HorizontalLayout {
+            alignment: start;
+            Plate {
+                width: 300px * Theme.text-scale;
+                height: menu-col.preferred-height;
+                menu-col := VerticalLayout {
+                    padding: Theme.sp-1;
+                    MenuRow {
+                        text: "Ask about the screen";
+                        keys: "?   Ctrl+1";
+                        checked: root.intent == "ask";
+                        selected: root.menu-mark == 0;
+                        clicked => { root.intent-picked(0); }
+                    }
+                    MenuRow {
+                        text: "Do it as a task";
+                        keys: ">   Ctrl+2";
+                        checked: root.intent == "do";
+                        selected: root.menu-mark == 1;
+                        clicked => { root.intent-picked(1); }
+                    }
+                }
+            }
+        }
+
+        if root.model-open: Plate {
+            height: min(model-col.preferred-height, 280px * Theme.text-scale);
+            Flickable {
+                viewport-height: model-col.preferred-height;
+                model-col := VerticalLayout {
+                    padding: Theme.sp-1;
+                    for row[i] in root.model-rows: Rectangle {
+                        height: row.header ? 26px * Theme.text-scale : 34px * Theme.text-scale;
+                        border-radius: Theme.r-row;
+                        background: !row.header && (row.marked || row-touch.has-hover) ? Theme.fill-2 : transparent;
+                        Text {
+                            x: Theme.sp-3;
+                            width: parent.width - 2 * Theme.sp-3;
+                            text: row.text;
+                            font-size: row.header ? Theme.meta : Theme.row;
+                            font-weight: row.header ? 600 : 400;
+                            color: row.header ? Theme.label-3 : Theme.label;
+                            vertical-alignment: center;
+                            overflow: elide;
+                        }
+                        row-touch := TouchArea {
+                            enabled: !row.header;
+                            clicked => { root.model-picked(i); }
+                        }
+                    }
+                    if root.model-empty != "": Text {
+                        text: root.model-empty;
+                        font-size: Theme.row;
+                        color: Theme.label-3;
+                        height: 34px * Theme.text-scale;
+                        vertical-alignment: center;
+                    }
+                }
+            }
+        }
+
+        if root.examples.length > 0 && root.text == "": HorizontalLayout {
+            spacing: Theme.sp-2;
+            alignment: start;
+            for ex[i] in root.examples: Chip {
+                text: ex;
+                clicked => { root.example-clicked(i); }
+            }
+        }
+
+        if root.region-text != "": HorizontalLayout {
+            alignment: start;
+            Plate {
+                height: 36px * Theme.text-scale;
+                width: region-row.preferred-width;
+                region-row := HorizontalLayout {
+                    padding-left: Theme.sp-3;
+                    padding-right: Theme.sp-1;
+                    spacing: Theme.sp-2;
+                    Text {
+                        text: Glyph.area;
+                        font-family: Theme.icons;
+                        font-size: 12px * Theme.text-scale;
+                        color: Theme.accent-text;
+                        vertical-alignment: center;
+                    }
+                    Text {
+                        text: root.region-text;
+                        font-size: Theme.caption;
+                        color: Theme.label;
+                        vertical-alignment: center;
+                    }
+                    Chip {
+                            text: "Whole screen";
+                        clicked => { root.region-clear(); }
+                    }
+                }
+            }
+        }
+
+        if root.status-text != "": Plate {
+            height: status.preferred-height + 2 * Theme.sp-2;
+            status := Text {
+                x: Theme.sp-4;
+                width: parent.width - 2 * Theme.sp-4;
+                text: root.status-text;
+                font-size: Theme.caption;
+                color: Theme.label-2;
+                wrap: word-wrap;
+                vertical-alignment: center;
+            }
+        }
+
+        if root.notice-text != "": Plate {
+            height: max(notice-row.preferred-height, 44px * Theme.text-scale);
+            background: root.notice-nudge ? Theme.raised : Theme.base;
+            notice-row := HorizontalLayout {
+                padding-left: Theme.sp-4;
+                padding-right: Theme.sp-2;
+                padding-top: Theme.sp-2;
+                padding-bottom: Theme.sp-2;
+                spacing: Theme.sp-3;
+                Text {
+                    text: Glyph.info;
+                    font-family: Theme.icons;
+                    font-size: 14px * Theme.text-scale;
+                    color: Theme.accent-text;
+                    vertical-alignment: center;
+                }
+                Text {
+                    text: root.notice-text;
+                    font-size: Theme.caption;
+                    color: Theme.label;
+                    wrap: word-wrap;
+                    vertical-alignment: center;
+                    horizontal-stretch: 1;
+                }
+                if root.notice-button != "": Button {
+                    text: root.notice-button;
+                    prominent: true;
+                    clicked => { root.notice-clicked(); }
+                }
+            }
+        }
+    }
+
+    }
+
+    // ------------------------------------------------------------ hud
+    if root.mode == "hud": Rectangle {
+        border-radius: Theme.r-card;
+        background: root.hud-snapped ? Theme.raised : Theme.base;
+        border-width: root.hud-snapped ? 2px : 0px;
+        border-color: Theme.accent;
+
+        TouchArea {
+            mouse-cursor: move;
+            pointer-event(e) => {
+                if (e.button == PointerEventButton.left && e.kind == PointerEventKind.down) {
+                    root.hud-drag();
+                }
+            }
+        }
+
+        VerticalLayout {
+            padding: Theme.sp-4;
+            spacing: Theme.sp-2;
+            alignment: center;
+            Text {
+                text: "Input bar";
+                font-size: Theme.title;
+                font-weight: 600;
+                color: Theme.label;
+            }
+            Text {
+                text: "Drag anywhere, or use the arrow keys. It snaps to screen edges and corners. Enter saves.";
+                font-size: Theme.caption;
+                color: Theme.label-2;
+                wrap: word-wrap;
+            }
+            HorizontalLayout {
+                alignment: end;
+                Button {
+                    text: "Done";
+                    prominent: true;
+                    clicked => { root.hud-done(); }
+                }
+            }
+        }
+    }
+}
