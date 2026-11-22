@@ -251,7 +251,10 @@ jobs:
           # Every [SMOKE] line as annotations, readable without a token (a
           # panic in host::setup or a hook shows in the stderr tail).
           $text = (Get-Content $out -Raw -ErrorAction SilentlyContinue) + ''
-          $strays = @(Get-Content $kids -ErrorAction SilentlyContinue | Select-Object -SkipWhile { $_ -ne 'unexpected:' } | Select-Object -Skip 1)
+          # Select-Object has no -SkipWhile: the lines after 'unexpected:'.
+          $kidLines = @(Get-Content $kids -ErrorAction SilentlyContinue)
+          $cut = [Array]::IndexOf($kidLines, 'unexpected:')
+          $strays = if ($cut -ge 0) { @($kidLines | Select-Object -Skip ($cut + 1)) } else { @('no child report') }
           $ok = -not $timedOut -and $code -eq 0 -and $gateCode -eq 0 -and $strays.Count -eq 0
           $lines = ($text -split "`n" | Where-Object { $_ -match '^\[SMOKE\]' }) -join "`n"
           if (-not $ok) { $lines += "`n--- stderr ---`n" + ((Get-Content $err -Tail 40 -ErrorAction SilentlyContinue) -join "`n") }
@@ -325,7 +328,10 @@ jobs:
           # stdout and the whole of stderr, for the ci-logs branch.
           @($text, '--- stderr ---') + @(Get-Content $errFile -ErrorAction SilentlyContinue) | Set-Content $log
           if ($timedOut) { Add-Content $log 'desktop selfcheck timed out after 240 s' }
-          $strays = @(Get-Content $kids -ErrorAction SilentlyContinue | Select-Object -SkipWhile { $_ -ne 'unexpected:' } | Select-Object -Skip 1)
+          # Select-Object has no -SkipWhile: the lines after 'unexpected:'.
+          $kidLines = @(Get-Content $kids -ErrorAction SilentlyContinue)
+          $cut = [Array]::IndexOf($kidLines, 'unexpected:')
+          $strays = if ($cut -ge 0) { @($kidLines | Select-Object -Skip ($cut + 1)) } else { @('no child report') }
           $ok = $text -match '\[DESKTOP\] done' -and $strays.Count -eq 0
           $lines = ($text -split "`n" | Where-Object { $_ -match '^\[DESKTOP\]' -and $_ -notmatch 'typeReadText|editorCandidates' }) -join "`n"
           if (-not $ok) { $lines += "`n--- stderr ---`n" + $errText }
