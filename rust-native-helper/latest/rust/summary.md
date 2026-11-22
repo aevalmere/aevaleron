@@ -1,12 +1,12 @@
 # rust: failure
 
 - Workflow: rust
-- Run: [44980229878](https://github.com/aevalmere/aevaleron/actions/runs/44980229878), attempt 1, on push
-- Commit: ab49f571a530c5e0cf9222fcb42bfc2eee9d5f97
+- Run: [44981380936](https://github.com/aevalmere/aevaleron/actions/runs/44981380936), attempt 1, on push
+- Commit: 2e1985ad396d243fdd499bdfc966b01e8ab5a8d3
 - Ref: rust/native-helper
 - Conclusion: **failure**
-- Failed: Format, Clippy, Unit tests, Capture check, Desktop selfcheck
-- Finished: 2026-11-22T03:34:10Z
+- Failed: Clippy, Unit tests, Capture check, Desktop selfcheck
+- Finished: 2026-11-22T03:49:45Z
 
 | Step | Outcome | Log |
 |---|---|---|
@@ -16,8 +16,8 @@
 | Voice build flags | success |  |
 | Cache cargo | success |  |
 | Gate helper | success |  |
-| Format | failure | [fmt.log](fmt.log) |
-| Format patch | success | [fmt.patch](fmt.patch) |
+| Format | success |  |
+| Format patch | skipped |  |
 | Clippy | failure | [clippy.log](clippy.log) |
 | Unit tests | failure | [test.log](test.log) |
 | Restore NSIS toolset | skipped |  |
@@ -29,4 +29,4 @@
 | Desktop selfcheck | failure | [desktop.log](desktop.log) |
 | Upload installer | skipped |  |
 
-errors.txt: 606 error and warning lines from the logs.
+errors.txt: 48 error and warning lines from the logs.
