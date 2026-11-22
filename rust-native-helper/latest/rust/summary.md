@@ -1,12 +1,11 @@
-# rust: failure
+# rust: success
 
 - Workflow: rust
-- Run: [44982479542](https://github.com/aevalmere/aevaleron/actions/runs/44982479542), attempt 1, on push
-- Commit: 20b61466d8759129af5170ec770b5ad6ac2c4649
+- Run: [45031541330](https://github.com/aevalmere/aevaleron/actions/runs/45031541330), attempt 1, on push
+- Commit: 7a417c8c6cca530905296f1ea3bc744ebe75de22
 - Ref: rust/native-helper
-- Conclusion: **failure**
-- Failed: Smoke, Desktop selfcheck
-- Finished: 2026-11-22T04:18:34Z
+- Conclusion: **success**
+- Finished: 2026-11-22T14:43:49Z
 
 | Step | Outcome | Log |
 |---|---|---|
@@ -22,11 +21,11 @@
 | Unit tests | success | [test.log](test.log) |
 | Restore NSIS toolset | success |  |
 | Seed NSIS toolset | success | [nsis.log](nsis.log) |
-| Save NSIS toolset | success |  |
+| Save NSIS toolset | skipped |  |
 | Build installer | success | [build.log](build.log) |
-| Smoke | failure | [smoke.log](smoke.log) |
+| Smoke | success | [smoke.log](smoke.log) |
 | Capture check | success | [capture.log](capture.log) |
-| Desktop selfcheck | failure | [desktop.log](desktop.log) |
-| Upload installer | skipped |  |
+| Desktop selfcheck | success | [desktop.log](desktop.log) |
+| Upload installer | success |  |
 
 errors.txt: 0 error and warning lines from the logs.

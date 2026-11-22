@@ -1,19 +1,16 @@
 {
   "workflow": "rust",
   "workflow_name": "rust",
-  "run_id": 44982479542,
+  "run_id": 45031541330,
   "run_attempt": 1,
-  "run_url": "https://github.com/aevalmere/aevaleron/actions/runs/44982479542",
+  "run_url": "https://github.com/aevalmere/aevaleron/actions/runs/45031541330",
   "event": "push",
-  "sha": "20b61466d8759129af5170ec770b5ad6ac2c4649",
+  "sha": "7a417c8c6cca530905296f1ea3bc744ebe75de22",
   "ref": "rust/native-helper",
   "ref_dir": "rust-native-helper",
-  "conclusion": "failure",
-  "failed": [
-    "Smoke",
-    "Desktop selfcheck"
-  ],
-  "finished": "2026-11-22T04:18:34Z",
+  "conclusion": "success",
+  "failed": [],
+  "finished": "2026-11-22T14:43:49Z",
   "error_lines": 0,
   "steps": [
     {
@@ -78,7 +75,7 @@
     },
     {
       "name": "Save NSIS toolset",
-      "outcome": "success",
+      "outcome": "skipped",
       "log": ""
     },
     {
@@ -88,7 +85,7 @@
     },
     {
       "name": "Smoke",
-      "outcome": "failure",
+      "outcome": "success",
       "log": "smoke.log"
     },
     {
@@ -98,12 +95,12 @@
     },
     {
       "name": "Desktop selfcheck",
-      "outcome": "failure",
+      "outcome": "success",
       "log": "desktop.log"
     },
     {
       "name": "Upload installer",
-      "outcome": "skipped",
+      "outcome": "success",
       "log": ""
     }
   ]
