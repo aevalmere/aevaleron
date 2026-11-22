@@ -1,0 +1,295 @@
+== clippy.log ==
+warning: aevaleron@1.1.1: The property 'viewport-height' has been deprecated: Please use 'content-height' instead
+warning: aevaleron@1.1.1:    --> D:\a\aevaleron\aevaleron\src-tauri\ui\settings-widgets.slint:568:43
+warning: aevaleron@1.1.1:     |
+warning: aevaleron@1.1.1: 568 |         fl.content-y = max(fl.height - fl.viewport-height, min(0px, fl.height / 2 - root.want));
+warning: aevaleron@1.1.1:     |                                           ^^^^^^^^^^^^^^^
+warning: aevaleron@1.1.1:     |
+warning: aevaleron@1.1.1: The property 'viewport-height' has been deprecated: Please use 'content-height' instead
+warning: aevaleron@1.1.1:    --> D:\a\aevaleron\aevaleron\src-tauri\ui\settings.slint:29:35
+warning: aevaleron@1.1.1:     |
+warning: aevaleron@1.1.1:  29 |     property <bool> at-end: flick.viewport-height > flick.height && flick.content-y <= flick.height - flick.viewport-height + 4px;
+warning: aevaleron@1.1.1:     |                                   ^^^^^^^^^^^^^^^
+warning: aevaleron@1.1.1: The property 'viewport-height' has been deprecated: Please use 'content-height' instead
+warning: aevaleron@1.1.1:    --> D:\a\aevaleron\aevaleron\src-tauri\ui\settings.slint:29:109
+warning: aevaleron@1.1.1:     |
+warning: aevaleron@1.1.1:  29 |     property <bool> at-end: flick.viewport-height > flick.height && flick.content-y <= flick.height - flick.viewport-height + 4px;
+warning: aevaleron@1.1.1:     |                                                                                                             ^^^^^^^^^^^^^^^
+warning: aevaleron@1.1.1: The property 'viewport-height' has been deprecated: Please use 'content-height' instead
+warning: aevaleron@1.1.1:    --> D:\a\aevaleron\aevaleron\src-tauri\ui\settings.slint:42:61
+warning: aevaleron@1.1.1:     |
+warning: aevaleron@1.1.1:  42 |         flick.content-y = max(min(0px, flick.height - flick.viewport-height), -y);
+warning: aevaleron@1.1.1:     |                                                             ^^^^^^^^^^^^^^^
+warning: aevaleron@1.1.1: The property 'viewport-height' has been deprecated: Please use 'content-height' instead
+warning: aevaleron@1.1.1:    --> D:\a\aevaleron\aevaleron\src-tauri\ui\settings.slint:192:26
+warning: aevaleron@1.1.1:     |
+warning: aevaleron@1.1.1: 192 |                 if flick.viewport-height > flick.height: Rectangle {
+warning: aevaleron@1.1.1:     |                          ^^^^^^^^^^^^^^^
+warning: aevaleron@1.1.1: The property 'viewport-height' has been deprecated: Please use 'content-height' instead
+warning: aevaleron@1.1.1:    --> D:\a\aevaleron\aevaleron\src-tauri\ui\settings.slint:196:76
+warning: aevaleron@1.1.1:     |
+warning: aevaleron@1.1.1: 196 |                     height: max(32px, parent.height * flick.height / flick.viewport-height);
+
+warning: aevaleron@1.1.1:     |                                                                            ^^^^^^^^^^^^^^^
+warning: aevaleron@1.1.1: The property 'viewport-height' has been deprecated: Please use 'content-height' instead
+warning: aevaleron@1.1.1:    --> D:\a\aevaleron\aevaleron\src-tauri\ui\settings.slint:194:91
+warning: aevaleron@1.1.1:     |
+warning: aevaleron@1.1.1: 194 |                     y: (parent.height - self.height) * (-flick.content-y / max(1px, flick.viewport-height - flick.height));
+warning: aevaleron@1.1.1:     |                                                                                           ^^^^^^^^^^^^^^^
+warning: aevaleron@1.1.1: The binding for the property 'head-avail' is part of a binding loop (root.head-avail -> title-text.width -> HorizontalLayout -> head-col -> head -> col -> Rectangle -> root -> root.head-avail)
+warning: aevaleron@1.1.1:          Compute 'head-avail' without depending on a size or a position the layout produces, or set an 'x' or a 'y' on 'head-col', so its parent stops sizing itself from it
+warning: aevaleron@1.1.1:          This was allowed in previous version of Slint, but is deprecated and may cause panic at runtime
+warning: aevaleron@1.1.1:    --> D:\a\aevaleron\aevaleron\src-tauri\ui\card-agents.slint:83:35
+warning: aevaleron@1.1.1:     |
+warning: aevaleron@1.1.1:  83 |     property <length> head-avail: root.width - root.text-x - root.head-right;
+warning: aevaleron@1.1.1:     |                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+warning: aevaleron@1.1.1: note: setting an 'x' or a 'y' here takes 'head-col' out of its parent's size, one way out of the binding loop reported for 'head-avail' at line 83
+warning: aevaleron@1.1.1:    --> D:\a\aevaleron\aevaleron\src-tauri\ui\card-agents.slint:151:29
+warning: aevaleron@1.1.1:     |
+warning: aevaleron@1.1.1: 151 |                 head-col := VerticalLayout {
+warning: aevaleron@1.1.1:     |                             ^^^^^^^^^^^^^^^
+warning: aevaleron@1.1.1: note: 'width' is part of the binding loop reported for 'head-avail' at line 83
+warning: aevaleron@1.1.1:    --> D:\a\aevaleron\aevaleron\src-tauri\ui\card-agents.slint:163:36
+warning: aevaleron@1.1.1:     |
+warning: aevaleron@1.1.1: 163 | ...                   width: max(0px, min(self.preferred-width, root.head-avail - place-text.width - 5px));
+warning: aevaleron@1.1.1:     |                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+warning: aevaleron@1.1.1: The binding for the property 'head-avail' is part of a binding loop (root.head-avail -> place-text.width -> title-text.width -> HorizontalLayout -> head-col -> head -> col -> Rectangle -> root -> root.head-avail)
+warning: aevaleron@1.1.1:          Compute 'head-avail' without depending on a size or a position the layout produces, or set an 'x' or a 'y' on 'head-col', so its parent stops sizing itself from it
+warning: aevaleron@1.1.1:          This was allowed in previous version of Slint, but is deprecated and may cause panic at runtime
+warning: aevaleron@1.1.1:    --> D:\a\aevaleron\aevaleron\src-tauri\ui\card-agents.slint:83:35
+warning: aevaleron@1.1.1:     |
+warning: aevaleron@1.1.1:  83 |     property <length> head-avail: root.width - root.text-x - root.head-right;
+warning: aevaleron@1.1.1:     |                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: aevaleron@1.1.1: note: setting an 'x' or a 'y' here takes 'head-col' out of its parent's size, one way out of the binding loop reported for 'head-avail' at line 83
+warning: aevaleron@1.1.1:    --> D:\a\aevaleron\aevaleron\src-tauri\ui\card-agents.slint:151:29
+warning: aevaleron@1.1.1:     |
+warning: aevaleron@1.1.1: 151 |                 head-col := VerticalLayout {
+warning: aevaleron@1.1.1:     |                             ^^^^^^^^^^^^^^^
+warning: aevaleron@1.1.1: note: 'width' is part of the binding loop reported for 'head-avail' at line 83
+warning: aevaleron@1.1.1:    --> D:\a\aevaleron\aevaleron\src-tauri\ui\card-agents.slint:174:36
+warning: aevaleron@1.1.1:     |
+warning: aevaleron@1.1.1: 174 | ...                   width: min(self.want, max(min(64px, self.want), root.head-avail - title-text.preferred-width - 5px));
+warning: aevaleron@1.1.1:     |                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+warning: aevaleron@1.1.1: note: 'width' is part of the binding loop reported for 'head-avail' at line 83
+warning: aevaleron@1.1.1:    --> D:\a\aevaleron\aevaleron\src-tauri\ui\card-agents.slint:163:36
+warning: aevaleron@1.1.1:     |
+warning: aevaleron@1.1.1: 163 | ...                   width: max(0px, min(self.preferred-width, root.head-avail - place-text.width - 5px));
+warning: aevaleron@1.1.1:     |                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+warning: aevaleron@1.1.1: The binding for the property 'layoutinfo-h' is part of a binding loop (root.layoutinfo-h -> HorizontalLayout.layoutinfo-h -> VerticalLayout.layoutinfo-h -> root.layoutinfo-h)
+warning: aevaleron@1.1.1:          Set an 'x' or a 'y' on 'VerticalLayout', so its parent stops sizing itself from it
+warning: aevaleron@1.1.1:          This was allowed in previous version of Slint, but is deprecated and may cause panic at runtime
+warning: aevaleron@1.1.1:    --> D:\a\aevaleron\aevaleron\src-tauri\ui\settings.slint:14:42
+warning: aevaleron@1.1.1:     |
+warning: aevaleron@1.1.1:  14 | export component SettingsWindow inherits Window {
+warning: aevaleron@1.1.1:     |                                          ^^^^^^^
+warning: aevaleron@1.1.1: note: setting an 'x' or a 'y' here takes 'VerticalLayout' out of its parent's size, one way out of the binding loop reported for 'layoutinfo-h' at line 14
+warning: aevaleron@1.1.1:    --> D:\a\aevaleron\aevaleron\src-tauri\ui\settings.slint:73:5
+warning: aevaleron@1.1.1:     |
+warning: aevaleron@1.1.1:  73 |     VerticalLayout {
+warning: aevaleron@1.1.1:     |     ^^^^^^^^^^^^^^^
+
+
+== test.log ==
+warning: aevaleron@1.1.1: The property 'viewport-height' has been deprecated: Please use 'content-height' instead
+warning: aevaleron@1.1.1:    --> D:\a\aevaleron\aevaleron\src-tauri\ui\settings-widgets.slint:568:43
+warning: aevaleron@1.1.1:     |
+warning: aevaleron@1.1.1: 568 |         fl.content-y = max(fl.height - fl.viewport-height, min(0px, fl.height / 2 - root.want));
+warning: aevaleron@1.1.1:     |                                           ^^^^^^^^^^^^^^^
+warning: aevaleron@1.1.1:     |
+warning: aevaleron@1.1.1: The property 'viewport-height' has been deprecated: Please use 'content-height' instead
+warning: aevaleron@1.1.1:    --> D:\a\aevaleron\aevaleron\src-tauri\ui\settings.slint:29:35
+warning: aevaleron@1.1.1:     |
+warning: aevaleron@1.1.1:  29 |     property <bool> at-end: flick.viewport-height > flick.height && flick.content-y <= flick.height - flick.viewport-height + 4px;
+warning: aevaleron@1.1.1:     |                                   ^^^^^^^^^^^^^^^
+warning: aevaleron@1.1.1: The property 'viewport-height' has been deprecated: Please use 'content-height' instead
+warning: aevaleron@1.1.1:    --> D:\a\aevaleron\aevaleron\src-tauri\ui\settings.slint:29:109
+warning: aevaleron@1.1.1:     |
+warning: aevaleron@1.1.1:  29 |     property <bool> at-end: flick.viewport-height > flick.height && flick.content-y <= flick.height - flick.viewport-height + 4px;
+warning: aevaleron@1.1.1:     |                                                                                                             ^^^^^^^^^^^^^^^
+warning: aevaleron@1.1.1: The property 'viewport-height' has been deprecated: Please use 'content-height' instead
+warning: aevaleron@1.1.1:    --> D:\a\aevaleron\aevaleron\src-tauri\ui\settings.slint:42:61
+warning: aevaleron@1.1.1:     |
+warning: aevaleron@1.1.1:  42 |         flick.content-y = max(min(0px, flick.height - flick.viewport-height), -y);
+warning: aevaleron@1.1.1:     |                                                             ^^^^^^^^^^^^^^^
+warning: aevaleron@1.1.1: The property 'viewport-height' has been deprecated: Please use 'content-height' instead
+warning: aevaleron@1.1.1:    --> D:\a\aevaleron\aevaleron\src-tauri\ui\settings.slint:192:26
+warning: aevaleron@1.1.1:     |
+warning: aevaleron@1.1.1: 192 |                 if flick.viewport-height > flick.height: Rectangle {
+warning: aevaleron@1.1.1:     |                          ^^^^^^^^^^^^^^^
+warning: aevaleron@1.1.1: The property 'viewport-height' has been deprecated: Please use 'content-height' instead
+warning: aevaleron@1.1.1:    --> D:\a\aevaleron\aevaleron\src-tauri\ui\settings.slint:196:76
+warning: aevaleron@1.1.1:     |
+warning: aevaleron@1.1.1: 196 |                     height: max(32px, parent.height * flick.height / flick.viewport-height);
+
+warning: aevaleron@1.1.1:     |                                                                            ^^^^^^^^^^^^^^^
+warning: aevaleron@1.1.1: The property 'viewport-height' has been deprecated: Please use 'content-height' instead
+warning: aevaleron@1.1.1:    --> D:\a\aevaleron\aevaleron\src-tauri\ui\settings.slint:194:91
+warning: aevaleron@1.1.1:     |
+warning: aevaleron@1.1.1: 194 |                     y: (parent.height - self.height) * (-flick.content-y / max(1px, flick.viewport-height - flick.height));
+warning: aevaleron@1.1.1:     |                                                                                           ^^^^^^^^^^^^^^^
+warning: aevaleron@1.1.1: The binding for the property 'head-avail' is part of a binding loop (root.head-avail -> title-text.width -> HorizontalLayout -> head-col -> head -> col -> Rectangle -> root -> root.head-avail)
+warning: aevaleron@1.1.1:          Compute 'head-avail' without depending on a size or a position the layout produces, or set an 'x' or a 'y' on 'head-col', so its parent stops sizing itself from it
+warning: aevaleron@1.1.1:          This was allowed in previous version of Slint, but is deprecated and may cause panic at runtime
+warning: aevaleron@1.1.1:    --> D:\a\aevaleron\aevaleron\src-tauri\ui\card-agents.slint:83:35
+warning: aevaleron@1.1.1:     |
+warning: aevaleron@1.1.1:  83 |     property <length> head-avail: root.width - root.text-x - root.head-right;
+warning: aevaleron@1.1.1:     |                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+warning: aevaleron@1.1.1: note: setting an 'x' or a 'y' here takes 'head-col' out of its parent's size, one way out of the binding loop reported for 'head-avail' at line 83
+warning: aevaleron@1.1.1:    --> D:\a\aevaleron\aevaleron\src-tauri\ui\card-agents.slint:151:29
+warning: aevaleron@1.1.1:     |
+warning: aevaleron@1.1.1: 151 |                 head-col := VerticalLayout {
+warning: aevaleron@1.1.1:     |                             ^^^^^^^^^^^^^^^
+warning: aevaleron@1.1.1: note: 'width' is part of the binding loop reported for 'head-avail' at line 83
+warning: aevaleron@1.1.1:    --> D:\a\aevaleron\aevaleron\src-tauri\ui\card-agents.slint:163:36
+warning: aevaleron@1.1.1:     |
+warning: aevaleron@1.1.1: 163 | ...                   width: max(0px, min(self.preferred-width, root.head-avail - place-text.width - 5px));
+warning: aevaleron@1.1.1:     |                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+warning: aevaleron@1.1.1: The binding for the property 'head-avail' is part of a binding loop (root.head-avail -> place-text.width -> title-text.width -> HorizontalLayout -> head-col -> head -> col -> Rectangle -> root -> root.head-avail)
+warning: aevaleron@1.1.1:          Compute 'head-avail' without depending on a size or a position the layout produces, or set an 'x' or a 'y' on 'head-col', so its parent stops sizing itself from it
+warning: aevaleron@1.1.1:          This was allowed in previous version of Slint, but is deprecated and may cause panic at runtime
+warning: aevaleron@1.1.1:    --> D:\a\aevaleron\aevaleron\src-tauri\ui\card-agents.slint:83:35
+warning: aevaleron@1.1.1:     |
+warning: aevaleron@1.1.1:  83 |     property <length> head-avail: root.width - root.text-x - root.head-right;
+warning: aevaleron@1.1.1:     |                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: aevaleron@1.1.1: note: setting an 'x' or a 'y' here takes 'head-col' out of its parent's size, one way out of the binding loop reported for 'head-avail' at line 83
+warning: aevaleron@1.1.1:    --> D:\a\aevaleron\aevaleron\src-tauri\ui\card-agents.slint:151:29
+warning: aevaleron@1.1.1:     |
+warning: aevaleron@1.1.1: 151 |                 head-col := VerticalLayout {
+warning: aevaleron@1.1.1:     |                             ^^^^^^^^^^^^^^^
+warning: aevaleron@1.1.1: note: 'width' is part of the binding loop reported for 'head-avail' at line 83
+warning: aevaleron@1.1.1:    --> D:\a\aevaleron\aevaleron\src-tauri\ui\card-agents.slint:174:36
+warning: aevaleron@1.1.1:     |
+warning: aevaleron@1.1.1: 174 | ...                   width: min(self.want, max(min(64px, self.want), root.head-avail - title-text.preferred-width - 5px));
+warning: aevaleron@1.1.1:     |                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+warning: aevaleron@1.1.1: note: 'width' is part of the binding loop reported for 'head-avail' at line 83
+warning: aevaleron@1.1.1:    --> D:\a\aevaleron\aevaleron\src-tauri\ui\card-agents.slint:163:36
+warning: aevaleron@1.1.1:     |
+warning: aevaleron@1.1.1: 163 | ...                   width: max(0px, min(self.preferred-width, root.head-avail - place-text.width - 5px));
+warning: aevaleron@1.1.1:     |                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+warning: aevaleron@1.1.1: The binding for the property 'layoutinfo-h' is part of a binding loop (root.layoutinfo-h -> HorizontalLayout.layoutinfo-h -> VerticalLayout.layoutinfo-h -> root.layoutinfo-h)
+warning: aevaleron@1.1.1:          Set an 'x' or a 'y' on 'VerticalLayout', so its parent stops sizing itself from it
+warning: aevaleron@1.1.1:          This was allowed in previous version of Slint, but is deprecated and may cause panic at runtime
+warning: aevaleron@1.1.1:    --> D:\a\aevaleron\aevaleron\src-tauri\ui\settings.slint:14:42
+warning: aevaleron@1.1.1:     |
+warning: aevaleron@1.1.1:  14 | export component SettingsWindow inherits Window {
+warning: aevaleron@1.1.1:     |                                          ^^^^^^^
+warning: aevaleron@1.1.1: note: setting an 'x' or a 'y' here takes 'VerticalLayout' out of its parent's size, one way out of the binding loop reported for 'layoutinfo-h' at line 14
+warning: aevaleron@1.1.1:    --> D:\a\aevaleron\aevaleron\src-tauri\ui\settings.slint:73:5
+warning: aevaleron@1.1.1:     |
+warning: aevaleron@1.1.1:  73 |     VerticalLayout {
+warning: aevaleron@1.1.1:     |     ^^^^^^^^^^^^^^^
+warning: linker stdout: LINK : warning LNK4098: defaultlib 'LIBCMT' conflicts with use of other libs; use /NODEFAULTLIB:library
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `aevaleron` (lib test) generated 1 warning
+
+
+== build.log ==
+warning: aevaleron@1.1.1: The property 'viewport-height' has been deprecated: Please use 'content-height' instead
+warning: aevaleron@1.1.1:    --> D:\a\aevaleron\aevaleron\src-tauri\ui\settings-widgets.slint:568:43
+warning: aevaleron@1.1.1:     |
+warning: aevaleron@1.1.1: 568 |         fl.content-y = max(fl.height - fl.viewport-height, min(0px, fl.height / 2 - root.want));
+warning: aevaleron@1.1.1:     |                                           ^^^^^^^^^^^^^^^
+warning: aevaleron@1.1.1:     |
+warning: aevaleron@1.1.1: The property 'viewport-height' has been deprecated: Please use 'content-height' instead
+warning: aevaleron@1.1.1:    --> D:\a\aevaleron\aevaleron\src-tauri\ui\settings.slint:29:35
+warning: aevaleron@1.1.1:     |
+warning: aevaleron@1.1.1:  29 |     property <bool> at-end: flick.viewport-height > flick.height && flick.content-y <= flick.height - flick.viewport-height + 4px;
+warning: aevaleron@1.1.1:     |                                   ^^^^^^^^^^^^^^^
+warning: aevaleron@1.1.1: The property 'viewport-height' has been deprecated: Please use 'content-height' instead
+warning: aevaleron@1.1.1:    --> D:\a\aevaleron\aevaleron\src-tauri\ui\settings.slint:29:109
+warning: aevaleron@1.1.1:     |
+warning: aevaleron@1.1.1:  29 |     property <bool> at-end: flick.viewport-height > flick.height && flick.content-y <= flick.height - flick.viewport-height + 4px;
+warning: aevaleron@1.1.1:     |                                                                                                             ^^^^^^^^^^^^^^^
+warning: aevaleron@1.1.1: The property 'viewport-height' has been deprecated: Please use 'content-height' instead
+warning: aevaleron@1.1.1:    --> D:\a\aevaleron\aevaleron\src-tauri\ui\settings.slint:42:61
+warning: aevaleron@1.1.1:     |
+warning: aevaleron@1.1.1:  42 |         flick.content-y = max(min(0px, flick.height - flick.viewport-height), -y);
+warning: aevaleron@1.1.1:     |                                                             ^^^^^^^^^^^^^^^
+warning: aevaleron@1.1.1: The property 'viewport-height' has been deprecated: Please use 'content-height' instead
+warning: aevaleron@1.1.1:    --> D:\a\aevaleron\aevaleron\src-tauri\ui\settings.slint:192:26
+warning: aevaleron@1.1.1:     |
+warning: aevaleron@1.1.1: 192 |                 if flick.viewport-height > flick.height: Rectangle {
+warning: aevaleron@1.1.1:     |                          ^^^^^^^^^^^^^^^
+warning: aevaleron@1.1.1: The property 'viewport-height' has been deprecated: Please use 'content-height' instead
+warning: aevaleron@1.1.1:    --> D:\a\aevaleron\aevaleron\src-tauri\ui\settings.slint:196:76
+warning: aevaleron@1.1.1:     |
+warning: aevaleron@1.1.1: 196 |                     height: max(32px, parent.height * flick.height / flick.viewport-height);
+
+warning: aevaleron@1.1.1:     |                                                                            ^^^^^^^^^^^^^^^
+warning: aevaleron@1.1.1: The property 'viewport-height' has been deprecated: Please use 'content-height' instead
+warning: aevaleron@1.1.1:    --> D:\a\aevaleron\aevaleron\src-tauri\ui\settings.slint:194:91
+warning: aevaleron@1.1.1:     |
+warning: aevaleron@1.1.1: 194 |                     y: (parent.height - self.height) * (-flick.content-y / max(1px, flick.viewport-height - flick.height));
+warning: aevaleron@1.1.1:     |                                                                                           ^^^^^^^^^^^^^^^
+warning: aevaleron@1.1.1: The binding for the property 'head-avail' is part of a binding loop (root.head-avail -> title-text.width -> HorizontalLayout -> head-col -> head -> col -> Rectangle -> root -> root.head-avail)
+warning: aevaleron@1.1.1:          Compute 'head-avail' without depending on a size or a position the layout produces, or set an 'x' or a 'y' on 'head-col', so its parent stops sizing itself from it
+warning: aevaleron@1.1.1:          This was allowed in previous version of Slint, but is deprecated and may cause panic at runtime
+warning: aevaleron@1.1.1:    --> D:\a\aevaleron\aevaleron\src-tauri\ui\card-agents.slint:83:35
+warning: aevaleron@1.1.1:     |
+warning: aevaleron@1.1.1:  83 |     property <length> head-avail: root.width - root.text-x - root.head-right;
+warning: aevaleron@1.1.1:     |                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+warning: aevaleron@1.1.1: note: setting an 'x' or a 'y' here takes 'head-col' out of its parent's size, one way out of the binding loop reported for 'head-avail' at line 83
+warning: aevaleron@1.1.1:    --> D:\a\aevaleron\aevaleron\src-tauri\ui\card-agents.slint:151:29
+warning: aevaleron@1.1.1:     |
+warning: aevaleron@1.1.1: 151 |                 head-col := VerticalLayout {
+warning: aevaleron@1.1.1:     |                             ^^^^^^^^^^^^^^^
+warning: aevaleron@1.1.1: note: 'width' is part of the binding loop reported for 'head-avail' at line 83
+warning: aevaleron@1.1.1:    --> D:\a\aevaleron\aevaleron\src-tauri\ui\card-agents.slint:163:36
+warning: aevaleron@1.1.1:     |
+warning: aevaleron@1.1.1: 163 | ...                   width: max(0px, min(self.preferred-width, root.head-avail - place-text.width - 5px));
+warning: aevaleron@1.1.1:     |                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+warning: aevaleron@1.1.1: The binding for the property 'head-avail' is part of a binding loop (root.head-avail -> place-text.width -> title-text.width -> HorizontalLayout -> head-col -> head -> col -> Rectangle -> root -> root.head-avail)
+warning: aevaleron@1.1.1:          Compute 'head-avail' without depending on a size or a position the layout produces, or set an 'x' or a 'y' on 'head-col', so its parent stops sizing itself from it
+warning: aevaleron@1.1.1:          This was allowed in previous version of Slint, but is deprecated and may cause panic at runtime
+warning: aevaleron@1.1.1:    --> D:\a\aevaleron\aevaleron\src-tauri\ui\card-agents.slint:83:35
+warning: aevaleron@1.1.1:     |
+warning: aevaleron@1.1.1:  83 |     property <length> head-avail: root.width - root.text-x - root.head-right;
+warning: aevaleron@1.1.1:     |                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: aevaleron@1.1.1: note: setting an 'x' or a 'y' here takes 'head-col' out of its parent's size, one way out of the binding loop reported for 'head-avail' at line 83
+warning: aevaleron@1.1.1:    --> D:\a\aevaleron\aevaleron\src-tauri\ui\card-agents.slint:151:29
+warning: aevaleron@1.1.1:     |
+warning: aevaleron@1.1.1: 151 |                 head-col := VerticalLayout {
+warning: aevaleron@1.1.1:     |                             ^^^^^^^^^^^^^^^
+warning: aevaleron@1.1.1: note: 'width' is part of the binding loop reported for 'head-avail' at line 83
+warning: aevaleron@1.1.1:    --> D:\a\aevaleron\aevaleron\src-tauri\ui\card-agents.slint:174:36
+warning: aevaleron@1.1.1:     |
+warning: aevaleron@1.1.1: 174 | ...                   width: min(self.want, max(min(64px, self.want), root.head-avail - title-text.preferred-width - 5px));
+warning: aevaleron@1.1.1:     |                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+warning: aevaleron@1.1.1: note: 'width' is part of the binding loop reported for 'head-avail' at line 83
+warning: aevaleron@1.1.1:    --> D:\a\aevaleron\aevaleron\src-tauri\ui\card-agents.slint:163:36
+warning: aevaleron@1.1.1:     |
+warning: aevaleron@1.1.1: 163 | ...                   width: max(0px, min(self.preferred-width, root.head-avail - place-text.width - 5px));
+warning: aevaleron@1.1.1:     |                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+warning: aevaleron@1.1.1: The binding for the property 'layoutinfo-h' is part of a binding loop (root.layoutinfo-h -> HorizontalLayout.layoutinfo-h -> VerticalLayout.layoutinfo-h -> root.layoutinfo-h)
+warning: aevaleron@1.1.1:          Set an 'x' or a 'y' on 'VerticalLayout', so its parent stops sizing itself from it
+warning: aevaleron@1.1.1:          This was allowed in previous version of Slint, but is deprecated and may cause panic at runtime
+warning: aevaleron@1.1.1:    --> D:\a\aevaleron\aevaleron\src-tauri\ui\settings.slint:14:42
+warning: aevaleron@1.1.1:     |
+warning: aevaleron@1.1.1:  14 | export component SettingsWindow inherits Window {
+warning: aevaleron@1.1.1:     |                                          ^^^^^^^
+warning: aevaleron@1.1.1: note: setting an 'x' or a 'y' here takes 'VerticalLayout' out of its parent's size, one way out of the binding loop reported for 'layoutinfo-h' at line 14
+warning: aevaleron@1.1.1:    --> D:\a\aevaleron\aevaleron\src-tauri\ui\settings.slint:73:5
+warning: aevaleron@1.1.1:     |
+warning: aevaleron@1.1.1:  73 |     VerticalLayout {
+warning: aevaleron@1.1.1:     |     ^^^^^^^^^^^^^^^
+warning: linker stdout: LINK : warning LNK4098: defaultlib 'LIBCMT' conflicts with use of other libs; use /NODEFAULTLIB:library
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `aevaleron` (bin "aevaleron") generated 1 warning
+
+
+== smoke.log ==
+[SMOKE] contextMenuEditable=FAIL:template true, bar true, field Ok(false), selection Ok(true)
+[SMOKE] quitOnLastClose=FAIL:windows up true, ended false, exit None
+[SMOKE] voiceNoCppRuntime=FAIL:imports ["vcruntime140.dll", "vcruntime140_1.dll"] of 38
+[SMOKE] failed: contextMenuEditable, quitOnLastClose, voiceNoCppRuntime
+[GATE] fail contextMenuEditable=FAIL:template true, bar true, field Ok(false), selection Ok(true)
+[GATE] fail quitOnLastClose=FAIL:windows up true, ended false, exit None
+[GATE] fail voiceNoCppRuntime=FAIL:imports ["vcruntime140.dll", "vcruntime140_1.dll"] of 38
+[GATE] verdict=FAIL:3 FAIL line(s); no "done" line; failed: contextMenuEditable, quitOnLastClose, voiceNoCppRuntime; 1 listed label(s) never printed
