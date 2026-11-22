@@ -54,11 +54,26 @@ pub fn user_message(raw: &str) -> String {
 
 /// The free model cleanup uses: the first ready OpenRouter account in the
 /// person's order, with its answer model when that is a `:free` one. Native
-/// providers bill per token, so they are never used for this.
+/// providers bill per token, so they are never used for this. A local CLI
+/// (on the person's own plan) is used only when it is picked for voice
+/// (`roleProviders.voice`).
 pub fn free_candidate(s: &dyn LlmSettings) -> Option<Candidate> {
-    llm_settings::candidates_for(s, Kind::Text)
+    let ready = llm_settings::candidates_for(s, Kind::Text);
+    let picked = s.role_provider("voice").filter(|p| p.is_cli());
+    if let Some(c) = picked.and_then(|p| ready.iter().find(|c| c.provider == p)) {
+        return Some(c.clone());
+    }
+    ready
         .into_iter()
         .find(|c| c.provider == Provider::OpenRouter && c.model(Kind::Text).ends_with(":free"))
+}
+
+/// The model the cleanup asks: a CLI's quickest one, else the answer model.
+fn model_of(c: &Candidate) -> String {
+    if c.provider.is_cli() {
+        return crate::llm::cli::fast_model(c.provider).to_string();
+    }
+    c.model(Kind::Text).to_string()
 }
 
 fn re(cell: &'static OnceLock<Regex>, pattern: &str) -> &'static Regex {
@@ -223,6 +238,13 @@ pub async fn clean_with(
     let Some(c) = free_candidate(settings) else {
         return (tidy(raw), Outcome::NoFreeModel);
     };
+    // A CLI takes a second or more just to start.
+    let budget = if c.provider.is_cli() {
+        budget.max(crate::llm::cli::VOICE_BUDGET)
+    } else {
+        budget
+    };
+    let model = model_of(&c);
     let cancel = CancellationToken::new();
     let max_tokens = (raw.chars().count() / 3 + 64) as u32;
     let user = user_message(raw);
@@ -231,7 +253,7 @@ pub async fn clean_with(
     let mut sink = |_: &str| {};
     let call = llm.stream_text(
         &active,
-        c.model(Kind::Text),
+        &model,
         SYSTEM,
         &user,
         &meta,
@@ -262,7 +284,7 @@ pub async fn clean(raw: &str) -> (String, Outcome) {
 
 /// The model cleanup would use now, for Settings: its id, or None.
 pub fn model_now() -> Option<String> {
-    free_candidate(&crate::host::settings::StoreSettings).map(|c| c.model(Kind::Text).to_string())
+    free_candidate(&crate::host::settings::StoreSettings).map(|c| model_of(&c))
 }
 
 #[cfg(test)]
@@ -340,6 +362,16 @@ mod tests {
         assert_eq!(paid.1, Outcome::NoFreeModel);
         let native = clean_with(&l, &MemorySettings::with_key("sk-ant-api03-x"), RAW, BUDGET).await;
         assert_eq!(native.1, Outcome::NoFreeModel);
+        // A CLI that is on but not picked for voice is not used either.
+        let cli = MemorySettings::default();
+        let exe = std::env::current_exe().unwrap();
+        let exe = exe.to_string_lossy().into_owned();
+        cli.cli.lock().insert(Provider::ClaudeCli, exe);
+        assert!(free_candidate(&cli).is_none());
+        cli.roles.lock().insert("voice".into(), Provider::ClaudeCli);
+        let c = free_candidate(&cli).unwrap();
+        assert_eq!(c.provider, Provider::ClaudeCli);
+        assert_eq!(model_of(&c), "haiku");
         assert!(fake.requests().is_empty());
         // A failing provider, a slow one, and one that answers instead.
         let (l, _) = llm(vec![json!({ "purpose": PURPOSE, "status": 429 })]);

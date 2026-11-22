@@ -464,6 +464,11 @@ impl Llm {
                     let reply = fake.respond(active.provider, body, cancel, meta).await;
                     reply.map(|r| (r, Provider::OpenRouter))
                 }
+                // A local CLI answers in OpenRouter's dialect (llm::cli).
+                None if active.provider.is_cli() => {
+                    let reply = super::cli::send(active, body, meta, cancel).await;
+                    reply.map(|r| (r, Provider::OpenRouter))
+                }
                 None => {
                     let req = wire::chat_request(active.provider, &active.key, body);
                     let reply = self.transport.send(req, cancel).await;
@@ -772,7 +777,12 @@ impl Llm {
     }
 
     /// Checks a key and says what it can do, before the first question.
+    /// For a local CLI, `key` is its program: the check runs its version
+    /// and sign-in status, and sends nothing to a model.
     pub async fn test_key(&self, provider: Provider, key: &str) -> KeyCheck {
+        if provider.is_cli() {
+            return self.test_cli(provider, key).await;
+        }
         let key = key.trim();
         if key.is_empty() {
             return KeyCheck::failed(Status::NotAdded, "No key saved yet.");
@@ -809,6 +819,43 @@ impl Llm {
             return KeyCheck::free_models_off(check.credit);
         }
         check
+    }
+
+    async fn test_cli(&self, provider: Provider, program: &str) -> KeyCheck {
+        let p = provider.name();
+        let command = super::cli::command_of(provider);
+        let program = program.trim();
+        if program.is_empty() {
+            let text = format!("{p} is off, or `{command}` isn't installed.");
+            return KeyCheck::failed(Status::NotAdded, text);
+        }
+        if self.fake.is_some() {
+            return KeyCheck::ready(WORKS, None);
+        }
+        let path = std::path::PathBuf::from(program);
+        let info = super::cli::inspect(provider, Some(path)).await;
+        let version = info
+            .version
+            .as_deref()
+            .map(|v| format!(" (version {v})"))
+            .unwrap_or_default();
+        match (info.installed, info.signed_in) {
+            (false, _) => {
+                let text = format!("Aevaleron can't find {p} at {program}.");
+                KeyCheck::failed(Status::NotAdded, text)
+            }
+            (true, Some(false)) => {
+                let text = format!(
+                    "{p}{version} isn't signed in. Run `{command}` in a terminal and sign in."
+                );
+                KeyCheck::failed(Status::Rejected, text)
+            }
+            (true, Some(true)) => KeyCheck::ready(format!("Works{version}. Signed in."), None),
+            (true, None) => KeyCheck::ready(
+                format!("Installed{version}. Sign-in is checked on the first question."),
+                None,
+            ),
+        }
     }
 
     /// One `max_tokens: 1` request to the default free model: a key can be
@@ -907,6 +954,11 @@ impl Llm {
         if provider == Provider::OpenAi {
             return false;
         }
+        // A CLI takes text in and gives text out; the agent drives it with
+        // the one-JSON-object fallback.
+        if provider.is_cli() {
+            return false;
+        }
         if provider.is_native() {
             return true;
         }
@@ -949,7 +1001,8 @@ impl Llm {
         provider: Provider,
         key: &str,
     ) -> Option<Arc<Vec<NativeModel>>> {
-        if !provider.is_native() || self.fake.is_some() || self.forced_offline() {
+        let listed = provider.is_native() && !provider.is_cli();
+        if !listed || self.fake.is_some() || self.forced_offline() {
             return None;
         }
         if let Some((at, list)) = self.native.lock().get(&provider) {
@@ -1038,7 +1091,12 @@ impl Llm {
                     m
                 })
                 .collect();
-            let label = format!("{} (your key)", provider.name());
+            let whose = if provider.is_cli() {
+                "your plan"
+            } else {
+                "your key"
+            };
+            let label = format!("{} ({whose})", provider.name());
             let group = json!({ "tier": "paid", "label": label, "models": models });
             let live = live.is_some();
             return json!({ "groups": [group], "live": live, "provider": provider.id() });

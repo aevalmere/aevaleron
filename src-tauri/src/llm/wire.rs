@@ -67,9 +67,24 @@ fn is_stream(body: &Value) -> bool {
     body["stream"].as_bool().unwrap_or(false)
 }
 
+/// What stands in for a URL for a local CLI, which is never sent over HTTP
+/// (the fake LLM's request log reads it).
+fn cli_request(provider: Provider, body: Option<Value>) -> HttpRequest {
+    HttpRequest {
+        method: Method::Post,
+        url: format!("cli:{}", provider.id()),
+        headers: Vec::new(),
+        body,
+        timeout: None,
+    }
+}
+
 /// The chat request for one provider, from the OpenAI-shaped body.
 pub fn chat_request(provider: Provider, key: &str, body: &Value) -> HttpRequest {
     match provider {
+        Provider::ClaudeCli | Provider::CodexCli | Provider::GeminiCli => {
+            cli_request(provider, Some(body.clone()))
+        }
         Provider::OpenRouter => HttpRequest {
             method: Method::Post,
             url: OPENROUTER_CHAT.to_string(),
@@ -126,6 +141,12 @@ pub fn chat_request(provider: Provider, key: &str, body: &Value) -> HttpRequest 
 /// The request that checks a key without spending anything.
 pub fn key_request(provider: Provider, key: &str) -> HttpRequest {
     let (url, headers) = match provider {
+        Provider::ClaudeCli | Provider::CodexCli | Provider::GeminiCli => {
+            let mut req = cli_request(provider, None);
+            req.method = Method::Get;
+            req.timeout = Some(Duration::from_secs(8));
+            return req;
+        }
         Provider::OpenRouter => (
             OPENROUTER_KEY.to_string(),
             vec![header("Authorization", &format!("Bearer {key}"))],
@@ -563,7 +584,7 @@ pub fn refusal(provider: Provider, obj: &Value) -> Option<ApiError> {
             let finish = &obj["candidates"][0]["finishReason"];
             blocked || GEMINI_BLOCKS.iter().any(|b| finish == b)
         }
-        Provider::OpenRouter | Provider::OpenAi => false,
+        _ => false,
     };
     if !declined {
         return None;
@@ -626,7 +647,12 @@ impl StreamDecoder {
             return Err(e);
         }
         match self.provider {
-            Provider::OpenRouter | Provider::OpenAi => {
+            // A CLI's output is turned into OpenRouter's dialect (llm::cli).
+            Provider::OpenRouter
+            | Provider::OpenAi
+            | Provider::ClaudeCli
+            | Provider::CodexCli
+            | Provider::GeminiCli => {
                 if obj.get("error").is_some_and(|e| !e.is_null()) {
                     return Err(stream_error(&obj["error"]));
                 }
@@ -757,7 +783,11 @@ fn parse_args(raw: &Value) -> (Value, String) {
 /// `Date.now()` in the generated ids of calls that arrive without one.
 pub fn parse_turn(provider: Provider, data: &Value, stamp: u128) -> Turn {
     match provider {
-        Provider::OpenRouter | Provider::OpenAi => {
+        Provider::OpenRouter
+        | Provider::OpenAi
+        | Provider::ClaudeCli
+        | Provider::CodexCli
+        | Provider::GeminiCli => {
             let msg = &data["choices"][0]["message"];
             let empty = Vec::new();
             let calls = msg["tool_calls"].as_array().unwrap_or(&empty);

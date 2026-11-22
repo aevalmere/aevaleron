@@ -100,6 +100,48 @@ impl LlmSettings for StoreSettings {
             .and_then(|v| serde_json::from_value(v).ok())
             .unwrap_or_default()
     }
+
+    /// `cliProviders.enabled` in aevaleron.json: the CLI ids turned on.
+    fn cli_enabled(&self, provider: Provider) -> bool {
+        let stored = store::get().raw("cliProviders");
+        cli_prefs(stored.as_ref()).0.contains(&provider)
+    }
+
+    /// `cliProviders.paths.<id>`, when the person gave one.
+    fn cli_path(&self, provider: Provider) -> Option<String> {
+        let v = store::get().raw("cliProviders")?;
+        let path = v.get("paths")?.get(provider.id())?.as_str()?.trim();
+        (!path.is_empty()).then(|| path.to_string())
+    }
+
+    /// `roleProviders.<role>`: `vision`, `text`, `agent` or `voice`.
+    fn role_provider(&self, role: &str) -> Option<Provider> {
+        let v = store::get().raw("roleProviders")?;
+        v.get(role)?.as_str().and_then(Provider::from_id)
+    }
+}
+
+/// The jobs a provider can be picked for (`roleProviders`).
+pub const ROLES: [&str; 4] = ["vision", "text", "agent", "voice"];
+
+/// `cliProviders` as the turned-on CLIs and the stored paths.
+fn cli_prefs(v: Option<&Value>) -> (Vec<Provider>, Map<String, Value>) {
+    let enabled = v
+        .and_then(|v| v.get("enabled"))
+        .and_then(Value::as_array)
+        .map(|ids| {
+            ids.iter()
+                .filter_map(|id| id.as_str().and_then(Provider::from_id))
+                .filter(|p| p.is_cli())
+                .collect()
+        })
+        .unwrap_or_default();
+    let paths = v
+        .and_then(|v| v.get("paths"))
+        .and_then(Value::as_object)
+        .cloned()
+        .unwrap_or_default();
+    (enabled, paths)
 }
 
 fn p_str(p: &Value, key: &str) -> String {
@@ -160,10 +202,13 @@ fn row_of(
         order: position,
         ..ProviderRow::default()
     };
-    let key = s
-        .api_key(provider)
-        .map(|k| k.trim().to_string())
-        .filter(|k| !k.is_empty());
+    let key = if provider.is_cli() {
+        llm_settings::usable_key(s, provider)
+    } else {
+        s.api_key(provider)
+            .map(|k| k.trim().to_string())
+            .filter(|k| !k.is_empty())
+    };
     let Some(key) = key else {
         return ProviderRow {
             status: Status::NotAdded.as_str().to_string(),
@@ -172,9 +217,15 @@ fn row_of(
     };
     let entry = table.get(provider, &key);
     let (word, text) = status::shown(&entry, now);
+    // A CLI's "key" is its program: the row shows the file name.
+    let key_hint = if provider.is_cli() {
+        crate::llm::cli::hint_of(&key)
+    } else {
+        crate::ipc::mask_key(&key)
+    };
     ProviderRow {
         has_key: true,
-        key_hint: crate::ipc::mask_key(&key),
+        key_hint,
         status: word.as_str().to_string(),
         status_text: text,
         checked_at: entry.checked_at,
@@ -206,7 +257,35 @@ fn providers_extra(s: &dyn LlmSettings, table: &Table, now: u64, storage: &str) 
         "failover": s.failover(),
         "keyHints": hints,
         "keyStorage": storage,
+        "clis": cli_rows(s, crate::llm::cli::known()),
+        "roleProviders": role_picks(s),
     })
+}
+
+/// The CLIs as Settings lists them: what [`crate::llm::cli::detect`] found,
+/// with whether each is turned on and the path the person gave.
+fn cli_rows(s: &dyn LlmSettings, found: Vec<crate::llm::cli::CliInfo>) -> Vec<Value> {
+    found
+        .into_iter()
+        .map(|info| {
+            let p = Provider::from_id(info.id);
+            let enabled = p.is_some_and(|p| s.cli_enabled(p));
+            let custom = p.and_then(|p| s.cli_path(p));
+            let mut row = json!(info);
+            row["enabled"] = json!(enabled);
+            row["customPath"] = json!(custom);
+            row
+        })
+        .collect()
+}
+
+/// `roleProviders` with every role named, `null` for the ones not picked.
+fn role_picks(s: &dyn LlmSettings) -> Value {
+    let picks: Map<String, Value> = ROLES
+        .iter()
+        .map(|r| (r.to_string(), json!(s.role_provider(r).map(|p| p.id()))))
+        .collect();
+    Value::Object(picks)
 }
 
 /// [`providers_extra`] as the app is now, for `settings_extra`.
@@ -238,6 +317,14 @@ fn record_answer(
         return t.mark_answered(provider, key, now);
     };
     match errors::code_of(provider, err, model) {
+        errors::codes::BAD_KEY if provider.is_cli() => {
+            let command = crate::llm::cli::command_of(provider);
+            let text = format!(
+                "{p} isn't signed in. Run `{command}` in a terminal to sign in, then test it \
+again. Aevaleron is skipping {p} until then."
+            );
+            t.mark_rejected(provider, key, &text)
+        }
         errors::codes::BAD_KEY => {
             let text = format!(
                 "{p} rejected this key. It may have been revoked or mistyped. Aevaleron is \
@@ -506,7 +593,11 @@ async fn test_key(app: &AppHandle, p: &Value) -> Value {
     let provider = named
         .or_else(|| llm_settings::active(&*sv.settings).map(|a| a.provider))
         .unwrap_or(Provider::OpenRouter);
-    let key = store::get().get_provider_key(provider.id());
+    let key = if provider.is_cli() {
+        llm_settings::usable_key(&*sv.settings, provider).unwrap_or_default()
+    } else {
+        store::get().get_provider_key(provider.id())
+    };
     if !key.trim().is_empty() {
         status::update(|t| t.mark_checking(provider, &key));
         emit_status(app, provider, None);
@@ -535,6 +626,108 @@ fn set_provider_order(app: &AppHandle, p: &Value) -> Value {
     store::get().set_raw("providerOrder", json!(order));
     windows::send_overlay_state(app);
     json!({ "ok": true, "order": order })
+}
+
+/// `settings:cli-detect`: every CLI with its path, version, sign-in state,
+/// and whether it is on (runs each CLI's `--version` and status command;
+/// nothing goes to a model).
+pub async fn cli_detect() -> Value {
+    let found = crate::llm::cli::detect().await;
+    json!({ "ok": true, "clis": cli_rows(&StoreSettings, found) })
+}
+
+/// `cliProviders` after `settings:set-cli {provider, enabled?, path?}`.
+fn with_cli(current: Option<&Value>, provider: Provider, p: &Value) -> Value {
+    let (mut enabled, mut paths) = cli_prefs(current);
+    if let Some(on) = p.get("enabled").and_then(Value::as_bool) {
+        enabled.retain(|x| *x != provider);
+        if on {
+            enabled.push(provider);
+        }
+    }
+    match p.get("path") {
+        Some(Value::String(path)) if !path.trim().is_empty() => {
+            paths.insert(provider.id().into(), json!(path.trim()));
+        }
+        Some(Value::String(_)) | Some(Value::Null) => {
+            paths.remove(provider.id());
+        }
+        _ => {}
+    }
+    let ids: Vec<&str> = Provider::CLI
+        .into_iter()
+        .filter(|x| enabled.contains(x))
+        .map(Provider::id)
+        .collect();
+    json!({ "enabled": ids, "paths": paths })
+}
+
+/// `settings:set-cli {provider, enabled?, path?, makeDefault?}`: turns a
+/// local CLI on or off, sets or clears (empty or `null`) the path of its
+/// program, and with `makeDefault: true` puts it first in the try order.
+/// No key is involved. Returns the CLI's row.
+pub async fn set_cli(app: &AppHandle, p: &Value) -> Value {
+    let named = p.get("provider").and_then(Value::as_str);
+    let Some(provider) = named.and_then(Provider::from_id).filter(|x| x.is_cli()) else {
+        return json!({ "ok": false, "error": "Unknown command-line tool." });
+    };
+    let s = store::get();
+    let next = with_cli(s.raw("cliProviders").as_ref(), provider, p);
+    s.set_raw("cliProviders", next);
+    if p.get("makeDefault").and_then(Value::as_bool) == Some(true) {
+        let mut order: Vec<&str> = vec![provider.id()];
+        for x in llm_settings::order(&StoreSettings) {
+            if !order.contains(&x.id()) {
+                order.push(x.id());
+            }
+        }
+        s.set_raw("providerOrder", json!(order));
+    }
+    let program = llm_settings::usable_key(&StoreSettings, provider);
+    let info = crate::llm::cli::inspect(provider, program.map(Into::into)).await;
+    let row = cli_rows(&StoreSettings, vec![info]).pop();
+    emit_status(app, provider, None);
+    windows::send_overlay_state(app);
+    json!({ "ok": true, "cli": row })
+}
+
+/// `roleProviders` with `role` set to `provider`, or cleared by `None`.
+fn with_role(current: Option<Value>, role: &str, provider: Option<Provider>) -> Value {
+    let mut all = match current {
+        Some(Value::Object(m)) => m,
+        _ => Map::new(),
+    };
+    match provider {
+        Some(p) => {
+            all.insert(role.to_string(), json!(p.id()));
+        }
+        None => {
+            all.remove(role);
+        }
+    }
+    Value::Object(all)
+}
+
+/// `settings:set-role {role, provider}`: the provider one job tries first
+/// (`vision`, `text`, `agent`, `voice`); `provider: null` goes back to the
+/// try order. Any provider, CLI or HTTP, can be picked.
+pub fn set_role(app: &AppHandle, p: &Value) -> Value {
+    let role = p.get("role").and_then(Value::as_str).unwrap_or_default();
+    if !ROLES.contains(&role) {
+        return json!({ "ok": false, "error": "Unknown job." });
+    }
+    let provider = match p.get("provider") {
+        None | Some(Value::Null) => None,
+        Some(v) => match v.as_str().and_then(Provider::from_id) {
+            Some(x) => Some(x),
+            None => return json!({ "ok": false, "error": "Unknown provider." }),
+        },
+    };
+    let s = store::get();
+    let next = with_role(s.raw("roleProviders"), role, provider);
+    s.set_raw("roleProviders", next);
+    windows::send_overlay_state(app);
+    json!({ "ok": true, "roleProviders": role_picks(&StoreSettings) })
 }
 
 /// `settings:set-failover`: the fields it carries change; the rest stay.
@@ -625,6 +818,10 @@ pub async fn route(
         "settings:test-key" => test_key(app, p).await,
         "settings:set-provider-order" => set_provider_order(app, p),
         "settings:set-failover" => set_failover(p),
+        // For the native Settings (the UI lane); no web page invokes these.
+        "settings:cli-detect" => cli_detect().await,
+        "settings:set-cli" => set_cli(app, p).await,
+        "settings:set-role" => set_role(app, p),
         "auth:openrouter-connect" => connect_openrouter(app).await,
         "skills:open-folder" => open_skills_folder(),
         _ => return None,
@@ -763,6 +960,49 @@ when you're online.";
         assert_eq!(v["keyHints"]["anthropic"], "sk-ant-ap\u{2026}efgh");
         assert_eq!(v["keyStorage"], "encrypted");
         assert!(!v.to_string().contains("sk-ant-api03-abcdefgh"));
+    }
+
+    #[test]
+    fn cli_and_role_picks_are_stored() {
+        let c = Provider::ClaudeCli;
+        let set = json!({ "enabled": true, "path": r" C:\x\claude.exe " });
+        let v = with_cli(None, c, &set);
+        assert_eq!(v["enabled"], json!(["claude-cli"]));
+        assert_eq!(v["paths"]["claude-cli"], r"C:\x\claude.exe");
+        let g = Provider::GeminiCli;
+        let v = with_cli(Some(&v), g, &json!({ "enabled": true }));
+        assert_eq!(v["enabled"], json!(["claude-cli", "gemini-cli"]));
+        let v = with_cli(Some(&v), c, &json!({ "enabled": false, "path": null }));
+        assert_eq!(v["enabled"], json!(["gemini-cli"]));
+        assert!(v["paths"].get("claude-cli").is_none());
+        let stored = json!({ "enabled": ["gemini-cli", "openrouter", "x"] });
+        let (on, _) = cli_prefs(Some(&stored));
+        assert_eq!(on, [g], "only CLI ids count");
+
+        let v = with_role(None, "vision", Some(c));
+        let v = with_role(Some(v), "voice", Some(Provider::OpenRouter));
+        assert_eq!(v, json!({ "vision": "claude-cli", "voice": "openrouter" }));
+        let v = with_role(Some(v), "vision", None);
+        assert_eq!(v, json!({ "voice": "openrouter" }));
+
+        // A turned-on CLI gets a row, its program's name as the hint.
+        let s = MemorySettings::with_key("sk-or-v1-abcdefghijklmn");
+        let exe = std::env::current_exe().unwrap();
+        let exe = exe.to_string_lossy().into_owned();
+        s.cli.lock().insert(c, exe.clone());
+        s.roles.lock().insert("text".into(), c);
+        let v = providers_extra(&s, &Table::default(), 0, "encrypted");
+        let rows = v["providers"].as_array().unwrap();
+        let row = rows.iter().find(|r| r["id"] == "claude-cli").unwrap();
+        assert_eq!(row["hasKey"], true);
+        assert_eq!(row["name"], "Claude Code");
+        assert_eq!(row["keyHint"], crate::llm::cli::hint_of(&exe));
+        assert_eq!(v["roleProviders"]["text"], "claude-cli");
+        assert_eq!(v["roleProviders"]["vision"], Value::Null);
+        let clis = v["clis"].as_array().unwrap();
+        assert_eq!(clis.len(), 3);
+        assert_eq!(clis[0]["enabled"], true);
+        assert_eq!(clis[1]["enabled"], false);
     }
 
     #[test]

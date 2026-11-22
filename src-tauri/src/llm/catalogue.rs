@@ -516,7 +516,9 @@ pub fn parse_native_list(provider: super::provider::Provider, body: &Value) -> V
     let text = |v: &Value, k: &str| v[k].as_str().unwrap_or_default().trim().to_string();
     let rows = |k: &str| body[k].as_array().cloned().unwrap_or_default();
     match provider {
-        Provider::OpenRouter => Vec::new(),
+        Provider::OpenRouter | Provider::ClaudeCli | Provider::CodexCli | Provider::GeminiCli => {
+            Vec::new()
+        }
         Provider::Anthropic => rows("data")
             .iter()
             .filter(|m| !matches!(m["type"].as_str(), Some(t) if t != "model"))
