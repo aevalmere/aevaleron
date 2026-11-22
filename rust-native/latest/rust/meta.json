@@ -1,29 +1,27 @@
 {
   "workflow": "rust",
   "workflow_name": "rust",
-  "run_id": 45060306109,
+  "run_id": 45063829913,
   "run_attempt": 1,
-  "run_url": "https://github.com/aevalmere/aevaleron/actions/runs/45060306109",
+  "run_url": "https://github.com/aevalmere/aevaleron/actions/runs/45063829913",
   "event": "push",
-  "sha": "61c47fdbd2fd30b23568f49e5959d74c60695e50",
+  "sha": "438777c94bbd28ff1091a20dbfe1d927f4f74459",
   "ref": "rust/native",
   "ref_dir": "rust-native",
-  "conclusion": "failure",
-  "failed": [
-    "Unit tests"
-  ],
-  "finished": "2026-11-22T19:53:42Z",
-  "error_lines": 278,
+  "conclusion": "success",
+  "failed": [],
+  "finished": "2026-11-22T20:34:08Z",
+  "error_lines": 274,
   "metrics": {
     "exeKB": "28647",
     "installerKB": "8567",
     "upgrade": "ok:from-1.1.1",
     "processCount": "1",
-    "idlePrivateMB": "38.5",
+    "idlePrivateMB": "39",
     "idleWorkingSetMB": "130.2",
-    "idleCpuPct": "0.08",
+    "idleCpuPct": "0.31",
     "idleThreads": "20",
-    "secondLaunchMs": "23"
+    "secondLaunchMs": "49"
   },
   "steps": [
     {
@@ -73,7 +71,7 @@
     },
     {
       "name": "Unit tests",
-      "outcome": "failure",
+      "outcome": "success",
       "log": "test.log"
     },
     {
@@ -93,7 +91,7 @@
     },
     {
       "name": "Save NSIS toolset",
-      "outcome": "success",
+      "outcome": "skipped",
       "log": ""
     },
     {

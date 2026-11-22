@@ -180,23 +180,17 @@ warning: aevaleron@1.1.1:    --> D:\a\aevaleron\aevaleron\src-tauri\ui\settings.
 warning: aevaleron@1.1.1:     |
 warning: aevaleron@1.1.1:  73 |     VerticalLayout {
 warning: aevaleron@1.1.1:     |     ^^^^^^^^^^^^^^^
-warning: linker stdout: LINK : warning LNK4098: defaultlib 'libvcruntime.lib' conflicts with use of other libs; use /NODEFAULTLIB:library␍
-         LINK : warning LNK4098: defaultlib 'LIBCMT' conflicts with use of other libs; use /NODEFAULTLIB:library
-  |
-
-warning: `aevaleron` (lib test) generated 1 warning
 warning: linker stdout: LINK : warning LNK4098: defaultlib 'libvcruntime.lib' conflicts with use of other libs; use /NODEFAULTLIB:library
   |
   = note: `#[warn(linker_messages)]` on by default
 
 warning: `aevaleron` (bin "aevaleron" test) generated 1 warning
+warning: linker stdout: LINK : warning LNK4098: defaultlib 'libvcruntime.lib' conflicts with use of other libs; use /NODEFAULTLIB:library␍
+         LINK : warning LNK4098: defaultlib 'LIBCMT' conflicts with use of other libs; use /NODEFAULTLIB:library
+  |
+  = note: `#[warn(linker_messages)]` on by default
 
-test llm::cli::run::tests::a_silent_cli_times_out_and_is_killed ... FAILED
-thread 'llm::cli::run::tests::a_silent_cli_times_out_and_is_killed' (9048) panicked at src\llm\cli\run.rs:862:9:
-both processes ran
-
-test result: FAILED. 673 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 19.68s
-error: test failed, to rerun pass `--lib`
+warning: `aevaleron` (lib test) generated 1 warning
 
 
 == build.log ==
