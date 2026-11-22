@@ -1,0 +1,53 @@
+{
+  "workflow": "ui-shots",
+  "workflow_name": "rust",
+  "run_id": 45037271159,
+  "run_attempt": 1,
+  "run_url": "https://github.com/aevalmere/aevaleron/actions/runs/45037271159",
+  "event": "push",
+  "sha": "bab8a3a10550c7054dce4befa30013e248dbc5bc",
+  "ref": "rust/native-ui",
+  "ref_dir": "rust-native-ui",
+  "conclusion": "success",
+  "failed": [],
+  "finished": "2026-11-22T15:46:51Z",
+  "error_lines": 0,
+  "metrics": {},
+  "steps": [
+    {
+      "name": "Checkout",
+      "outcome": "success",
+      "log": ""
+    },
+    {
+      "name": "Node",
+      "outcome": "success",
+      "log": ""
+    },
+    {
+      "name": "Download the exe from this run",
+      "outcome": "success",
+      "log": ""
+    },
+    {
+      "name": "Download the exe",
+      "outcome": "skipped",
+      "log": ""
+    },
+    {
+      "name": "Screenshots",
+      "outcome": "success",
+      "log": "shots.log"
+    },
+    {
+      "name": "Upload screenshots",
+      "outcome": "success",
+      "log": ""
+    },
+    {
+      "name": "Publish to the shots branch",
+      "outcome": "success",
+      "log": ""
+    }
+  ]
+}
