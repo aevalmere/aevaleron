@@ -1,11 +1,11 @@
 # rust: cancelled
 
 - Workflow: rust
-- Run: [45040492369](https://github.com/aevalmere/aevaleron/actions/runs/45040492369), attempt 1, on push
-- Commit: 2700b0e4a08bb64fe0275d263d353e60cf6569d1
+- Run: [45041069263](https://github.com/aevalmere/aevaleron/actions/runs/45041069263), attempt 1, on push
+- Commit: c3e962ab2a6a8f71f52adaadd7c4029e481adb4d
 - Ref: rust/native-ui
 - Conclusion: **cancelled**
-- Finished: 2026-11-22T15:56:51Z
+- Finished: 2026-11-22T16:05:55Z
 
 | Step | Outcome | Log |
 |---|---|---|
@@ -18,8 +18,8 @@
 | Prebuild desktop helper | success | [prebuild.log](prebuild.log) |
 | Format | success |  |
 | Format patch | skipped |  |
-| Clippy | cancelled | [clippy.log](clippy.log) |
-| Unit tests | skipped |  |
+| Clippy | success | [clippy.log](clippy.log) |
+| Unit tests | cancelled | [test.log](test.log) |
 | Release build | skipped |  |
 | Restore NSIS toolset | skipped |  |
 | Seed NSIS toolset | skipped |  |
@@ -32,4 +32,4 @@
 | Upload installer | skipped |  |
 | Upload exe | skipped |  |
 
-errors.txt: 0 error and warning lines from the logs.
+errors.txt: 87 error and warning lines from the logs.

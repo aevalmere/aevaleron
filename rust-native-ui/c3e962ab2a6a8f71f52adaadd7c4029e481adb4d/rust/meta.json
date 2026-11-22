@@ -1,0 +1,128 @@
+{
+  "workflow": "rust",
+  "workflow_name": "rust",
+  "run_id": 45041069263,
+  "run_attempt": 1,
+  "run_url": "https://github.com/aevalmere/aevaleron/actions/runs/45041069263",
+  "event": "push",
+  "sha": "c3e962ab2a6a8f71f52adaadd7c4029e481adb4d",
+  "ref": "rust/native-ui",
+  "ref_dir": "rust-native-ui",
+  "conclusion": "cancelled",
+  "failed": [],
+  "finished": "2026-11-22T16:05:55Z",
+  "error_lines": 87,
+  "metrics": {},
+  "steps": [
+    {
+      "name": "Checkout",
+      "outcome": "success",
+      "log": ""
+    },
+    {
+      "name": "Node",
+      "outcome": "success",
+      "log": ""
+    },
+    {
+      "name": "Rust toolchain",
+      "outcome": "success",
+      "log": ""
+    },
+    {
+      "name": "Voice build flags",
+      "outcome": "success",
+      "log": ""
+    },
+    {
+      "name": "Cache cargo",
+      "outcome": "success",
+      "log": ""
+    },
+    {
+      "name": "Gate helper",
+      "outcome": "success",
+      "log": ""
+    },
+    {
+      "name": "Prebuild desktop helper",
+      "outcome": "success",
+      "log": "prebuild.log"
+    },
+    {
+      "name": "Format",
+      "outcome": "success",
+      "log": ""
+    },
+    {
+      "name": "Format patch",
+      "outcome": "skipped",
+      "log": ""
+    },
+    {
+      "name": "Clippy",
+      "outcome": "success",
+      "log": "clippy.log"
+    },
+    {
+      "name": "Unit tests",
+      "outcome": "cancelled",
+      "log": "test.log"
+    },
+    {
+      "name": "Release build",
+      "outcome": "skipped",
+      "log": ""
+    },
+    {
+      "name": "Restore NSIS toolset",
+      "outcome": "skipped",
+      "log": ""
+    },
+    {
+      "name": "Seed NSIS toolset",
+      "outcome": "skipped",
+      "log": ""
+    },
+    {
+      "name": "Save NSIS toolset",
+      "outcome": "skipped",
+      "log": ""
+    },
+    {
+      "name": "Build installer",
+      "outcome": "skipped",
+      "log": ""
+    },
+    {
+      "name": "Smoke",
+      "outcome": "skipped",
+      "log": ""
+    },
+    {
+      "name": "Capture check",
+      "outcome": "skipped",
+      "log": ""
+    },
+    {
+      "name": "Desktop selfcheck",
+      "outcome": "skipped",
+      "log": ""
+    },
+    {
+      "name": "Install check",
+      "outcome": "skipped",
+      "log": ""
+    },
+    {
+      "name": "Upload installer",
+      "outcome": "skipped",
+      "log": ""
+    },
+    {
+      "name": "Upload exe",
+      "outcome": "skipped",
+      "log": ""
+    }
+  ]
+}

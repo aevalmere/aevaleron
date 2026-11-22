@@ -1,17 +1,17 @@
 {
   "workflow": "rust",
   "workflow_name": "rust",
-  "run_id": 45040492369,
+  "run_id": 45041069263,
   "run_attempt": 1,
-  "run_url": "https://github.com/aevalmere/aevaleron/actions/runs/45040492369",
+  "run_url": "https://github.com/aevalmere/aevaleron/actions/runs/45041069263",
   "event": "push",
-  "sha": "2700b0e4a08bb64fe0275d263d353e60cf6569d1",
+  "sha": "c3e962ab2a6a8f71f52adaadd7c4029e481adb4d",
   "ref": "rust/native-ui",
   "ref_dir": "rust-native-ui",
   "conclusion": "cancelled",
   "failed": [],
-  "finished": "2026-11-22T15:56:51Z",
-  "error_lines": 0,
+  "finished": "2026-11-22T16:05:55Z",
+  "error_lines": 87,
   "metrics": {},
   "steps": [
     {
@@ -61,13 +61,13 @@
     },
     {
       "name": "Clippy",
-      "outcome": "cancelled",
+      "outcome": "success",
       "log": "clippy.log"
     },
     {
       "name": "Unit tests",
-      "outcome": "skipped",
-      "log": ""
+      "outcome": "cancelled",
+      "log": "test.log"
     },
     {
       "name": "Release build",
