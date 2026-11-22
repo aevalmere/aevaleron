@@ -1,0 +1,263 @@
+// Settings' state (lane native-ui): what src/ui/settings/ shows, in one
+// global so every page file reads it without a chain of properties. Rust
+// owns every value; the controls never change their own state, they call
+// back and Rust sets the new value (a failed save puts the old one back).
+
+// One button under a provider: `kind` is "", "prominent", "danger", "text"
+// or "link" (opens `href`).
+export struct SetProvAction {
+    id: string,
+    label: string,
+    kind: string,
+    disabled: bool,
+    href: string,
+}
+
+// One provider row: its head and, while open, its body.
+export struct SetProvRow {
+    id: string,
+    name: string,
+    pos: int,
+    sub: string,
+    mono: bool,
+    word: string,
+    icon: string,
+    tone: string,
+    is-default: bool,
+    msg: string,
+    msg-danger: bool,
+    clip: string,
+    field: bool,
+    field-label: string,
+    placeholder: string,
+    busy: bool,
+    save-prominent: bool,
+    // The field takes field-text whenever epoch changes, and the keyboard
+    // whenever focus changes.
+    field-text: string,
+    epoch: int,
+    focus: int,
+    actions: [SetProvAction],
+    order: bool,
+    can-up: bool,
+    can-down: bool,
+    show-first: bool,
+}
+
+// A choice in a radio group, a segment, or a skill.
+export struct SetChoice {
+    id: string,
+    name: string,
+    note: string,
+    checked: bool,
+    enabled: bool,
+}
+
+// A row of an inline picker: a group label, or an option.
+export struct SetComboRow {
+    header: bool,
+    id: string,
+    name: string,
+    detail: string,
+    checked: bool,
+}
+
+// A picker's closed face and its list.
+export struct SetComboView {
+    label: string,
+    detail: string,
+    note: string,
+    rows: [SetComboRow],
+}
+
+// A switch in a list (the coding agents found on this PC).
+export struct SetToggle {
+    id: string,
+    name: string,
+    note: string,
+    on: bool,
+    error: bool,
+}
+
+// A program on the private apps list.
+export struct SetAppRow {
+    name: string,
+    exe: string,
+}
+
+// A global shortcut's row.
+export struct SetShortcutRow {
+    action: string,
+    label: string,
+    current: string,
+    empty: bool,
+    warn: string,
+    capturing: bool,
+}
+
+export global SettingsState {
+    // The one open row, and the one open picker, by id.
+    in-out property <string> open-row;
+    in-out property <string> combo-open;
+    in property <int> combo-mark: -1;
+    in property <length> combo-scroll;
+    // A provider being dragged, and the slot it would land in.
+    in-out property <string> drag-id;
+    in-out property <int> drag-to: -1;
+
+    // Providers.
+    in property <[SetProvRow]> providers;
+    in property <bool> ordered;
+    in property <string> prov-live;
+    in property <bool> failover-shown;
+    in property <bool> failover-across: true;
+    in property <bool> failover-ask: true;
+    in property <string> key-storage;
+    in property <bool> key-storage-warn;
+    // CLI provider picker (lane cli-providers): wire here
+    in property <bool> cli-picker-shown: false;
+
+    // Models.
+    in property <string> models-mode: "auto";
+    in property <[SetChoice]> models-for;
+    in property <SetComboView> model-combo;
+    in property <SetComboView> brain-combo;
+    in property <SetComboView> agent-combo;
+    in property <string> model-summary: "Loading…";
+    in property <string> brain-summary: "Off";
+    in property <string> agent-model-summary: "Loading…";
+    in property <bool> brain-enabled;
+    in property <bool> show-paid;
+    in property <bool> paid-shown: true;
+
+    // Answers.
+    in property <[SetChoice]> skills;
+    in property <string> skill-summary: "Automatic";
+    in property <string> skills-status;
+
+    // Tasks.
+    in property <string> permission: "auto";
+    in property <string> permission-note;
+    in property <string> agent-summary;
+    in property <float> steps: 25;
+    in property <bool> shots: true;
+    in property <bool> cursor: true;
+    in property <bool> revoke-shown;
+    in property <string> agent-status;
+
+    // Voice.
+    in property <bool> dictation;
+    in property <string> hotkey-label: "Ctrl+Win";
+    in property <bool> hotkey-capturing;
+    in property <string> hotkey-warn;
+    in property <string> dictation-summary: "Off";
+    in property <bool> wake;
+    in property <string> wake-label: "Start when I say Aevaleron";
+    in property <string> wake-summary: "Off";
+    in property <string> wake-status;
+    in property <bool> wake-error;
+    in property <string> wake-word: "Aevaleron";
+    in property <int> wake-epoch;
+    in property <[SetChoice]> engines;
+    in property <string> engine-summary: "Whisper base";
+    in property <bool> download-shown;
+    in property <bool> progress-shown;
+    in property <float> progress;
+    in property <string> engine-status;
+    in property <bool> engine-error;
+    in property <SetComboView> lang-combo;
+    in property <string> language-summary: "English";
+    in property <SetComboView> mic-combo;
+    in property <string> mic-summary: "Windows default";
+    in property <bool> mic-enabled: true;
+    in property <bool> cleanup;
+    in property <string> cleanup-summary: "Off";
+    in property <string> cleanup-note;
+    in property <string> last-timing;
+
+    // Agents (watching coding agents).
+    in property <bool> watch;
+    in property <[SetToggle]> watch-agents;
+    in property <string> watch-status;
+    in property <bool> watch-status-error;
+    in property <bool> chats;
+    in property <string> chats-status;
+    in property <bool> keep-awake: true;
+    in property <bool> display-on;
+    in property <bool> lid-awake;
+    in property <bool> has-lid;
+    in property <string> awake-note;
+    in property <string> watch-summary: "Off";
+    in property <string> awake-summary: "On";
+    in property <string> cards-summary;
+    in property <bool> notify-done;
+    in property <bool> notify-bg-done;
+    in property <bool> notify-needs;
+    in property <bool> notify-bg-needs;
+    in property <bool> sound;
+    in property <bool> expand-hover;
+    in property <bool> alt-tab;
+    in property <bool> show-children;
+    in property <int> card-time: 1;
+    in property <bool> test-enabled: true;
+
+    // Privacy.
+    in property <string> recipients;
+    in property <bool> save-history: true;
+    in property <string> history-summary: "On";
+    in property <bool> clear-shown;
+    in property <string> history-confirm;
+    in property <string> history-status;
+    in property <[SetAppRow]> private-apps;
+    in property <string> private-summary;
+    in property <int> private-epoch;
+    in property <bool> front-enabled;
+    in property <string> front-note;
+    in property <string> private-status;
+    in property <bool> private-error;
+    in property <string> share-summary: "Hidden";
+    in property <string> share-line;
+
+    // Shortcuts.
+    in property <[SetShortcutRow]> shortcuts;
+    in property <string> shortcut-summary;
+    in property <string> shortcut-error;
+    in property <[string]> free;
+
+    // General.
+    in property <float> text-pct: 100;
+    in property <string> text-note: "Starts from your Windows text size.";
+    in property <bool> launch;
+    in property <string> startup-summary: "Off";
+    in property <string> startup-note;
+    in property <bool> show-button;
+    in property <string> button-summary: "Off";
+    in property <string> button-note;
+    in property <string> about-summary;
+    in property <string> update-line;
+    in property <bool> update-progress-shown;
+    in property <float> update-progress;
+    in property <string> update-notes;
+    in property <bool> restart-shown;
+    in property <bool> check-shown: true;
+    in property <bool> check-enabled: true;
+    in property <string> release-url;
+    in property <string> release-label: "Release notes";
+    in property <bool> update-btn-shown;
+    in property <string> layout-summary;
+    in property <string> version;
+
+    // What the controls ask for. `act(what, arg)`: a button; `toggle(what,
+    // on)`: a switch; `slide(what, value, done)`: a slider, moving or let
+    // go; `pick(combo, id)`: an option in a picker; `text-accept(what,
+    // text)`: Enter or Save beside a field; `prov-act(provider, act,
+    // field)`: a button in a provider row, with what its key field holds.
+    callback act(string, string);
+    callback toggle(string, bool);
+    callback slide(string, float, bool);
+    callback pick(string, string);
+    callback text-accept(string, string);
+    callback prov-act(string, string, string);
+    callback prov-edited(string, string);
+    callback prov-move(string, int);
+}

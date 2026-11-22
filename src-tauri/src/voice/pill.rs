@@ -7,10 +7,10 @@ use std::sync::Mutex;
 use std::time::Duration;
 
 use serde_json::Value;
-use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder};
 
 use crate::capture::{self, screen, PxRect};
 use crate::desktop::win;
+use crate::shell::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder};
 
 pub const LABEL: &str = "voice-pill";
 const WIDTH: f64 = 200.0;
@@ -28,7 +28,7 @@ fn last() -> std::sync::MutexGuard<'static, Option<Value>> {
     LAST.lock().unwrap_or_else(|e| e.into_inner())
 }
 
-fn create(app: &AppHandle) -> tauri::Result<tauri::WebviewWindow> {
+fn create(app: &AppHandle) -> crate::shell::Result<crate::shell::WebviewWindow> {
     let win = WebviewWindowBuilder::new(
         app,
         LABEL,
@@ -45,12 +45,10 @@ fn create(app: &AppHandle) -> tauri::Result<tauri::WebviewWindow> {
     .skip_taskbar(true)
     .content_protected(true)
     .visible(false)
-    .data_directory(crate::paths::webview_data_dir())
-    .initialization_script(crate::ipc::bridge_script())
     .on_page_load(|w, p| {
-        if matches!(p.event(), tauri::webview::PageLoadEvent::Finished) {
+        if matches!(p.event(), crate::shell::webview::PageLoadEvent::Finished) {
             if let Some(v) = last().clone() {
-                let _ = tauri::Emitter::emit_to(&w, LABEL, "voice:state", v);
+                let _ = crate::shell::Emitter::emit_to(&w, LABEL, "voice:state", v);
             }
         }
     })
@@ -59,15 +57,10 @@ fn create(app: &AppHandle) -> tauri::Result<tauri::WebviewWindow> {
     win::tool_window(raw, true);
     win::set_mouse_through(raw, true);
     capture::exclude_window(raw);
-    crate::crash::guard_webview(&win, |app, label| {
-        if let Some(w) = app.get_webview_window(label) {
-            let _ = w.destroy();
-        }
-    });
     Ok(win)
 }
 
-fn window(app: &AppHandle) -> Option<tauri::WebviewWindow> {
+fn window(app: &AppHandle) -> Option<crate::shell::WebviewWindow> {
     app.get_webview_window(LABEL).or_else(|| match create(app) {
         Ok(w) => Some(w),
         Err(e) => {

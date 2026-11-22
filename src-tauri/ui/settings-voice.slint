@@ -1,0 +1,369 @@
+// Settings' Voice and Agents pages (settings.html #pg-voice, #pg-watch;
+// renderer/voice-settings.js and agents-settings.js did their work).
+
+import { Theme, Button } from "theme.slint";
+import { SettingsState } from "settings-state.slint";
+import { PageTitle, Group, Note, SwitchRow, ChoiceOption, ChoiceList, Progress, TextField, Key, Disclosure, StaticRow, Combo } from "settings-widgets.slint";
+
+// The wake word's field and its Save. It takes the stored name whenever
+// Rust says it changed (wake-epoch), never while being typed in.
+component WakeField inherits HorizontalLayout {
+    property <int> epoch: SettingsState.wake-epoch;
+    changed epoch => {
+        if (!word.focused) {
+            word.set-text(SettingsState.wake-word);
+        }
+    }
+    init => {
+        word.set-text(SettingsState.wake-word);
+    }
+    spacing: Theme.sp-2;
+    word := TextField {
+        placeholder: "Aevaleron";
+        accepted(t) => {
+            SettingsState.text-accept("wake-word", t);
+        }
+    }
+    Button {
+        text: "Save";
+        clicked => {
+            SettingsState.text-accept("wake-word", word.text);
+        }
+    }
+}
+
+export component VoicePage inherits VerticalLayout {
+    spacing: Theme.sp-3;
+    PageTitle {
+        text: "Voice";
+    }
+    Group {
+        Disclosure {
+            rid: "sec-voice-dictation";
+            title: "Dictation";
+            summary: SettingsState.dictation-summary;
+            SwitchRow {
+                text: "Type with your voice in any app";
+                checked: SettingsState.dictation;
+                toggled(v) => {
+                    SettingsState.toggle("dictation", v);
+                }
+            }
+            HorizontalLayout {
+                spacing: Theme.sp-3;
+                padding-left: Theme.sp-3;
+                Text {
+                    text: "Hold to talk";
+                    font-size: Theme.row;
+                    color: Theme.label;
+                    vertical-alignment: center;
+                    horizontal-stretch: 1;
+                }
+                VerticalLayout {
+                    alignment: center;
+                    Key {
+                        text: SettingsState.hotkey-label;
+                        live: SettingsState.hotkey-capturing;
+                    }
+                }
+                Button {
+                    text: SettingsState.hotkey-capturing ? "Cancel" : "Change";
+                    enabled: SettingsState.dictation;
+                    clicked => {
+                        SettingsState.act("voice-hotkey", "");
+                    }
+                }
+            }
+            if SettingsState.hotkey-warn != "": Note {
+                text: SettingsState.hotkey-warn;
+                tone: "danger";
+            }
+            Note {
+                text: "Hold the keys, speak, and let go: the words are typed where your cursor is. Press Space while holding to keep listening hands-free; Esc stops without typing.";
+            }
+        }
+        Disclosure {
+            rid: "sec-voice-wake";
+            title: "Listen for a name";
+            summary: SettingsState.wake-summary;
+            SwitchRow {
+                text: SettingsState.wake-label;
+                checked: SettingsState.wake;
+                toggled(v) => {
+                    SettingsState.toggle("wake", v);
+                }
+            }
+            Note {
+                text: "Say the name, then what you want, and stop talking: it is sent as if you typed it and pressed Enter. While this is on, the microphone stays open and a red dot shows on the tray icon. Nothing is saved or sent while it waits: the last two seconds of sound are kept in memory only, and a short check on this PC listens for the name when someone speaks.";
+            }
+            Text {
+                text: "The name to listen for";
+                font-size: Theme.caption;
+                color: Theme.label-2;
+            }
+            WakeField { }
+            if SettingsState.wake-status != "": Note {
+                text: SettingsState.wake-status;
+                tone: SettingsState.wake-error ? "danger" : "";
+            }
+        }
+        Disclosure {
+            rid: "sec-voice-engine";
+            title: "Transcription";
+            summary: SettingsState.engine-summary;
+            ChoiceList {
+                group: "voice-engine";
+                choices: SettingsState.engines;
+            }
+            if SettingsState.progress-shown: Progress {
+                value: SettingsState.progress;
+            }
+            if SettingsState.download-shown: HorizontalLayout {
+                alignment: start;
+                Button {
+                    text: "Download now";
+                    clicked => {
+                        SettingsState.act("voice-download", "");
+                    }
+                }
+            }
+            if SettingsState.engine-status != "": Note {
+                text: SettingsState.engine-status;
+                tone: SettingsState.engine-error ? "danger" : "";
+            }
+        }
+        Disclosure {
+            rid: "sec-voice-language";
+            title: "Language";
+            summary: SettingsState.language-summary;
+            Combo {
+                cid: "language";
+                view: SettingsState.lang-combo;
+            }
+            Note {
+                text: "Parakeet 110M hears English only: for any other language Whisper base is used. Parakeet 0.6B also hears Spanish, French, German, Italian, Portuguese, Dutch and Polish.";
+            }
+        }
+        Disclosure {
+            rid: "sec-voice-mic";
+            title: "Microphone";
+            summary: SettingsState.mic-summary;
+            Combo {
+                cid: "mic";
+                view: SettingsState.mic-combo;
+                enabled: SettingsState.mic-enabled;
+            }
+        }
+        Disclosure {
+            rid: "sec-voice-cleanup";
+            title: "Cleanup";
+            summary: SettingsState.cleanup-summary;
+            SwitchRow {
+                text: "AI cleanup: fix grammar and keep only the correction when I correct myself";
+                checked: SettingsState.cleanup;
+                toggled(v) => {
+                    SettingsState.toggle("cleanup", v);
+                }
+            }
+            Note {
+                text: SettingsState.cleanup-note;
+            }
+            if SettingsState.last-timing != "": Note {
+                text: SettingsState.last-timing;
+            }
+        }
+        StaticRow {
+            title: "What is kept";
+            note: "Nothing is recorded or kept beyond the utterance. The audio stays in memory while you speak and is gone once the text is in. On this PC it never leaves the computer; with Gemini it goes to Google to be transcribed. Cleanup sends the text, never the audio.";
+        }
+        StaticRow {
+            title: "Speech models";
+            note: "Parakeet is by NVIDIA, used under CC BY 4.0 (creativecommons.org/licenses/by/4.0) and converted to GGUF by Handy. Whisper is by OpenAI, under the MIT licence.";
+        }
+    }
+}
+
+export component WatchPage inherits VerticalLayout {
+    spacing: Theme.sp-3;
+    PageTitle {
+        text: "Agents";
+    }
+    Group {
+        Disclosure {
+            rid: "sec-watch-agents";
+            title: "Coding agents";
+            summary: SettingsState.watch-summary;
+            SwitchRow {
+                text: "Watch my coding agents";
+                checked: SettingsState.watch;
+                toggled(v) => {
+                    SettingsState.toggle("watch", v);
+                }
+            }
+            Note {
+                text: "Keeps this PC awake while Claude Code, Codex, Gemini CLI, Copilot CLI, Cursor, Windsurf or OpenCode is working, and shows a notification at the top of the screen when one finishes or needs you. Turning this on adds a hook to each agent's own settings file, after saving a copy of the file beside it; turning it off takes the hooks out again. Nothing about your sessions leaves this PC.";
+            }
+            if SettingsState.watch && SettingsState.watch-agents.length > 0: VerticalLayout {
+                for a in SettingsState.watch-agents: SwitchRow {
+                    text: a.name;
+                    says: a.note;
+                    says-error: a.error;
+                    checked: a.on;
+                    indent: Theme.sp-4;
+                    toggled(v) => {
+                        SettingsState.toggle("agent:" + a.id, v);
+                    }
+                }
+            }
+            if SettingsState.watch-status != "": Note {
+                text: SettingsState.watch-status;
+                tone: SettingsState.watch-status-error ? "danger" : "";
+            }
+            if SettingsState.watch: SwitchRow {
+                text: "Also watch the Claude and ChatGPT apps";
+                checked: SettingsState.chats;
+                toggled(v) => {
+                    SettingsState.toggle("chats", v);
+                }
+            }
+            if SettingsState.watch: Note {
+                text: "Shows a notification when a reply in the Claude or ChatGPT desktop app finishes while you are in another app, and keeps the PC awake until it does. It looks only for the app's Stop button, and only after you switch away from the app.";
+            }
+            if SettingsState.chats-status != "": Note {
+                text: SettingsState.chats-status;
+                tone: "danger";
+            }
+        }
+        Disclosure {
+            rid: "sec-watch-awake";
+            title: "Keep awake";
+            summary: SettingsState.awake-summary;
+            SwitchRow {
+                text: "Keep the PC awake while agents work";
+                checked: SettingsState.keep-awake;
+                toggled(v) => {
+                    SettingsState.toggle("keepAwake", v);
+                }
+            }
+            if SettingsState.keep-awake: SwitchRow {
+                text: "Keep the screen on too";
+                indent: Theme.sp-4;
+                checked: SettingsState.display-on;
+                toggled(v) => {
+                    SettingsState.toggle("displayOn", v);
+                }
+            }
+            if SettingsState.keep-awake && SettingsState.has-lid: SwitchRow {
+                text: "Keep working with the lid closed";
+                indent: Theme.sp-4;
+                checked: SettingsState.lid-awake;
+                toggled(v) => {
+                    SettingsState.toggle("lidAwake", v);
+                }
+            }
+            Note {
+                text: SettingsState.awake-note;
+            }
+        }
+        Disclosure {
+            rid: "sec-watch-cards";
+            title: "Notifications";
+            summary: SettingsState.cards-summary;
+            SwitchRow {
+                text: "Notify me when an agent finishes";
+                checked: SettingsState.notify-done;
+                toggled(v) => {
+                    SettingsState.toggle("notifyDone", v);
+                }
+            }
+            if SettingsState.notify-done: SwitchRow {
+                text: "Also when background agents finish";
+                indent: Theme.sp-4;
+                checked: SettingsState.notify-bg-done;
+                toggled(v) => {
+                    SettingsState.toggle("notifyBackgroundDone", v);
+                }
+            }
+            SwitchRow {
+                text: "Notify me when an agent needs you";
+                checked: SettingsState.notify-needs;
+                toggled(v) => {
+                    SettingsState.toggle("notifyNeedsYou", v);
+                }
+            }
+            if SettingsState.notify-needs: SwitchRow {
+                text: "Also when a background agent needs you";
+                indent: Theme.sp-4;
+                checked: SettingsState.notify-bg-needs;
+                toggled(v) => {
+                    SettingsState.toggle("notifyBackgroundNeedsYou", v);
+                }
+            }
+            SwitchRow {
+                text: "Play a soft chime";
+                checked: SettingsState.sound;
+                toggled(v) => {
+                    SettingsState.toggle("sound", v);
+                }
+            }
+            SwitchRow {
+                text: "Open the notification on hover to read the whole message";
+                checked: SettingsState.expand-hover;
+                toggled(v) => {
+                    SettingsState.toggle("expandOnHover", v);
+                }
+            }
+            SwitchRow {
+                text: "Alt+Tab jumps to the agent while its notification is up";
+                checked: SettingsState.alt-tab;
+                toggled(v) => {
+                    SettingsState.toggle("altTab", v);
+                }
+            }
+            SwitchRow {
+                text: "List subagents under their session";
+                checked: SettingsState.show-children;
+                toggled(v) => {
+                    SettingsState.toggle("showChildren", v);
+                }
+            }
+            ChoiceOption {
+                name: "Short";
+                note: "About 5 seconds.";
+                checked: SettingsState.card-time == 0;
+                clicked => {
+                    SettingsState.act("card-time", "0");
+                }
+            }
+            ChoiceOption {
+                name: "Normal";
+                note: "About 8 seconds, 10 when an agent needs you.";
+                checked: SettingsState.card-time == 1;
+                clicked => {
+                    SettingsState.act("card-time", "1");
+                }
+            }
+            ChoiceOption {
+                name: "Long";
+                note: "About 14 seconds.";
+                checked: SettingsState.card-time == 2;
+                clicked => {
+                    SettingsState.act("card-time", "2");
+                }
+            }
+            HorizontalLayout {
+                alignment: start;
+                Button {
+                    text: "Show a test notification";
+                    enabled: SettingsState.test-enabled;
+                    clicked => {
+                        SettingsState.act("watch-test", "");
+                    }
+                }
+            }
+            Note {
+                text: "A notification drops from the top of the screen you are on, where Aevalsistant puts its own. It counts down only while you are at the keyboard, never takes the keyboard from the app you are in, and stays out of screenshots and screen sharing. Click it to go to the agent, right-click to put it away. Background means subagents, sessions another agent started, and turns an agent takes on its own.";
+            }
+        }
+    }
+}

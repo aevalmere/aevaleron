@@ -27,10 +27,13 @@
 //! - `cx.must(label, ok, why)` is an invariant: `label=ok`, or
 //!   `label=FAIL:<why>`, which fails the run.
 //! - `cx.log(label, value)` is an observation: `label=<value>`.
-//! - `cx.eval(window, js)` runs `js`, one expression, in that window's page and
-//!   returns its value as JSON; a Promise is awaited first. Wrap statements in
-//!   `(() => { ...; return x; })()`. It gives up after 5 s ([`Cx::eval_for`]
-//!   takes another timeout).
+//! - `cx.probe(window, key)` asks that window's native page a named question
+//!   (`ui::Page::probe`) on the UI thread and returns the answer as JSON; an
+//!   error when the window or its page does not exist. Every page answers
+//!   `text` (all the text it shows, joined with `\n`) and `visible`; the bar
+//!   also `input`, `focused-input`, `intent`, `locked`, `mode`, `notice`,
+//!   `status`, `menu` and `examples`; an answer window `messages`,
+//!   `streaming`, `title`, `trail`, `card`, `scrollTop` and `atBottom`.
 //! - `cx.input(Input::...)` sends real mouse and keyboard input through
 //!   `SendInput` at physical pixels: move, click, double and right click,
 //!   drag, wheel, key chords and text. `input::cursor()` reads the pointer.
@@ -60,19 +63,18 @@
 //!
 //! pub fn run(cx: &mut Cx) {
 //!     cx.log("model", crate::store::get().get_model());
-//!     let found = cx.eval("output-1", "document.querySelectorAll('input, textarea').length");
-//!     cx.must("noOutputInput", found == Ok(json!(0)), format!("{found:?}"));
+//!     let shown = cx.probe("output-1", "visible");
+//!     cx.must("outputShown", shown == Ok(json!(true)), format!("{shown:?}"));
 //!     // Three notches down over the answer, then wait for it to scroll.
 //!     let sent = cx.input(Input::Wheel { at: (400, 300), notches: -3 });
 //!     let moved = cx.wait_for(Duration::from_secs(2), || {
-//!         let top = cx.eval("output-1", "document.getElementById('chat').scrollTop");
+//!         let top = cx.probe("output-1", "scrollTop");
 //!         top.is_ok_and(|v| v.as_f64() > Some(0.0))
 //!     });
 //!     cx.must("transcriptWheel", sent.is_ok() && moved, format!("{sent:?}"));
 //! }
 //! ```
 
-mod eval;
 pub mod input;
 pub mod notepad;
 pub mod probes;
@@ -87,17 +89,14 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use serde_json::Value;
-use tauri::AppHandle;
+
+use crate::shell::AppHandle;
 
 pub use input::Input;
 pub use notepad::Notepad;
 pub use report::Report;
 
-/// The script each page runs once loaded under smoke: one call through the
-/// bridge, which `ipc::Seen` records.
-pub const PING: &str = "window.aeval && window.aeval.invoke('glass:hello').catch(() => {});";
-
-/// `AEVAL_SMOKE` is set: lib.rs pings every page and starts [`scaffold`].
+/// `AEVAL_SMOKE` is set: lib.rs starts [`scaffold`].
 pub fn smoke_enabled() -> bool {
     std::env::var_os("AEVAL_SMOKE").is_some()
 }
@@ -160,15 +159,22 @@ impl Cx {
         self.rep.log(label, value);
     }
 
-    /// Runs `js`, one expression, in the page of window `label` and returns
-    /// its value as JSON (a Promise is awaited first). Gives up after 5 s.
-    pub fn eval(&self, label: &str, js: &str) -> Result<Value, String> {
-        self.eval_for(label, js, Duration::from_secs(5))
-    }
-
-    /// [`Cx::eval`] with its own timeout.
-    pub fn eval_for(&self, label: &str, js: &str, timeout: Duration) -> Result<Value, String> {
-        eval::eval(&self.app, label, js, timeout)
+    /// The native page of window `label` answers `key` (`ui::Page::probe`),
+    /// on the UI thread. An error when there is no such page, or the UI
+    /// thread did not answer within 10 s.
+    pub fn probe(&self, label: &str, key: &str) -> Result<Value, String> {
+        let (l, k) = (label.to_string(), key.to_string());
+        let got = self.on_main(move |_| {
+            if crate::ui::page(&l).is_none() {
+                return None;
+            }
+            Some(crate::ui::probe(&l, &k))
+        });
+        match got {
+            Some(Some(v)) => Ok(v),
+            Some(None) => Err(format!("no page {label}")),
+            None => Err(format!("the UI thread did not answer for {label}")),
+        }
     }
 
     /// Real mouse or keyboard input through `SendInput`, at physical pixels.
@@ -191,9 +197,9 @@ impl Cx {
         }
     }
 
-    /// Runs async code to completion on Tauri's runtime.
+    /// Runs async code to completion on the app's runtime.
     pub fn block_on<F: Future>(&self, fut: F) -> F::Output {
-        tauri::async_runtime::block_on(fut)
+        crate::shell::async_runtime::block_on(fut)
     }
 
     /// Runs `f` on the main thread and returns its value; None when the

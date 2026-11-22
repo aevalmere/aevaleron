@@ -2,19 +2,23 @@
 //! semantics from lib/smoke-v2.js, lib/smoke-v21.js and lib/smoke-glass.js
 //! on `main`, plus the labels the bar items add: `barMultiline` (B-056),
 //! `tokenReply` (B-150) and `earlyKeys` (B-154).
+//!
+//! The bar is a native page now: the intent checks call `ui::intent`
+//! directly, keys go in through `SendInput`, and the field is read back
+//! with the bar's probe keys (`input`, `intent`, `locked`, `mode`, `text`,
+//! `examples`).
 
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use serde_json::{json, Value};
-use tauri::Manager;
-use tauri_plugin_clipboard_manager::ClipboardExt;
-use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Shortcut};
 use windows_sys::Win32::Foundation::HWND;
 use windows_sys::Win32::UI::WindowsAndMessaging::{
     GetForegroundWindow, GetWindowLongPtrW, GWL_EXSTYLE, GWL_STYLE,
 };
 
-use crate::selftest::{Cx, Input};
+use crate::selftest::{input, Cx, Input};
+use crate::shell::Manager;
+use crate::ui::intent::{self, Intent};
 use crate::windows::{self, flags, OVERLAY};
 use crate::{paths, state, store};
 
@@ -31,196 +35,92 @@ const STYLE_MASK: u32 = !0x1000_0000;
 /// One window's styles at one stage: (stage, window, style, extended style).
 type Sample = (&'static str, String, u32, u32);
 
-const INTENT_LABELS: [&str; 5] = [
-    "intentTable",
-    "intentOffersDo",
-    "intentPrefixes",
-    "intentFast",
-    "intentDoNeedsMargin",
-];
-
 // Three lines a person pastes: each one a question, so Enter asks.
 const LINES: &str = "why does the build fail?\nwhat does LNK1104 mean?\nhow do I fix it?";
 
-const READY_JS: &str = "!!(window.AevalIntent && document.getElementById('query-input'))";
-const VALUE_JS: &str = "document.getElementById('query-input').value";
-const MODE_JS: &str = "document.body.dataset.mode || ''";
+// lib/smoke-v21.js basics(): the guess against what a person types. Every
+// phrase Find used to take is here too, as an ask or a task.
+const TABLE: [(&str, Intent); 50] = [
+    ("why is the build red", Intent::Ask),
+    ("how do I save this as pdf", Intent::Ask),
+    ("what does this error mean?", Intent::Ask),
+    ("explain this function", Intent::Ask),
+    ("summarize this page", Intent::Ask),
+    ("is this email a scam?", Intent::Ask),
+    ("write me a haiku", Intent::Ask),
+    ("translate this paragraph to French", Intent::Ask),
+    ("find the bug in this function", Intent::Ask),
+    ("what is the total of this column", Intent::Ask),
+    ("which button saves the file?", Intent::Ask),
+    ("save", Intent::Ask),
+    ("/etc/hosts", Intent::Ask),
+    ("can you open notepad?", Intent::Ask),
+    ("", Intent::Ask),
+    ("hello", Intent::Ask),
+    ("refund policy", Intent::Ask),
+    ("?invoice", Intent::Ask),
+    ("?rename these files", Intent::Ask),
+    ("invoice", Intent::Ask),
+    ("2291", Intent::Ask),
+    ("total due", Intent::Ask),
+    ("0x1F3A", Intent::Ask),
+    ("Please settle by Friday", Intent::Ask),
+    ("where is the submit button", Intent::Ask),
+    ("/invoice", Intent::Ask),
+    ("//total", Intent::Ask),
+    ("/ deadline", Intent::Ask),
+    ("find invoice", Intent::Ask),
+    ("find \"price\"", Intent::Ask),
+    ("where is the cancel button", Intent::Ask),
+    ("where's the save button", Intent::Ask),
+    ("locate the download link", Intent::Ask),
+    ("look for the word deadline", Intent::Ask),
+    ("show me where the settings are", Intent::Ask),
+    ("search for flights to Paris", Intent::Do),
+    ("jump to the next chapter", Intent::Do),
+    ("highlight the deadline in this document", Intent::Do),
+    ("rename these screenshots by date", Intent::Do),
+    ("open Notepad and write a haiku", Intent::Do),
+    ("send the report to Sam", Intent::Do),
+    ("delete the old ones", Intent::Do),
+    ("do it", Intent::Do),
+    ("can you open notepad", Intent::Do),
+    (">save", Intent::Do),
+    (">what time is it", Intent::Do),
+    ("close all the tabs except this one", Intent::Do),
+    ("sort this sheet by date", Intent::Do),
+    ("open a new tab and search for the weather", Intent::Do),
+    ("move these files into a folder called old", Intent::Do),
+];
 
-const TOKEN_JS: &str = r#"
-(() => {
-  const t = document.getElementById('intent');
-  return t ? t.dataset.intent + (t.dataset.locked === 'true' ? '!' : '') : 'none';
-})()
-"#;
+/// The middle: asked, with "Do this instead" on the answer.
+const OFFER: [(&str, bool); 6] = [
+    ("save", true),
+    ("can you open notepad?", true),
+    ("open notepad?", true),
+    ("why is the build red", false),
+    ("open notepad", false),
+    ("?open notepad", false),
+];
 
-const TOKEN_STATE_JS: &str = r#"
-(() => {
-  const t = document.getElementById('intent');
-  const label = t.getAttribute('aria-label') || '';
-  return [t.dataset.intent, label, t.getAttribute('aria-disabled') || ''].join('|');
-})()
-"#;
-
-// The field emptied without telling the bar, as Electron's barKeys did.
-const EMPTY_JS: &str = r#"
-(() => {
-  document.getElementById('query-input').value = '';
-  return true;
-})()
-"#;
-
-const TYPE_JS: &str = r#"
-(() => {
-  const i = document.getElementById('query-input');
-  i.focus();
-  i.value = $TEXT;
-  i.dispatchEvent(new Event('input', { bubbles: true }));
-  return i.value;
-})()
-"#;
-
-const PRESS_JS: &str = r#"
-(() => {
-  const i = document.getElementById('query-input');
-  i.focus();
-  const e = new KeyboardEvent('keydown', {
-    key: $KEY,
-    ctrlKey: $CTRL,
-    bubbles: true,
-    cancelable: true,
-  });
-  i.dispatchEvent(e);
-  return e.defaultPrevented;
-})()
-"#;
-
-const ROWS_JS: &str = r#"
-(() => {
-  const lines = document.getElementById('query-input').value.split('\n').length;
-  return lines + ':' + (document.getElementById('bar').dataset.rows || '');
-})()
-"#;
-
-const EXAMPLES_JS: &str = r#"
-(() => {
-  const e = document.getElementById('examples');
-  return (e.hidden ? 'hidden:' : 'shown:') + e.querySelectorAll('button').length;
-})()
-"#;
-
-// lib/smoke-v21.js basics(): the guess against what a person types, the
-// prefixes, the cost per keystroke and the margin rule, run in the page.
-// Every phrase Find used to take is here too, as an ask or a task.
-const INTENT_JS: &str = r##"
-(() => {
-  const I = window.AevalIntent;
-  const TABLE = [
-    ['why is the build red', 'ask'],
-    ['how do I save this as pdf', 'ask'],
-    ['what does this error mean?', 'ask'],
-    ['explain this function', 'ask'],
-    ['summarize this page', 'ask'],
-    ['is this email a scam?', 'ask'],
-    ['write me a haiku', 'ask'],
-    ['translate this paragraph to French', 'ask'],
-    ['find the bug in this function', 'ask'],
-    ['what is the total of this column', 'ask'],
-    ['which button saves the file?', 'ask'],
-    ['save', 'ask'],
-    ['/etc/hosts', 'ask'],
-    ['can you open notepad?', 'ask'],
-    ['', 'ask'],
-    ['hello', 'ask'],
-    ['refund policy', 'ask'],
-    ['?invoice', 'ask'],
-    ['?rename these files', 'ask'],
-    ['invoice', 'ask'],
-    ['2291', 'ask'],
-    ['total due', 'ask'],
-    ['0x1F3A', 'ask'],
-    ['Please settle by Friday', 'ask'],
-    ['where is the submit button', 'ask'],
-    ['/invoice', 'ask'],
-    ['//total', 'ask'],
-    ['/ deadline', 'ask'],
-    ['find invoice', 'ask'],
-    ['find "price"', 'ask'],
-    ['where is the cancel button', 'ask'],
-    ["where's the save button", 'ask'],
-    ['locate the download link', 'ask'],
-    ['look for the word deadline', 'ask'],
-    ['show me where the settings are', 'ask'],
-    ['search for flights to Paris', 'do'],
-    ['jump to the next chapter', 'do'],
-    ['highlight the deadline in this document', 'do'],
-    ['rename these screenshots by date', 'do'],
-    ['open Notepad and write a haiku', 'do'],
-    ['send the report to Sam', 'do'],
-    ['delete the old ones', 'do'],
-    ['do it', 'do'],
-    ['can you open notepad', 'do'],
-    ['>save', 'do'],
-    ['>what time is it', 'do'],
-    ['close all the tabs except this one', 'do'],
-    ['sort this sheet by date', 'do'],
-    ['open a new tab and search for the weather', 'do'],
-    ['move these files into a folder called old', 'do'],
-  ];
-  // The middle: asked, with "Do this instead" on the answer.
-  const OFFER = [
-    ['save', true],
-    ['can you open notepad?', true],
-    ['open notepad?', true],
-    ['why is the build red', false],
-    ['open notepad', false],
-    ['?open notepad', false],
-  ];
-  const PARSE = [
-    ['?why', 'ask', 'why'],
-    ['> open notepad', 'do', 'open notepad'],
-    ['/invoice', null, '/invoice'],
-    ['//total', null, '//total'],
-    ['/etc/hosts', null, '/etc/hosts'],
-  ];
-  const wrong = [];
-  for (const [text, want] of TABLE) {
-    const got = I.classify(text).intent;
-    if (got !== want) wrong.push(`"${text}" ${got}!=${want}`);
-  }
-  const offer = [];
-  for (const [text, want] of OFFER) {
-    const got = I.classify(text).offerDo;
-    if (got !== want) offer.push(`"${text}" ${got}!=${want}`);
-  }
-  const badParse = [];
-  for (const [raw, lock, body] of PARSE) {
-    const p = I.parse(raw);
-    if (p.lock !== lock || p.body !== body) badParse.push(`${raw}:${JSON.stringify(p)}`);
-  }
-  I.score('warm up');
-  let worst = 0;
-  for (let round = 0; round < 3; round += 1) {
-    for (const [text] of TABLE) {
-      const t0 = performance.now();
-      I.score(`${text} `.repeat(40));
-      worst = Math.max(worst, performance.now() - t0);
-    }
-  }
-  const weak = I.classify('fix it');
-  return { n: TABLE.length, wrong, offer, badParse, worst, weak: { i: weak.intent, m: weak.margin } };
-})()
-"##;
+const PARSE: [(&str, Option<Intent>, &str); 5] = [
+    ("?why", Some(Intent::Ask), "why"),
+    ("> open notepad", Some(Intent::Do), "open notepad"),
+    ("/invoice", None, "/invoice"),
+    ("//total", None, "//total"),
+    ("/etc/hosts", None, "/etc/hosts"),
+];
 
 pub fn run(cx: &mut Cx) {
     probe(cx);
 }
 
 fn probe(cx: &Cx) {
-    let ready = cx.wait_for(BOOT, || page(cx, READY_JS) == json!(true));
+    let ready = cx.wait_for(BOOT, || cx.probe(OVERLAY, "input").is_ok());
     if !ready {
-        cx.log("barPage", "the overlay page never loaded");
+        cx.log("barPage", "the overlay page never came up");
     }
-    intent(cx);
+    intent_labels(cx);
     key_swallow(cx);
     style(cx);
     bar_keys(cx);
@@ -228,27 +128,34 @@ fn probe(cx: &Cx) {
     early_keys(cx);
     lines_and_suggestions(cx);
     text_entry(cx);
-    page(cx, &TYPE_JS.replace("$TEXT", "''"));
+    type_text(cx, "");
     collapse(cx);
 }
 
 // ----------------------------------------------------------------- helpers
 
-fn page(cx: &Cx, js: &str) -> Value {
-    cx.eval(OVERLAY, js).unwrap_or(Value::Null)
+/// The bar page's answer to `key`, or null when it has none.
+fn page(cx: &Cx, key: &str) -> Value {
+    cx.probe(OVERLAY, key).unwrap_or(Value::Null)
 }
 
 fn text(v: &Value) -> String {
     v.as_str().unwrap_or_default().to_string()
 }
 
-fn strings(v: &Value) -> Vec<String> {
-    let all = v.as_array().cloned().unwrap_or_default();
-    all.iter().map(text).collect()
+fn field(cx: &Cx) -> String {
+    text(&page(cx, "input"))
+}
+
+/// The token as Electron's smoke read it: `ask`, `do`, with `!` when locked.
+fn token(cx: &Cx) -> String {
+    let locked = page(cx, "locked") == json!(true);
+    let mark = if locked { "!" } else { "" };
+    format!("{}{mark}", text(&page(cx, "intent")))
 }
 
 fn mode(cx: &Cx) -> String {
-    text(&page(cx, MODE_JS))
+    text(&page(cx, "mode"))
 }
 
 /// The page shows `want`, then time for the morph and the window's resize.
@@ -277,22 +184,43 @@ fn open_by_hotkey(cx: &Cx, chord: &str) -> bool {
     open(cx)
 }
 
-/// A synthetic keydown on the field, the way Electron's barKeys pressed.
-fn press(cx: &Cx, key: &str, ctrl: bool) -> Value {
-    let js = PRESS_JS
-        .replace("$KEY", &json!(key).to_string())
-        .replace("$CTRL", &ctrl.to_string());
-    page(cx, &js)
+/// The middle of the bar, in physical pixels: inside the field.
+fn bar_point(cx: &Cx) -> (i32, i32) {
+    let r = windows::screen::dip_to_px(windows::bar_rect(&cx.app));
+    let x = (r.x + r.width / 2.0).round() as i32;
+    let y = (r.y + r.height / 2.0).round() as i32;
+    (x, y)
 }
 
+/// Puts the keyboard in the bar's field: a real click on it when it does
+/// not have focus already.
+fn focus_field(cx: &Cx) -> bool {
+    let focused = || page(cx, "focused-input") == json!(true);
+    if focused() {
+        return true;
+    }
+    let at = bar_point(cx);
+    let _ = cx.input(Input::Click(at.0, at.1));
+    cx.wait_for(Duration::from_secs(2), focused)
+}
+
+/// Real keys: the field emptied (Ctrl+A, Delete), then `value` typed.
 fn type_text(cx: &Cx, value: &str) {
-    page(cx, &TYPE_JS.replace("$TEXT", &json!(value).to_string()));
+    if mode(cx) != "panel" {
+        return;
+    }
+    focus_field(cx);
+    let _ = cx.input(Input::Key("Ctrl+A"));
+    let _ = cx.input(Input::Key("Delete"));
+    if !value.is_empty() {
+        let _ = cx.input(Input::Text(value));
+    }
+    cx.wait_for(Duration::from_secs(2), || field(cx) == value);
 }
 
-fn held(cx: &Cx, code: Code) -> bool {
-    let sc = Shortcut::new(None, code);
-    let on = cx.on_main(move |app| app.global_shortcut().is_registered(sc));
-    on.unwrap_or(true)
+/// Whether the key is held as a global hotkey, asked of Windows.
+fn held(key: &str) -> bool {
+    input::hotkey_taken(key).unwrap_or(true)
 }
 
 fn styles(hwnd: isize) -> (u32, u32) {
@@ -325,38 +253,70 @@ fn saved_flag() -> bool {
     v["hasSentFirstRequest"] == true
 }
 
+/// Whether the bar shows its starting points: a list or a count from the
+/// page's `examples` probe.
+fn examples_shown(v: &Value) -> bool {
+    match v {
+        Value::Array(a) => !a.is_empty(),
+        Value::Number(n) => n.as_u64().unwrap_or(0) > 0,
+        Value::Bool(b) => *b,
+        _ => false,
+    }
+}
+
 // ------------------------------------------------------------------ labels
 
 /// intentTable, intentOffersDo, intentPrefixes, intentWorstMs, intentFast
-/// and intentDoNeedsMargin (lib/smoke-v21.js).
-fn intent(cx: &Cx) {
-    let r = match cx.eval(OVERLAY, INTENT_JS) {
-        Ok(v) => v,
-        Err(e) => {
-            for label in INTENT_LABELS {
-                cx.must(label, false, &e);
-            }
-            return;
+/// and intentDoNeedsMargin (lib/smoke-v21.js), on the bar's own rules.
+fn intent_labels(cx: &Cx) {
+    let mut wrong = Vec::new();
+    for (line, want) in TABLE {
+        let got = intent::classify(line).intent;
+        if got != want {
+            wrong.push(format!("\"{line}\" {}!={}", got.key(), want.key()));
         }
-    };
-    let n = r["n"].as_u64().unwrap_or(0);
-    let wrong = strings(&r["wrong"]);
-    let right = n.saturating_sub(wrong.len() as u64);
-    cx.log("intentTable", format!("{right}/{n}"));
-    let table = n >= 40 && wrong.is_empty();
-    cx.must("intentTable", table, wrong.join(" | "));
-    let offer = strings(&r["offer"]);
+    }
+    let n = TABLE.len();
+    cx.log("intentTable", format!("{}/{n}", n - wrong.len()));
+    cx.must("intentTable", n >= 40 && wrong.is_empty(), wrong.join(" | "));
+
+    let mut offer = Vec::new();
+    for (line, want) in OFFER {
+        let got = intent::classify(line).offer_do;
+        if got != want {
+            offer.push(format!("\"{line}\" {got}!={want}"));
+        }
+    }
     cx.must("intentOffersDo", offer.is_empty(), offer.join(" | "));
-    let bad = strings(&r["badParse"]);
+
+    let mut bad = Vec::new();
+    for (raw, lock, body) in PARSE {
+        let got = intent::parse(raw);
+        if got != (lock, body) {
+            bad.push(format!("{raw}:{got:?}"));
+        }
+    }
     cx.must("intentPrefixes", bad.is_empty(), bad.join(" | "));
-    let worst = r["worst"].as_f64().unwrap_or(f64::MAX);
+
+    // The cost per keystroke, on a long line.
+    intent::score("warm up");
+    let mut worst = 0.0_f64;
+    for _ in 0..3 {
+        for (line, _) in TABLE {
+            let long = format!("{line} ").repeat(40);
+            let t0 = Instant::now();
+            intent::score(&long);
+            worst = worst.max(t0.elapsed().as_secs_f64() * 1000.0);
+        }
+    }
     cx.log("intentWorstMs", format!("{worst:.2}"));
     cx.must("intentFast", worst < 5.0, format!("{worst:.2}ms"));
+
     // Only a clear task runs: the margin rule leaves weak ones as Ask.
-    let weak = &r["weak"];
-    let margin = weak["m"].as_f64().unwrap_or(0.0);
-    let ok = weak["i"] != "do" || margin >= 0.15;
-    cx.must("intentDoNeedsMargin", ok, weak);
+    let weak = intent::classify("fix it");
+    let margin = weak.run - weak.ask;
+    let ok = weak.intent != Intent::Do || margin >= 0.15;
+    cx.must("intentDoNeedsMargin", ok, format!("{weak:?}"));
 }
 
 /// keySwallow: no global Enter ever, and no global Escape while only the
@@ -364,11 +324,11 @@ fn intent(cx: &Cx) {
 fn key_swallow(cx: &Cx) {
     open(cx);
     cx.sleep(300);
-    let enter = held(cx, Code::Enter);
-    let esc_bar = held(cx, Code::Escape);
+    let enter = held("Enter");
+    let esc_bar = held("Escape");
     collapse(cx);
     cx.sleep(200);
-    let esc_idle = held(cx, Code::Escape);
+    let esc_idle = held("Escape");
     let seen = format!("enter={enter} escBar={esc_bar} escIdle={esc_idle}");
     let ok = !enter && !esc_bar && !esc_idle;
     cx.must("keySwallow", ok, seen);
@@ -434,26 +394,30 @@ fn sample(cx: &Cx, stage: &'static str, out: &mut Vec<Sample>) {
     }
 }
 
-/// barKeys: Tab is never taken by the field; Ctrl+1 and Ctrl+2 lock the
+/// barKeys: Tab is never typed into the field; Ctrl+1 and Ctrl+2 lock the
 /// token and keep the text; Backspace on an empty locked field unlocks it
-/// (lib/smoke-v2.js).
+/// (lib/smoke-v2.js). Real keys, with the field focused.
 fn bar_keys(cx: &Cx) {
     open(cx);
-    page(cx, EMPTY_JS);
-    let tab = press(cx, "Tab", false);
+    type_text(cx, "");
+    let _ = cx.input(Input::Key("Tab"));
+    let tab = field(cx).contains('\t');
     type_text(cx, "invoice");
-    press(cx, "2", true);
-    let do_lock = text(&page(cx, TOKEN_JS));
-    let kept = text(&page(cx, VALUE_JS));
-    press(cx, "1", true);
-    let back = text(&page(cx, TOKEN_JS));
-    page(cx, EMPTY_JS);
-    press(cx, "Backspace", false);
-    let unlocked = text(&page(cx, TOKEN_JS));
+    let _ = cx.input(Input::Key("Ctrl+2"));
+    cx.sleep(150);
+    let do_lock = token(cx);
+    let kept = field(cx);
+    let _ = cx.input(Input::Key("Ctrl+1"));
+    cx.sleep(150);
+    let back = token(cx);
+    type_text(cx, "");
+    let _ = cx.input(Input::Key("Backspace"));
+    cx.sleep(150);
+    let unlocked = token(cx);
     let seen = format!("tab={tab}:{do_lock}:{kept}:{back}:{unlocked}");
     cx.log("barKeys", &seen);
     let locks = do_lock == "do!" && back == "ask!";
-    let ok = tab == json!(false) && kept == "invoice" && locks && !unlocked.ends_with('!');
+    let ok = !tab && kept == "invoice" && locks && !unlocked.ends_with('!');
     cx.must("barKeys", ok, seen);
 }
 
@@ -467,6 +431,11 @@ fn send_waiting(cx: &Cx, waiting: &str) {
     });
 }
 
+/// The token's state: its intent and whether the bar's text names `word`.
+fn token_says(cx: &Cx, word: &str) -> bool {
+    text(&page(cx, "intent")) == "do" && text(&page(cx, "text")).contains(word)
+}
+
 /// tokenReply (B-150): while a task asks, the token says Reply and Enter
 /// belongs to the task; with a plan waiting and the field empty it says
 /// Start; once the task stops waiting it is the guess again.
@@ -474,18 +443,19 @@ fn token_reply(cx: &Cx) {
     open(cx);
     type_text(cx, "");
     send_waiting(cx, "asking");
-    let reply = "do|Reply. Enter sends this to the running task.|true";
-    let asked = cx.wait_for(WAIT, || text(&page(cx, TOKEN_STATE_JS)) == reply);
-    let got_reply = text(&page(cx, TOKEN_STATE_JS));
+    let asked = cx.wait_for(WAIT, || token_says(cx, "Reply"));
+    let got_reply = token(cx);
     send_waiting(cx, "plan");
-    let start = "do|Start. Enter sends this to the running task.|true";
-    let planned = cx.wait_for(WAIT, || text(&page(cx, TOKEN_STATE_JS)) == start);
-    let got_start = text(&page(cx, TOKEN_STATE_JS));
+    let planned = cx.wait_for(WAIT, || token_says(cx, "Start"));
+    let got_start = token(cx);
     cx.on_main(windows::send_overlay_state);
-    let rest = |t: &str| t.starts_with("ask|") && t.ends_with('|');
-    let back = cx.wait_for(WAIT, || rest(&text(&page(cx, TOKEN_STATE_JS))));
-    let got_back = text(&page(cx, TOKEN_STATE_JS));
-    let why = format!("asking={got_reply} plan={got_start} after={got_back}");
+    let rest = || {
+        let t = text(&page(cx, "text"));
+        token(cx) == "ask" && !t.contains("Reply") && !t.contains("Start")
+    };
+    let back = cx.wait_for(WAIT, rest);
+    let got_back = token(cx);
+    let why = format!("asking={got_reply}/{asked} plan={got_start}/{planned} after={got_back}");
     cx.must("tokenReply", asked && planned && back, why);
 }
 
@@ -500,8 +470,8 @@ fn early_keys(cx: &Cx) {
     let sent = cx.input(Input::Key(&hotkey));
     cx.sleep(5);
     let typed = cx.input(Input::Text("early"));
-    let kept = cx.wait_for(WAIT, || text(&page(cx, VALUE_JS)) == "early");
-    let value = text(&page(cx, VALUE_JS));
+    let kept = cx.wait_for(WAIT, || field(cx) == "early");
+    let value = field(cx);
     let fg = foreground_is_overlay();
     let keys = format!("{hotkey}={sent:?} text={typed:?}");
     let why = format!("{keys} field={value:?} foreground={fg}");
@@ -571,23 +541,24 @@ fn lines_and_suggestions(cx: &Cx) {
     let has_key = s.has_api_key();
     open(cx);
     type_text(cx, "");
-    let shown_before = text(&page(cx, EXAMPLES_JS));
-    let clip = cx.app.clipboard();
-    let kept = clip.read_text().ok();
-    let pasted = clip.write_text(LINES).is_ok();
+    let shown_before = page(cx, "examples");
+    let kept = crate::shell::sys::clipboard_read();
+    let pasted = crate::shell::sys::clipboard_write(LINES);
+    focus_field(cx);
     let paste = cx.input(Input::Key("Ctrl+V"));
-    let three = cx.wait_for(WAIT, || text(&page(cx, ROWS_JS)) == "3:3");
-    let rows = text(&page(cx, ROWS_JS));
+    let rows = || field(cx).lines().count();
+    let three = cx.wait_for(WAIT, || rows() == 3);
+    let got_rows = rows();
     let enter = cx.input(Input::Key("Enter"));
     let sent = cx.wait_for(WAIT, || last_question() == LINES);
     let question = last_question();
     let breaks = question.matches('\n').count();
     let ok = pasted && three && sent && breaks == 2;
-    let keys = format!("paste={paste:?} rows={rows} enter={enter:?}");
+    let keys = format!("paste={paste:?} rows={got_rows} enter={enter:?}");
     let why = format!("{keys} sent={question:?} key={has_key}");
     cx.must("barMultiline", ok, why);
     if let Some(t) = kept {
-        let _ = clip.write_text(t);
+        let _ = crate::shell::sys::clipboard_write(&t);
     }
 
     let flag = s.get_has_sent_first_request();
@@ -597,8 +568,8 @@ fn lines_and_suggestions(cx: &Cx) {
     type_text(cx, "");
     collapse(cx);
     open(cx);
-    let after = text(&page(cx, EXAMPLES_JS));
-    let hidden = after.starts_with("hidden");
+    let after = page(cx, "examples");
+    let hidden = !examples_shown(&after);
     let ok = flag && on_disk && in_state && hidden;
     let before = format!("before={sent_before}/{shown_before}");
     let why = format!("{before} after={after} disk={on_disk} state={in_state}");

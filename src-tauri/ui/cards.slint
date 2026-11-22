@@ -1,12 +1,5 @@
-// Stubs until these pages are ported (lane native-ui, stage 2).
-import { Theme } from "theme.slint";
+// The cards (src/ui/cards.rs): the agents notification at the top of the
+// screen and the copy-text note, one file each.
 
-export component AgentsWindow inherits Window {
-    background: Theme.base;
-    default-font-family: Theme.font;
-}
-
-export component NoteWindow inherits Window {
-    background: Theme.base;
-    default-font-family: Theme.font;
-}
+export { AgentsWindow, AgentRow } from "card-agents.slint";
+export { NoteWindow } from "card-note.slint";

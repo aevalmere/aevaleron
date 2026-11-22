@@ -1,0 +1,73 @@
+// The copy-text confirmation (renderer/region-note.html): beside the
+// rectangle the person drew, never focused, it says how much was copied and
+// how it starts, or that nothing readable was there, and goes by itself.
+// The window is the card (opaque); Rust hides it once the words have faded.
+
+import { Theme, Glyph } from "theme.slint";
+
+export component NoteWindow inherits Window {
+    background: Theme.base;
+    default-font-family: Theme.font;
+
+    // "idle", "copied", "reading", "none" or "error".
+    in property <string> kind: "idle";
+    // Not `title`: that is the window's own.
+    in property <string> note-title;
+    in property <string> lead;
+
+    // An explanation may take two lines; the copied words keep to one.
+    property <bool> explains: kind == "none" || kind == "error";
+
+    Rectangle {
+        width: root.width;
+        height: root.height;
+        opacity: root.kind == "idle" ? 0 : 1;
+        animate opacity { duration: Theme.fast; }
+
+        HorizontalLayout {
+            padding-top: Theme.sp-2;
+            padding-bottom: Theme.sp-2;
+            padding-left: Theme.sp-4;
+            padding-right: Theme.sp-5;
+            spacing: Theme.sp-3;
+
+            // The tick: only when something was copied.
+            if root.kind == "copied": Text {
+                text: Glyph.check;
+                font-family: Theme.icons;
+                font-size: 16px * Theme.text-scale;
+                color: Theme.accent-text;
+                vertical-alignment: center;
+            }
+
+            VerticalLayout {
+                alignment: center;
+                horizontal-stretch: 1;
+
+                Text {
+                    text: root.note-title;
+                    font-size: Theme.caption;
+                    font-weight: 600;
+                    color: Theme.label;
+                    overflow: elide;
+                }
+
+                if root.lead != "" && !root.explains: Text {
+                    text: root.lead;
+                    font-size: Theme.caption;
+                    color: Theme.label-2;
+                    overflow: elide;
+                }
+
+                if root.lead != "" && root.explains: Text {
+                    text: root.lead;
+                    font-size: Theme.caption;
+                    color: Theme.label-2;
+                    wrap: word-wrap;
+                    overflow: elide;
+                    max-height: 2.8 * Theme.caption;
+                }
+            }
+        }
+    }
+}

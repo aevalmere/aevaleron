@@ -14,7 +14,6 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use async_trait::async_trait;
 use parking_lot::Mutex;
 use serde_json::{json, Value};
-use tauri::AppHandle;
 use tokio::runtime::Handle;
 use tokio_util::sync::CancellationToken;
 
@@ -28,6 +27,7 @@ use crate::llm::errors::ApiError;
 use crate::llm::fake::Fake;
 use crate::llm::settings::Active;
 use crate::llm::wire::HttpRequest;
+use crate::shell::AppHandle;
 
 use super::run::{trail_text, Agent, AgentHost, AgentSettings, Point, RunReport, StartOpts};
 use super::seams::{DesktopOps, Emitter};

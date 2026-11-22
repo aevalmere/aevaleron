@@ -11,7 +11,6 @@ use std::time::Duration;
 use parking_lot::Mutex;
 use regex::Regex;
 use serde_json::{json, Value};
-use tauri::{AppHandle, Manager};
 
 use crate::agent::run::{trail_text, AgentHost, AgentSettings, Point, RunReport, StartOpts};
 use crate::agent::seams::{DesktopOps, Emitter};
@@ -23,6 +22,7 @@ use crate::llm::failover::short_model;
 use crate::llm::provider::Provider;
 use crate::llm::settings::{candidates_for, keyed, model_for, Active, LlmSettings};
 use crate::llm::{recipients_with, Recipient};
+use crate::shell::{AppHandle, Manager};
 use crate::state::{shared, OutputKind, Rect};
 use crate::windows::{self, flags, layout, motion, outputs, screen};
 use crate::{buddy, lens, store};
@@ -92,15 +92,6 @@ fn is_link(t: &str) -> bool {
     ["http://", "https://", "mailto:"]
         .iter()
         .any(|p| lower.starts_with(p))
-}
-
-/// The last path segment of a page URL (`output.html`), or `window`.
-fn page_name(path: &str) -> String {
-    path.rsplit('/')
-        .next()
-        .filter(|s| !s.is_empty())
-        .unwrap_or("window")
-        .to_string()
 }
 
 /// main.js showTrail: the run's output, shown; focused when
@@ -301,7 +292,7 @@ fn consent(app: &AppHandle, allow: bool) -> Value {
     let started = pending.is_some();
     if let Some(req) = pending {
         let a = app.clone();
-        tauri::async_runtime::spawn(async move {
+        crate::shell::async_runtime::spawn(async move {
             start_run(&a, req).await;
         });
     }
@@ -458,7 +449,7 @@ impl AgentHost for Host {
             return;
         }
         let app = self.app.clone();
-        tauri::async_runtime::spawn(async move {
+        crate::shell::async_runtime::spawn(async move {
             let Some(sv) = super::try_services() else {
                 return;
             };
@@ -509,12 +500,11 @@ impl AgentHost for Host {
     async fn open_target(&self, target: &str) -> Result<(), String> {
         let t = target.trim();
         if is_link(t) {
-            use tauri_plugin_opener::OpenerExt;
-            return self
-                .app
-                .opener()
-                .open_url(t, None::<&str>)
-                .map_err(|e| e.to_string());
+            return if crate::shell::sys::open_url(t) {
+                Ok(())
+            } else {
+                Err("Windows could not open the link".into())
+            };
         }
         if !is_app_name(t) {
             return Err("not an app name".into());
@@ -547,11 +537,7 @@ impl AgentHost for Host {
             .webview_windows()
             .into_values()
             .find(|w| w.is_focused().unwrap_or(false))
-            .map(|w| {
-                w.url()
-                    .map(|u| page_name(u.path()))
-                    .unwrap_or_else(|_| "window".into())
-            })?;
+            .map(|w| w.label().to_string())?;
         if let Some(sv) = super::try_services() {
             if let Ok(list) = sv.desktop.op("listWindows", json!({})).await {
                 let front = list
@@ -566,13 +552,11 @@ impl AgentHost for Host {
     }
 
     fn clipboard_read(&self) -> Option<String> {
-        use tauri_plugin_clipboard_manager::ClipboardExt;
-        self.app.clipboard().read_text().ok()
+        crate::shell::sys::clipboard_read()
     }
 
     fn clipboard_write(&self, text: &str) -> bool {
-        use tauri_plugin_clipboard_manager::ClipboardExt;
-        self.app.clipboard().write_text(text).is_ok()
+        crate::shell::sys::clipboard_write(text)
     }
 
     /// main.js finishAgentRun.
@@ -606,7 +590,7 @@ impl AgentHost for Host {
         let failed = matches!(run.end_state.as_str(), "error" | "limit" | "offline");
         shared(app).lock().pill_error = failed;
         let a = app.clone();
-        tauri::async_runtime::spawn(async move {
+        crate::shell::async_runtime::spawn(async move {
             super::apply_registrations(&a);
             super::send_overlay_state(&a);
             crate::tray::refresh(&a);
@@ -785,12 +769,5 @@ mod tests {
         assert!(is_link("mailto:a@b.c"));
         assert!(!is_link("file:///c:/x"));
         assert!(!is_link("notepad"));
-    }
-
-    #[test]
-    fn page_names_come_from_the_url_path() {
-        assert_eq!(page_name("/renderer/output.html"), "output.html");
-        assert_eq!(page_name("/"), "window");
-        assert_eq!(page_name(""), "window");
     }
 }

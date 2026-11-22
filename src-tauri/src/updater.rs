@@ -27,7 +27,8 @@ use parking_lot::Mutex;
 use regex::Regex;
 use serde_json::{json, Map, Value};
 use sha2::{Digest, Sha512};
-use tauri::{AppHandle, Emitter};
+
+use crate::shell::{AppHandle, Emitter};
 
 const FIRST_CHECK_MS: u64 = 20_000;
 const RECHECK_MS: u64 = 4 * 60 * 60 * 1000;
@@ -180,7 +181,7 @@ pub fn feed_override_from(get: impl Fn(&str) -> Option<String>, packaged: bool) 
     if packaged && !test {
         return String::new();
     }
-    let Ok(u) = tauri::Url::parse(&url) else {
+    let Ok(u) = url::Url::parse(&url) else {
         return String::new();
     };
     if !u.username().is_empty() || u.password().is_some() {
@@ -561,7 +562,7 @@ fn schedule(ms: u64) {
             .insert("nextCheck".into(), json!(crate::state::now_ms() + ms));
         i.timer_gen
     };
-    tauri::async_runtime::spawn(async move {
+    crate::shell::async_runtime::spawn(async move {
         tokio::time::sleep(Duration::from_millis(ms)).await;
         if inner().lock().timer_gen != gen {
             return;
@@ -588,7 +589,7 @@ fn wait_for_network() {
         }
         i.waiting_network = true;
     }
-    tauri::async_runtime::spawn(async {
+    crate::shell::async_runtime::spawn(async {
         loop {
             tokio::time::sleep(Duration::from_millis(ONLINE_POLL_MS)).await;
             if online() {
@@ -668,7 +669,7 @@ pub fn init(app: &AppHandle, user_data: &Path) {
     }
     if !updated_from.is_empty() {
         let app = app.clone();
-        tauri::async_runtime::spawn(async move {
+        crate::shell::async_runtime::spawn(async move {
             tokio::time::sleep(Duration::from_secs(3)).await;
             announce_updated(&app);
         });
@@ -825,7 +826,7 @@ pub async fn check(app: &AppHandle) -> Value {
                     "problem": "",
                 }));
                 let app = app.clone();
-                tauri::async_runtime::spawn(async move {
+                crate::shell::async_runtime::spawn(async move {
                     download(&app, c, latest, url).await;
                 });
                 return get();

@@ -17,7 +17,7 @@ pub mod win;
 use std::sync::{Arc, OnceLock};
 use std::time::{Duration, Instant};
 
-use tauri::Manager;
+use crate::shell::Manager;
 
 #[allow(unused_imports)]
 pub use client::{Deps, Desktop, OwnWindow};
@@ -30,11 +30,10 @@ pub fn client() -> &'static Arc<Desktop> {
     CLIENT.get_or_init(Desktop::new)
 }
 
-/// Called once from `lib.rs` setup: lets the client read our windows, starts
-/// the glass backdrop, and runs a CI check when one is asked for.
-pub fn setup(app: &tauri::AppHandle) {
+/// Called once from `lib.rs` setup: lets the client read our windows, and
+/// runs a CI check when one is asked for.
+pub fn setup(app: &crate::shell::AppHandle) {
     client().set_app(app.clone());
-    crate::backdrop::init(app.clone());
     watch_boot(app);
     checks::maybe_run(app);
 }
@@ -44,7 +43,7 @@ static HELPER_AT_BOOT: OnceLock<bool> = OnceLock::new();
 /// Under the smoke, notes whether the helper is already running once the
 /// boot windows have reached Rust: the moment Electron's runSmoke took
 /// `helperStartedBeforeSmoke`, before any lane uses the helper.
-fn watch_boot(app: &tauri::AppHandle) {
+fn watch_boot(app: &crate::shell::AppHandle) {
     if !crate::selftest::smoke_enabled() {
         return;
     }

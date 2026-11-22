@@ -8,10 +8,10 @@ use std::collections::HashSet;
 use std::sync::Mutex;
 
 use serde_json::{json, Value};
-use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
 
 use crate::capture::{self, screen};
 use crate::desktop::win;
+use crate::shell::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 use crate::windows::flags;
 
 #[derive(Default)]
@@ -44,7 +44,7 @@ pub fn draw_payload(frame: Option<&(u32, String)>, display: &screen::Display) ->
     })
 }
 
-fn create(app: &AppHandle, d: &screen::Display) -> tauri::Result<tauri::WebviewWindow> {
+fn create(app: &AppHandle, d: &screen::Display) -> crate::shell::Result<WebviewWindow> {
     let label = label_for(d.id);
     let win = WebviewWindowBuilder::new(app, &label, WebviewUrl::App("renderer/lens.html".into()))
         .title("Aevaleron")
@@ -58,12 +58,10 @@ fn create(app: &AppHandle, d: &screen::Display) -> tauri::Result<tauri::WebviewW
         .skip_taskbar(true)
         .content_protected(true)
         .visible(false)
-        .data_directory(crate::paths::webview_data_dir())
-        .initialization_script(crate::ipc::bridge_script())
         .on_page_load(|w, p| {
             // A reload starts over. `lens:ready` ends the wait, so a frame
             // set while the page loaded is drawn once it can hear it.
-            if matches!(p.event(), tauri::webview::PageLoadEvent::Started) {
+            if matches!(p.event(), crate::shell::webview::PageLoadEvent::Started) {
                 with(|s| s.ready.remove(w.label()));
             }
         })
@@ -74,25 +72,11 @@ fn create(app: &AppHandle, d: &screen::Display) -> tauri::Result<tauri::WebviewW
     win::place(&win, d.phys);
     capture::exclude_window(raw);
     win.on_window_event(move |e| {
-        if matches!(e, tauri::WindowEvent::Destroyed) {
+        if matches!(e, crate::shell::WindowEvent::Destroyed) {
             with(|s| s.closing.remove(&label));
         }
     });
-    crate::crash::guard_webview(&win, browser_gone);
     Ok(win)
-}
-
-/// The browser process died and the webview with it: the window goes, and
-/// the next draw builds a new one.
-fn browser_gone(app: &AppHandle, label: &str) {
-    if let Some(w) = app.get_webview_window(label) {
-        with(|s| {
-            s.ready.remove(label);
-            s.closing.insert(label.to_string());
-        });
-        let _ = w.destroy();
-    }
-    redraw(app);
 }
 
 /// `lens:ready`: the page has its listeners, so what waited can be drawn.
@@ -187,7 +171,7 @@ pub fn set_hidden(app: &AppHandle, on: bool) {
     redraw(app);
 }
 
-fn all_windows(app: &AppHandle) -> Vec<tauri::WebviewWindow> {
+fn all_windows(app: &AppHandle) -> Vec<WebviewWindow> {
     app.webview_windows()
         .into_iter()
         .filter(|(l, _)| l.starts_with("lens-"))
@@ -197,7 +181,7 @@ fn all_windows(app: &AppHandle) -> Vec<tauri::WebviewWindow> {
 
 /// The lens windows on screen. A hidden one must not count as something the
 /// backdrop has to keep fresh (B-030).
-pub fn windows(app: &AppHandle) -> Vec<tauri::WebviewWindow> {
+pub fn windows(app: &AppHandle) -> Vec<WebviewWindow> {
     all_windows(app)
         .into_iter()
         .filter(|w| flags::is_visible(capture::hwnd_of(w)))

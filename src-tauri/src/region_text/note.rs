@@ -13,11 +13,11 @@ use std::sync::Mutex;
 use std::time::Duration;
 
 use serde_json::{json, Value};
-use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder};
 
 use crate::capture::{self, screen, PxRect};
 use crate::desktop::win;
 use crate::desktop::DesktopError;
+use crate::shell::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder};
 
 use super::assemble;
 
@@ -131,7 +131,7 @@ fn state() -> std::sync::MutexGuard<'static, State> {
     STATE.lock().unwrap_or_else(|e| e.into_inner())
 }
 
-fn create(app: &AppHandle) -> tauri::Result<tauri::WebviewWindow> {
+fn create(app: &AppHandle) -> crate::shell::Result<crate::shell::WebviewWindow> {
     state().ready = false;
     let win = WebviewWindowBuilder::new(
         app,
@@ -149,18 +149,11 @@ fn create(app: &AppHandle) -> tauri::Result<tauri::WebviewWindow> {
     .skip_taskbar(true)
     .content_protected(true)
     .visible(false)
-    .data_directory(crate::paths::webview_data_dir())
-    .initialization_script(crate::ipc::bridge_script())
     .build()?;
     let raw = capture::hwnd_of(&win);
     win::tool_window(raw, true);
     win::set_mouse_through(raw, true);
     capture::exclude_window(raw);
-    crate::crash::guard_webview(&win, |app, label| {
-        if let Some(w) = app.get_webview_window(label) {
-            let _ = w.destroy();
-        }
-    });
     Ok(win)
 }
 

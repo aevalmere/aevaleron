@@ -1,7 +1,11 @@
-# The Tauri rewrite (branch rust-rewrite). Every gate runs here: no Rust
-# toolchain is installed on a developer machine for this project. Results,
-# pass or fail, land on the ci-logs branch under <ref>/<sha>/rust/; wait for
-# them with `node tools/ci-wait.mjs <sha>` rather than the GitHub API.
+# The native Rust app (branches rust-rewrite, rust/**). Every gate runs here:
+# no Rust toolchain is installed on a developer machine for this project.
+# cargo builds the exe, makensis packs it with src-tauri/installer.nsi (no
+# tauri-bundler, no WebView2), and tools/native-install-check.ps1 installs,
+# measures, upgrades and uninstalls it on this runner. Every gate runs after
+# a failed one, so one run reports everything. Results, pass or fail, land on
+# the ci-logs branch under <ref>/<sha>/rust/, metrics included; wait for them
+# with `node tools/ci-wait.mjs <sha>` rather than the GitHub API.
 name: rust
 
 on:
@@ -16,13 +20,11 @@ concurrency:
 jobs:
   build:
     runs-on: windows-latest
-    timeout-minutes: 60
+    timeout-minutes: 75
     permissions:
       contents: write
-    env:
-      # The bundler pins its NSIS toolset per CLI release; tools/seed-nsis.ps1
-      # holds this release's hashes, so the two move together.
-      TAURI_CLI: '2.12.4'
+      # gh run list / download of the previous installer (the upgrade check).
+      actions: read
     defaults:
       run:
         shell: pwsh
@@ -96,7 +98,8 @@ jobs:
           '@ | Set-Content (Join-Path $env:RUNNER_TEMP 'gate.ps1')
 
       # The desktop helper ships prebuilt (DESK-12): compile host.cs once,
-      # bundle build/desktop-<hash>.dll, and pin its SHA-256 into the exe.
+      # ship build/desktop-<hash>.dll in desktop\ beside the exe, and pin its
+      # SHA-256 into the exe.
       - name: Prebuild desktop helper
         id: prebuild
         run: |
@@ -144,61 +147,71 @@ jobs:
         if: success() || failure()
         run: '& "$env:RUNNER_TEMP\gate.ps1" test "cargo test --color never"'
 
-      # The bundler downloads NSIS and nsis_tauri_utils.dll from github.com
-      # release assets into %LOCALAPPDATA%\tauri\NSIS when that folder is not
-      # complete, and that endpoint answers 504 for days at a time. The
-      # folder comes from the cache, else tools/seed-nsis.ps1 builds it
-      # (NSIS from SourceForge, the vendored DLL) with the hashes the
-      # bundler checks, so the build downloads nothing. Saved as soon as it
-      # is seeded, whatever the later steps do.
+      # cargo's bin is target\release\aevaleron.exe (the package name); the
+      # installer names it Aevaleron.exe. The helper DLL goes into desktop\
+      # beside it, where an installed copy has it (desktop/client.rs), so the
+      # checks below run the exe as installed.
+      - name: Release build
+        id: build
+        if: success() || failure()
+        run: |
+          & "$env:RUNNER_TEMP\gate.ps1" build "cargo build --release --color never"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $desk = 'target\release\desktop'
+          if (Test-Path $desk) { Remove-Item -Recurse -Force $desk }
+          New-Item -ItemType Directory -Force $desk | Out-Null
+          Copy-Item ..\build\desktop-*.dll $desk
+          $exe = Get-Item target\release\aevaleron.exe
+          "[METRIC] exeKB=$([Math]::Round($exe.Length / 1KB))" | Tee-Object -Append -FilePath "$env:RUNNER_TEMP\ci-logs\build.log"
+
+      # makensis comes from the pinned NSIS 3.13 toolset tools/seed-nsis.ps1
+      # lays out (cached; SourceForge, else the runner's own NSIS), the same
+      # one the Tauri bundler used, so the build downloads nothing from the
+      # github.com release assets that answer 504 for days at a time.
       - name: Restore NSIS toolset
         id: nsiscache
+        if: success() || failure()
         uses: actions/cache/restore@v4
         with:
           path: ~/AppData/Local/tauri/NSIS
-          key: tauri-nsis-${{ runner.os }}-${{ env.TAURI_CLI }}-${{ hashFiles('tools/seed-nsis.ps1', 'tools/nsis/*') }}
+          key: tauri-nsis-${{ runner.os }}-2.12.4-${{ hashFiles('tools/seed-nsis.ps1', 'tools/nsis/*') }}
 
       - name: Seed NSIS toolset
         id: nsis
+        if: success() || failure()
         run: '& "$env:RUNNER_TEMP\gate.ps1" nsis "pwsh -NoProfile -File ../tools/seed-nsis.ps1"'
 
       - name: Save NSIS toolset
         id: nsissave
-        if: steps.nsis.outcome == 'success' && steps.nsiscache.outputs.cache-hit != 'true'
+        if: (success() || failure()) && steps.nsis.outcome == 'success' && steps.nsiscache.outputs.cache-hit != 'true'
         continue-on-error: true
         uses: actions/cache/save@v4
         with:
           path: ~/AppData/Local/tauri/NSIS
           key: ${{ steps.nsiscache.outputs.cache-primary-key }}
 
-      # Retried only when the log ends on a bundler download failure (an
-      # HTTP status, a refused or timed-out request), never on a compile
-      # error; the retry reuses the compiled target, so it only bundles. With
-      # the toolset seeded there should be no download at all: a bundler that
-      # still verified or replaced NSIS means seed-nsis.ps1 is out of date.
+      # The version is package.json's (the updater compares it, release.yml
+      # checks the tag against it); Cargo.toml has to agree. The name keeps
+      # the Tauri pattern, Aevaleron_<version>_x64-setup.exe.
       - name: Build installer
-        id: build
+        id: installer
+        if: success() || failure()
         run: |
-          $log = Join-Path $env:RUNNER_TEMP 'ci-logs\build.log'
-          $download = 'failed to bundle project.*(http status|error sending request|timed out|timeout|connection|dns error|download)'
-          $notes = @()
-          for ($try = 1; $try -le 3; $try++) {
-            & "$env:RUNNER_TEMP\gate.ps1" build "npx --yes @tauri-apps/cli@$env:TAURI_CLI build --bundles nsis"
-            $code = $LASTEXITCODE
-            if ($code -eq 0) { break }
-            $hit = Select-String -Path $log -Pattern $download | Select-Object -Last 1
-            if (-not $hit -or $try -eq 3) { break }
-            $notes += "build try $try failed on a bundler download, retrying: $($hit.Line.Trim())"
-            Write-Output "::warning title=Build installer::$($notes[-1].Replace('%', '%25'))"
-            Start-Sleep -Seconds (20 * $try)
-          }
-          $redo = Select-String -Path $log -Pattern 'Verifying NSIS package|NSIS directory (is missing|contains mis-hashed)|NSIS\.exe is (outdated|missing)' | Select-Object -First 1
-          if ($redo) {
-            $notes += "the bundler did not take the seeded NSIS toolset ($($redo.Line.Trim())); tools/seed-nsis.ps1 no longer matches tauri-cli $env:TAURI_CLI"
-            Write-Output "::warning title=Build installer::$($notes[-1].Replace('%', '%25'))"
-          }
-          if ($notes) { @($notes) + @('') + @(Get-Content $log) | Set-Content $log }
-          exit $code
+          $log = Join-Path $env:RUNNER_TEMP 'ci-logs\installer.log'
+          $v = node -p "require('../package.json').version"
+          $cargo = [regex]::Match((Get-Content Cargo.toml -Raw), '(?m)^version = "([^"]+)"').Groups[1].Value
+          if ($cargo -ne $v) { "Cargo.toml says $cargo, package.json says $v" | Set-Content $log; Write-Output "::error title=Build installer::Cargo.toml $cargo != package.json $v"; exit 1 }
+          $four = ($v -replace '[-+].*$', '') + '.0'
+          $dir = 'target\release\bundle\nsis'
+          if (Test-Path $dir) { Remove-Item -Recurse -Force $dir }
+          New-Item -ItemType Directory -Force $dir | Out-Null
+          $makensis = Join-Path $env:LOCALAPPDATA 'tauri\NSIS\makensis.exe'
+          & "$env:RUNNER_TEMP\gate.ps1" installer "`"$makensis`" /V3 /DVERSION=$v /DVERSIONWITHBUILD=$four installer.nsi"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $setup = Get-Item "$dir\Aevaleron_${v}_x64-setup.exe"
+          "[METRIC] installerKB=$([Math]::Round($setup.Length / 1KB))" | Tee-Object -Append -FilePath $log
+          "APP_VERSION=$v" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "APP_INSTALLER=$($setup.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
       # The smoke run (src-tauri/src/selftest): every lane's probe inside the
       # built exe. tools/smoke-gate.mjs fails it on any =FAIL line, on a
@@ -206,9 +219,10 @@ jobs:
       # tools/smoke-labels/*.txt that never printed; it checks itself first.
       - name: Smoke
         id: smoke
+        if: success() || failure()
         run: |
           $log = Join-Path $env:RUNNER_TEMP 'ci-logs\smoke.log'
-          $exe = 'target\release\Aevaleron.exe'
+          $exe = 'target\release\aevaleron.exe'
           if (-not (Test-Path $exe)) { "missing $exe" | Set-Content $log; throw "missing $exe" }
           node ../tools/smoke-gate.mjs --self-test 2>&1 | Tee-Object -FilePath $log
           if ($LASTEXITCODE -ne 0) { Write-Output '::error::the smoke gate failed its own self-test'; exit 1 }
@@ -253,9 +267,9 @@ jobs:
         if: success() || failure()
         run: |
           $log = Join-Path $env:RUNNER_TEMP 'ci-logs\capture.log'
-          $exe = 'target\release\Aevaleron.exe'
+          $exe = 'target\release\aevaleron.exe'
           if (-not (Test-Path $exe)) { "missing $exe" | Set-Content $log; throw "missing $exe" }
-          if (-not (Test-Path 'target\release\desktop')) { Write-Output '::warning::no bundled desktop/ folder beside the exe' }
+          if (-not (Test-Path 'target\release\desktop')) { Write-Output '::warning::no desktop/ folder beside the exe' }
           $scratch = Join-Path $env:RUNNER_TEMP 'aeval-capture'
           New-Item -ItemType Directory -Force $scratch | Out-Null
           $env:AEVAL_CAPTURE_CHECK = '1'
@@ -289,7 +303,7 @@ jobs:
         if: success() || failure()
         run: |
           $log = Join-Path $env:RUNNER_TEMP 'ci-logs\desktop.log'
-          $exe = 'target\release\Aevaleron.exe'
+          $exe = 'target\release\aevaleron.exe'
           if (-not (Test-Path $exe)) { "missing $exe" | Set-Content $log; throw "missing $exe" }
           $scratch = Join-Path $env:RUNNER_TEMP 'aeval-desktop'
           New-Item -ItemType Directory -Force $scratch | Out-Null
@@ -319,16 +333,48 @@ jobs:
           }
           if (-not $ok) { Add-Content $log 'desktop selfcheck failed: no "[DESKTOP] done" line'; exit 1 }
 
+      # The installer on this runner: files, shortcuts, the uninstall entry,
+      # one process and no WebView2, idle memory and CPU, single instance, an
+      # upgrade over the last green rust/next (Tauri) installer, and an
+      # uninstall that keeps %APPDATA%\aevaleron. Its [METRIC] lines go into
+      # the ci-logs summary table.
+      - name: Install check
+        id: install
+        if: (success() || failure()) && env.APP_INSTALLER != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $out = Join-Path $env:RUNNER_TEMP 'native-install'
+          & "$env:RUNNER_TEMP\gate.ps1" install "pwsh -NoProfile -File ..\tools\native-install-check.ps1 -Installer `"$env:APP_INSTALLER`" -Version $env:APP_VERSION -Exe target\release\aevaleron.exe -Out `"$out`" -PreviousBranch rust/next"
+          exit $LASTEXITCODE
+
+      # Consumers download the installer under this name (it kept the Tauri
+      # era's name on purpose).
       - id: upload
+        if: success() || failure()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: aevaleron-tauri-nsis
           path: src-tauri/target/release/bundle/nsis/Aevaleron_*.exe
           if-no-files-found: error
 
-      # Last, pass, fail or cancel: summary.md, errors.txt and every gate's
-      # log to ci-logs/<ref>/<sha>/rust/ (tools/ci-publish.mjs). A failure to
-      # publish never turns a green run red.
+      # The bare exe and its helper, for ui-shots.yml (it shoots this build
+      # instead of compiling again).
+      - id: uploadexe
+        if: success() || failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: aevaleron-native-exe
+          retention-days: 7
+          path: |
+            src-tauri/target/release/aevaleron.exe
+            src-tauri/target/release/desktop/
+          if-no-files-found: error
+
+      # Last, pass, fail or cancel: summary.md (with the [METRIC] table),
+      # errors.txt and every gate's log to ci-logs/<ref>/<sha>/rust/
+      # (tools/ci-publish.mjs). A failure to publish never turns a green run
+      # red.
       - name: Publish to ci-logs
         if: always()
         continue-on-error: true
@@ -349,12 +395,26 @@ jobs:
             Format patch|${{ steps.fmtpatch.outcome }}|fmt.patch
             Clippy|${{ steps.clippy.outcome }}|clippy.log
             Unit tests|${{ steps.test.outcome }}|test.log
+            Release build|${{ steps.build.outcome }}|build.log
             Restore NSIS toolset|${{ steps.nsiscache.outcome }}
             Seed NSIS toolset|${{ steps.nsis.outcome }}|nsis.log
             Save NSIS toolset|${{ steps.nsissave.outcome }}
-            Build installer|${{ steps.build.outcome }}|build.log
+            Build installer|${{ steps.installer.outcome }}|installer.log
             Smoke|${{ steps.smoke.outcome }}|smoke.log
             Capture check|${{ steps.capture.outcome }}|capture.log
             Desktop selfcheck|${{ steps.desktop.outcome }}|desktop.log
+            Install check|${{ steps.install.outcome }}|install.log
             Upload installer|${{ steps.upload.outcome }}
+            Upload exe|${{ steps.uploadexe.outcome }}
         run: node tools/ci-publish.mjs
+
+  # The native screenshots of this build (ui-shots.yml), from the exe the
+  # build job uploaded: no second compile. rust/native-ui only.
+  shots:
+    needs: build
+    if: always() && github.ref == 'refs/heads/rust/native-ui' && needs.build.result != 'cancelled'
+    permissions:
+      contents: write
+      actions: read
+    uses: ./.github/workflows/ui-shots.yml
+    secrets: inherit

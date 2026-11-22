@@ -1,19 +1,31 @@
 //! Right-click menus inside the windows (main.js contextMenu, SPEC-v2 4.5):
 //! an answer (Copy, Do it) and a trail row (Copy step, Retry from here). The
-//! bridge asks for the edit menu on a text field and Copy / Select all on a
+//! pages ask for the edit menu on a text field and Copy / Select all on a
 //! selection (main.js attachContextMenu, WIN-14).
+//!
+//! A plain Win32 popup menu, tracked on the UI thread with TPM_RETURNCMD:
+//! the click comes back as the call's value, so these menus need no share of
+//! the tray's menu events. The edit commands are the keys a text field
+//! already answers (Ctrl+X, C, V, A), sent to the page that has the keyboard.
 
 use std::collections::HashMap;
 use std::sync::OnceLock;
 
 use parking_lot::Mutex;
 use serde_json::{json, Value};
-use tauri::menu::{IsMenuItem, Menu, MenuItem, PredefinedMenuItem};
-use tauri::{AppHandle, Manager, Wry};
+use windows_sys::Win32::Foundation::{HWND, POINT};
+use windows_sys::Win32::UI::WindowsAndMessaging::{
+    AppendMenuW, CreatePopupMenu, DestroyMenu, GetCursorPos, PostMessageW, SetForegroundWindow,
+    TrackPopupMenu, MF_SEPARATOR, MF_STRING, TPM_NONOTIFY, TPM_RETURNCMD, TPM_RIGHTBUTTON, WM_NULL,
+};
 
 use super::agent::{start_run, StartReq};
+use crate::shell::{AppHandle, Manager};
 
 const PREFIX: &str = "ctx:";
+
+/// Command ids of the edit roles; the menu's own items are 1..=n.
+const ROLE_BASE: usize = 100;
 
 #[derive(Clone, Debug)]
 enum Action {
@@ -21,10 +33,8 @@ enum Action {
     DoIt { task: String, context: String },
 }
 
-type Item = Box<dyn IsMenuItem<Wry>>;
-
 /// The actions of the menu shown last, by item id. Locked only to swap a
-/// map in or take one out, never across a main-thread round trip.
+/// map in or take one out, never while the menu is up.
 fn pending() -> &'static Mutex<HashMap<String, Action>> {
     static P: OnceLock<Mutex<HashMap<String, Action>>> = OnceLock::new();
     P.get_or_init(|| Mutex::new(HashMap::new()))
@@ -93,19 +103,19 @@ pub fn edit_template(kind: &str) -> &'static [&'static str] {
     }
 }
 
-fn predefined(app: &AppHandle, role: &str) -> tauri::Result<PredefinedMenuItem<Wry>> {
+/// A role's menu text and the key that does it with Ctrl.
+fn role_entry(role: &str) -> Option<(&'static str, u16)> {
     match role {
-        "cut" => PredefinedMenuItem::cut(app, None),
-        "copy" => PredefinedMenuItem::copy(app, None),
-        "paste" => PredefinedMenuItem::paste(app, None),
-        "selectAll" => PredefinedMenuItem::select_all(app, None),
-        _ => PredefinedMenuItem::separator(app),
+        "cut" => Some(("Cut", 0x58)),
+        "copy" => Some(("Copy", 0x43)),
+        "paste" => Some(("Paste", 0x56)),
+        "selectAll" => Some(("Select all", 0x41)),
+        _ => None,
     }
 }
 
 /// Makes one menu's items with `make`, then swaps their actions in as the
-/// pending ones. Making an item is a round trip to the main thread, where a
-/// click may be waiting on `pending`, so the lock is never held meanwhile.
+/// pending ones, so the lock is never held while items are made.
 fn stage<T>(
     items: Vec<(&'static str, Action)>,
     mut make: impl FnMut(&str, &'static str) -> Result<T, String>,
@@ -126,13 +136,11 @@ fn stage<T>(
     built
 }
 
-fn run(app: &AppHandle, action: Action) {
-    let app = app.clone();
+fn run(action: Action) {
     let work = async move {
         match action {
             Action::Copy(t) => {
-                use tauri_plugin_clipboard_manager::ClipboardExt;
-                let _ = app.clipboard().write_text(t);
+                crate::shell::sys::clipboard_write(&t);
             }
             Action::DoIt { task, context } => {
                 let req = StartReq {
@@ -140,11 +148,75 @@ fn run(app: &AppHandle, action: Action) {
                     context: Some(context),
                     ..StartReq::default()
                 };
-                start_run(&app, req).await;
+                start_run(&AppHandle::get(), req).await;
             }
         }
     };
-    tauri::async_runtime::spawn(crate::crash::guard_async("context-menu.run", work));
+    crate::shell::async_runtime::spawn(crate::crash::guard_async("context-menu.run", work));
+}
+
+/// One line of the popup: a command id and its text, or a separator.
+enum Line {
+    Item(usize, &'static str),
+    Separator,
+}
+
+/// Shows `lines` at the pointer, owned by `hwnd`, and returns the chosen
+/// command id (0 when the menu was dismissed). UI thread only.
+fn track(hwnd: isize, lines: &[Line]) -> usize {
+    let owner = hwnd as HWND;
+    // SAFETY: a new menu, filled with NUL-terminated strings that outlive
+    // each call, tracked against a live window of ours on its own thread,
+    // and destroyed before returning.
+    unsafe {
+        let menu = CreatePopupMenu();
+        if menu.is_null() {
+            return 0;
+        }
+        for line in lines {
+            match line {
+                Line::Item(id, text) => {
+                    let wide: Vec<u16> = text.encode_utf16().chain(std::iter::once(0)).collect();
+                    AppendMenuW(menu, MF_STRING, *id, wide.as_ptr());
+                }
+                Line::Separator => {
+                    AppendMenuW(menu, MF_SEPARATOR, 0, std::ptr::null());
+                }
+            }
+        }
+        let mut at = POINT { x: 0, y: 0 };
+        GetCursorPos(&mut at);
+        // Without the window in front the menu does not close on a click
+        // outside it (TrackPopupMenu's remarks).
+        SetForegroundWindow(owner);
+        let flags = TPM_RETURNCMD | TPM_NONOTIFY | TPM_RIGHTBUTTON;
+        let chosen = TrackPopupMenu(menu, flags, at.x, at.y, 0, owner, std::ptr::null());
+        PostMessageW(owner, WM_NULL, 0, 0);
+        DestroyMenu(menu);
+        chosen.max(0) as usize
+    }
+}
+
+/// What a chosen command id does: one of the menu's own items (by its
+/// pending id) or an edit role's chord.
+fn chosen(cmd: usize, roles: &[&str]) {
+    if cmd == 0 {
+        return;
+    }
+    if cmd >= ROLE_BASE {
+        let key = roles.get(cmd - ROLE_BASE).copied().and_then(role_entry);
+        if let Some((_, vk)) = key {
+            if let Err(e) = crate::voice::insert::ctrl_chord(vk) {
+                crate::crash::write("context-menu", &e);
+            }
+        }
+        return;
+    }
+    let id = format!("{PREFIX}{}", cmd - 1);
+    let action = std::mem::take(&mut *pending().lock()).remove(&id);
+    if let Some(a) = action {
+        run(a);
+    }
 }
 
 /// `ui:context-menu`: pops the menu at the pointer in the calling window.
@@ -158,49 +230,27 @@ pub fn popup(app: &AppHandle, label: &str, p: &Value) -> Value {
     let Some(win) = app.get_webview_window(label) else {
         return done;
     };
-    let mut built: Vec<Item> = Vec::new();
-    if roles.is_empty() {
-        built = stage(items, |id, text| {
-            let made = MenuItem::with_id(app, id, text, true, None::<&str>);
-            let item = made.map_err(|e| e.to_string())?;
-            Ok(Box::new(item) as Item)
-        });
+    let lines: Vec<Line> = if roles.is_empty() {
+        stage(items, |id, text| {
+            let n: usize = id[PREFIX.len()..].parse().map_err(|_| id.to_string())?;
+            Ok(Line::Item(n + 1, text))
+        })
     } else {
-        for role in roles {
-            match predefined(app, role) {
-                Ok(m) => built.push(Box::new(m)),
-                Err(e) => crate::crash::write("context-menu", &e.to_string()),
-            }
-        }
-    }
-    let refs: Vec<&dyn IsMenuItem<Wry>> = built.iter().map(|m| &**m).collect();
-    match Menu::with_items(app, &refs) {
-        Ok(menu) => {
-            let _ = app.run_on_main_thread(move || {
-                crate::crash::guard("context-menu.popup", || {
-                    let _ = win.popup_menu(&menu);
-                });
-            });
-        }
-        Err(e) => crate::crash::write("context-menu", &e.to_string()),
-    }
+        roles
+            .iter()
+            .enumerate()
+            .map(|(i, r)| match role_entry(r) {
+                Some((text, _)) => Line::Item(ROLE_BASE + i, text),
+                None => Line::Separator,
+            })
+            .collect()
+    };
+    let hwnd = win.hwnd();
+    // Queued, so the menu never opens inside the call that asked for it.
+    let _ = crate::shell::platform::post(Box::new(move || {
+        crate::crash::guard("context-menu.popup", || chosen(track(hwnd, &lines), roles));
+    }));
     done
-}
-
-/// Routes clicks on these menus (ids `ctx:<n>`); other menus' ids pass by.
-pub fn init(app: &AppHandle) {
-    app.on_menu_event(|app, event| {
-        crate::crash::guard("context-menu.click", || {
-            let id = event.id().as_ref();
-            if !id.starts_with(PREFIX) {
-                return;
-            }
-            let action = std::mem::take(&mut *pending().lock()).remove(id);
-            if let Some(a) = action {
-                run(app, a);
-            }
-        });
-    });
 }
 
 #[cfg(test)]
@@ -234,6 +284,9 @@ mod tests {
         assert_eq!(edit_template("selection"), ["copy", "selectAll"]);
         assert!(edit_template("answer").is_empty());
         assert!(edit_template("").is_empty());
+        for role in edit_template("edit") {
+            assert_eq!(role_entry(role).is_none(), *role == "-", "{role}");
+        }
     }
 
     #[test]

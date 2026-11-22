@@ -292,7 +292,7 @@ pub fn capture_screen(region: Option<Rect>) -> Option<Shot> {
 
 /// `capture_screen` off the async runtime's worker threads.
 pub async fn capture_screen_async(region: Option<Rect>) -> Option<Shot> {
-    tauri::async_runtime::spawn_blocking(move || capture_screen(region))
+    crate::shell::async_runtime::spawn_blocking(move || capture_screen(region))
         .await
         .ok()
         .flatten()
@@ -337,10 +337,9 @@ pub fn exclude_window(hwnd: isize) -> bool {
     unsafe { SetWindowDisplayAffinity(HWND(hwnd as *mut _), WDA_EXCLUDEFROMCAPTURE).is_ok() }
 }
 
-/// A Tauri window's HWND as a plain integer (independent of the windows-rs
-/// version Tauri itself links).
-pub fn hwnd_of<R: tauri::Runtime>(win: &tauri::WebviewWindow<R>) -> isize {
-    win.hwnd().map(|h| h.0 as isize).unwrap_or(0)
+/// A window's HWND as a plain integer.
+pub fn hwnd_of(win: &crate::shell::WebviewWindow) -> isize {
+    win.hwnd()
 }
 
 #[cfg(test)]

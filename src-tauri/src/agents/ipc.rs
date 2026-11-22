@@ -4,7 +4,8 @@
 //! which falls through to the next router.
 
 use serde_json::{json, Value};
-use tauri::AppHandle;
+
+use crate::shell::AppHandle;
 
 pub async fn route(app: &AppHandle, channel: &str, p: &Value) -> Option<Result<Value, String>> {
     let out = match channel {
@@ -34,7 +35,7 @@ pub async fn route(app: &AppHandle, channel: &str, p: &Value) -> Option<Result<V
         "agents:set" => {
             let patch = p.clone();
             // Hooks are files in other tools' folders: off the IPC thread.
-            tauri::async_runtime::spawn_blocking(move || super::set(&patch))
+            crate::shell::async_runtime::spawn_blocking(move || super::set(&patch))
                 .await
                 .map_err(|e| e.to_string())
                 .unwrap_or_else(|why| json!({ "error": why }))

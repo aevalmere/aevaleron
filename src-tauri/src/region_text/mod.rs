@@ -22,8 +22,6 @@ use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 use serde_json::{json, Value};
-use tauri::AppHandle;
-use tauri_plugin_clipboard_manager::ClipboardExt;
 use windows_sys::Win32::Foundation::HWND;
 use windows_sys::Win32::UI::WindowsAndMessaging::{
     GetForegroundWindow, GetWindowThreadProcessId, IsWindow, SetForegroundWindow,
@@ -32,6 +30,7 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{
 use crate::capture::screen::{self, PxRect};
 use crate::desktop::DesktopError;
 use crate::region;
+use crate::shell::AppHandle;
 use crate::state::{shared, Mode};
 
 use assemble::{Piece, Source};
@@ -92,7 +91,7 @@ pub fn clear_outcome() {
 /// drag too small to mean anything, changes nothing.
 pub fn start(app: &AppHandle) {
     let app = app.clone();
-    tauri::async_runtime::spawn(async move {
+    crate::shell::async_runtime::spawn(async move {
         run(&app).await;
     });
 }
@@ -145,12 +144,11 @@ pub async fn copy_rect(app: &AppHandle, px: PxRect, display: &screen::Display) -
         Ok((text, source)) if !text.is_empty() => {
             // Windows' clipboard text has CRLF line ends.
             let crlf = text.replace('\n', "\r\n");
-            match app.clipboard().write_text(crlf) {
-                Ok(()) => (Note::copied(&text), "copied", source.name()),
-                Err(e) => {
-                    eprintln!("copy text: the clipboard refused: {e}");
-                    (Note::not_copied(), "error", source.name())
-                }
+            if crate::shell::sys::clipboard_write(&crlf) {
+                (Note::copied(&text), "copied", source.name())
+            } else {
+                eprintln!("copy text: the clipboard refused the text");
+                (Note::not_copied(), "error", source.name())
             }
         }
         Ok((_, source)) => (Note::none(), "none", source.name()),

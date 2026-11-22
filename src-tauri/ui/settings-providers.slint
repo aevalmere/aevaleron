@@ -1,0 +1,434 @@
+// Settings' Providers and Models pages (settings.html #pg-providers,
+// #pg-models). A provider row is its head (place, name, key hint, state)
+// and, while open, what its state offers: a message, the key field, the
+// actions and the order buttons. Press a head and move it to reorder.
+
+import { Theme, Glyph, Button } from "theme.slint";
+import { SettingsState, SetProvRow } from "settings-state.slint";
+import { PageTitle, Group, Note, SwitchRow, ChoiceOption, Segments, TextField, TextButton, Disclosure, Combo } from "settings-widgets.slint";
+
+component ProvRowView inherits Rectangle {
+    in property <SetProvRow> row;
+    in property <int> index;
+    in property <int> count;
+    property <bool> open: SettingsState.open-row == "prov-" + root.row.id;
+    property <int> epoch: root.row.epoch;
+    property <int> focus-at: root.row.focus;
+    property <bool> shown: false;
+    property <length> pressed-y;
+    property <length> head-h: 56px * Theme.text-scale;
+    property <bool> dragged: SettingsState.drag-id == root.row.id;
+    property <bool> lands-here: SettingsState.drag-id != "" && !root.dragged && SettingsState.drag-to == root.index;
+
+    changed epoch => {
+        field.set-text(root.row.field-text);
+        root.shown = false;
+    }
+    changed focus-at => {
+        field.focus-field();
+    }
+
+    border-radius: Theme.r-row;
+    background: root.dragged ? Theme.accent-wash : transparent;
+
+    // Where a dragged row would land: a line at the top of this one.
+    Rectangle {
+        visible: root.lands-here;
+        x: Theme.sp-3;
+        y: 0;
+        width: parent.width - 2 * Theme.sp-3;
+        height: 2px;
+        background: Theme.accent;
+    }
+
+    VerticalLayout {
+        Rectangle {
+            min-height: root.head-h;
+            border-radius: Theme.r-row;
+            background: head-touch.has-hover ? Theme.fill-1 : transparent;
+            head-touch := TouchArea {
+                mouse-cursor: SettingsState.ordered ? MouseCursor.grab : MouseCursor.pointer;
+                pointer-event(e) => {
+                    if (e.button == PointerEventButton.left && e.kind == PointerEventKind.down) {
+                        root.pressed-y = self.mouse-y;
+                    }
+                    if (e.button == PointerEventButton.left && e.kind == PointerEventKind.up) {
+                        if (SettingsState.drag-id == root.row.id) {
+                            SettingsState.prov-move(root.row.id, SettingsState.drag-to);
+                        } else {
+                            SettingsState.combo-open = "";
+                            SettingsState.open-row = root.open ? "" : "prov-" + root.row.id;
+                        }
+                    }
+                }
+                moved => {
+                    if (self.pressed && SettingsState.ordered && root.count > 1) {
+                        if (SettingsState.drag-id == root.row.id || abs(self.mouse-y - root.pressed-y) > 6px) {
+                            SettingsState.drag-id = root.row.id;
+                            SettingsState.drag-to = max(0, min(root.count - 1, root.index + round((self.mouse-y - root.pressed-y) / root.head-h)));
+                        }
+                    }
+                }
+            }
+            HorizontalLayout {
+                padding-left: Theme.sp-2;
+                padding-right: Theme.sp-3;
+                spacing: Theme.sp-3;
+                if SettingsState.ordered: Text {
+                    text: "\u{E700}";
+                    font-family: Theme.icons;
+                    font-size: 12px * Theme.text-scale;
+                    color: Theme.label-3;
+                    vertical-alignment: center;
+                }
+                Text {
+                    text: root.row.pos;
+                    font-size: Theme.caption;
+                    color: Theme.label-3;
+                    vertical-alignment: center;
+                    min-width: 12px;
+                }
+                VerticalLayout {
+                    alignment: center;
+                    horizontal-stretch: 1;
+                    spacing: 2px;
+                    Text {
+                        text: root.row.name;
+                        font-size: Theme.row;
+                        font-weight: 600;
+                        color: Theme.label;
+                        overflow: elide;
+                    }
+                    Text {
+                        text: root.row.sub;
+                        font-size: Theme.meta;
+                        font-family: root.row.mono ? Theme.mono : Theme.font;
+                        color: Theme.label-3;
+                        overflow: elide;
+                    }
+                }
+                HorizontalLayout {
+                    spacing: Theme.sp-1;
+                    alignment: end;
+                    Text {
+                        text: root.row.icon;
+                        font-family: Theme.icons;
+                        font-size: 12px * Theme.text-scale;
+                        color: root.row.tone == "danger" ? Theme.danger : root.row.tone == "ok" ? Theme.accent-text : Theme.label-2;
+                        vertical-alignment: center;
+                    }
+                    Text {
+                        text: root.row.word;
+                        font-size: Theme.caption;
+                        color: root.row.tone == "danger" ? Theme.danger : root.row.tone == "ok" ? Theme.accent-text : Theme.label-2;
+                        vertical-alignment: center;
+                    }
+                }
+                if root.row.is-default: Rectangle {
+                    height: 22px * Theme.text-scale;
+                    min-width: cap.preferred-width + 2 * Theme.sp-2;
+                    border-radius: self.height / 2;
+                    background: Theme.accent-wash;
+                    cap := Text {
+                        text: "Default";
+                        font-size: Theme.meta;
+                        color: Theme.accent-text;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
+                }
+                Text {
+                    text: root.open ? Glyph.up : Glyph.down;
+                    font-family: Theme.icons;
+                    font-size: 10px * Theme.text-scale;
+                    color: Theme.label-3;
+                    vertical-alignment: center;
+                }
+            }
+        }
+
+        Rectangle {
+            clip: true;
+            height: root.open ? body.preferred-height : 0px;
+            body := VerticalLayout {
+                padding-left: Theme.sp-3;
+                padding-right: Theme.sp-3;
+                padding-bottom: Theme.sp-4;
+                spacing: Theme.sp-3;
+
+                if root.row.msg != "": Note {
+                    text: root.row.msg;
+                    tone: root.row.msg-danger ? "danger" : "";
+                    font-size: Theme.row;
+                    color: root.row.msg-danger ? Theme.danger : Theme.label-2;
+                }
+
+                if root.row.clip != "": HorizontalLayout {
+                    spacing: Theme.sp-3;
+                    Text {
+                        text: "Key on the clipboard: " + root.row.clip;
+                        font-size: Theme.caption;
+                        font-family: Theme.mono;
+                        color: Theme.label-2;
+                        vertical-alignment: center;
+                        horizontal-stretch: 1;
+                        overflow: elide;
+                    }
+                    Button {
+                        text: "Use this key";
+                        prominent: true;
+                        clicked => {
+                            SettingsState.prov-act(root.row.id, "clip", "");
+                        }
+                    }
+                }
+
+                // The field lives as long as the row: a re-render never
+                // moves it, so a half-pasted key survives.
+                Rectangle {
+                    height: root.row.field ? field-col.preferred-height : 0px;
+                    clip: true;
+                    field-col := VerticalLayout {
+                        spacing: Theme.sp-1;
+                        Text {
+                            text: root.row.field-label;
+                            font-size: Theme.caption;
+                            color: Theme.label-2;
+                        }
+                        HorizontalLayout {
+                            spacing: Theme.sp-2;
+                            field := TextField {
+                                placeholder: root.row.placeholder;
+                                password: !root.shown;
+                                mono: true;
+                                enabled: !root.row.busy;
+                                edited(t) => {
+                                    SettingsState.prov-edited(root.row.id, t);
+                                }
+                                accepted(t) => {
+                                    SettingsState.prov-act(root.row.id, "enter", t);
+                                }
+                            }
+                            Button {
+                                text: root.shown ? "Hide" : "Show";
+                                enabled: !root.row.busy;
+                                clicked => {
+                                    root.shown = !root.shown;
+                                    field.focus-field();
+                                }
+                            }
+                            Button {
+                                text: "Save";
+                                prominent: root.row.save-prominent;
+                                enabled: !root.row.busy;
+                                clicked => {
+                                    SettingsState.prov-act(root.row.id, "save", field.text);
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if root.row.actions.length > 0: HorizontalLayout {
+                    spacing: Theme.sp-2;
+                    alignment: start;
+                    for a in root.row.actions: HorizontalLayout {
+                        if a.kind == "text": TextButton {
+                            text: a.label;
+                            enabled: !a.disabled;
+                            clicked => {
+                                SettingsState.prov-act(root.row.id, a.id, field.text);
+                            }
+                        }
+                        if a.kind == "link": TextButton {
+                            text: a.label;
+                            clicked => {
+                                SettingsState.act("open-url", a.href);
+                            }
+                        }
+                        if a.kind == "link-button": Button {
+                            text: a.label;
+                            clicked => {
+                                SettingsState.act("open-url", a.href);
+                            }
+                        }
+                        if a.kind != "text" && a.kind != "link" && a.kind != "link-button": Button {
+                            text: a.label;
+                            prominent: a.kind == "prominent";
+                            danger: a.kind == "danger";
+                            enabled: !a.disabled;
+                            clicked => {
+                                SettingsState.prov-act(root.row.id, a.id, field.text);
+                            }
+                        }
+                    }
+                }
+
+                if root.row.order: HorizontalLayout {
+                    spacing: Theme.sp-1;
+                    alignment: start;
+                    TextButton {
+                        text: "Move up";
+                        enabled: root.row.can-up;
+                        clicked => {
+                            SettingsState.prov-act(root.row.id, "up", "");
+                        }
+                    }
+                    TextButton {
+                        text: "Move down";
+                        enabled: root.row.can-down;
+                        clicked => {
+                            SettingsState.prov-act(root.row.id, "down", "");
+                        }
+                    }
+                    if root.row.show-first: TextButton {
+                        text: "Use first";
+                        enabled: !root.row.busy;
+                        clicked => {
+                            SettingsState.prov-act(root.row.id, "first", "");
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+export component ProvidersPage inherits VerticalLayout {
+    spacing: Theme.sp-3;
+    PageTitle {
+        text: "Providers";
+        lede: SettingsState.ordered ? "Answers come from the first ready provider in this list. Drag to change the order." : "Answers come from the first ready provider in this list.";
+    }
+    Group {
+        for p[i] in SettingsState.providers: ProvRowView {
+            row: p;
+            index: i;
+            count: SettingsState.providers.length;
+        }
+    }
+    // CLI provider picker (lane cli-providers): wire here
+    if SettingsState.cli-picker-shown: Rectangle { }
+    if SettingsState.prov-live != "": Note {
+        text: SettingsState.prov-live;
+        font-size: Theme.row;
+        color: Theme.label-2;
+    }
+    if SettingsState.failover-shown: Group {
+        SwitchRow {
+            text: "When one is busy or fails, try the next";
+            checked: SettingsState.failover-across;
+            toggled(v) => {
+                SettingsState.toggle("failover-across", v);
+            }
+        }
+        SwitchRow {
+            text: "Ask me before switching from free models to a paid provider";
+            indent: Theme.sp-4;
+            checked: SettingsState.failover-ask;
+            enabled: SettingsState.failover-across;
+            toggled(v) => {
+                SettingsState.toggle("failover-ask", v);
+            }
+        }
+    }
+    if SettingsState.key-storage != "": Note {
+        text: SettingsState.key-storage;
+        tone: SettingsState.key-storage-warn ? "warn" : "";
+    }
+}
+
+export component ModelsPage inherits VerticalLayout {
+    spacing: Theme.sp-3;
+    PageTitle {
+        text: "Models";
+    }
+    Group {
+        ChoiceOption {
+            name: "Automatic (recommended)";
+            note: "Aevaleron picks a model for each job: free ones on OpenRouter, the recommended one elsewhere.";
+            checked: SettingsState.models-mode == "auto";
+            clicked => {
+                SettingsState.act("models-mode", "auto");
+            }
+        }
+        ChoiceOption {
+            name: "Choose for each job";
+            checked: SettingsState.models-mode == "custom";
+            clicked => {
+                SettingsState.act("models-mode", "custom");
+            }
+        }
+    }
+    if SettingsState.models-mode == "custom": VerticalLayout {
+        spacing: Theme.sp-3;
+        if SettingsState.models-for.length > 0: HorizontalLayout {
+            spacing: Theme.sp-3;
+            Text {
+                text: "Models for";
+                font-size: Theme.row;
+                color: Theme.label-2;
+                vertical-alignment: center;
+            }
+            Segments {
+                group: "models-for";
+                choices: SettingsState.models-for;
+            }
+        }
+        Group {
+            Disclosure {
+                rid: "sec-model";
+                title: "Screen model";
+                summary: SettingsState.model-summary;
+                Note {
+                    text: "Looks at your screen and answers.";
+                }
+                Combo {
+                    cid: "model";
+                    view: SettingsState.model-combo;
+                }
+            }
+            Disclosure {
+                rid: "sec-brain";
+                title: "Answer model";
+                summary: SettingsState.brain-summary;
+                SwitchRow {
+                    text: "Let the screen model read, and a bigger model answer";
+                    checked: SettingsState.brain-enabled;
+                    toggled(v) => {
+                        SettingsState.toggle("brain-enabled", v);
+                    }
+                }
+                if SettingsState.brain-enabled: Combo {
+                    cid: "brain";
+                    view: SettingsState.brain-combo;
+                }
+            }
+            Disclosure {
+                rid: "sec-agent-model";
+                title: "Task model";
+                summary: SettingsState.agent-model-summary;
+                Note {
+                    text: "Any model works. Tools means it calls actions natively; JSON mode means it writes them out, which works but slips more often.";
+                }
+                Combo {
+                    cid: "agent";
+                    view: SettingsState.agent-combo;
+                }
+            }
+        }
+    }
+    Group {
+        if SettingsState.paid-shown: SwitchRow {
+            text: "Show paid models";
+            checked: SettingsState.show-paid;
+            toggled(v) => {
+                SettingsState.toggle("show-paid", v);
+            }
+        }
+        if !SettingsState.paid-shown: Note {
+            text: "Every model here is billed per question.";
+            font-size: Theme.row;
+        }
+    }
+}

@@ -1,85 +1,81 @@
 //! The polish lane's labels (`tools/smoke-labels/polish.txt`): a menu in
-//! the bar is never cut by the bar's window. The bar's menus sit in the
-//! page's flow and Rust sizes the window to them, so only the real window
-//! can show whether the cap (`INPUT_MAX_HEIGHT`, scaled with the text) and
-//! the resize during the opening glide leave room for the whole menu.
+//! the bar is never cut by the bar's window. Rust sizes the window to the
+//! bar's menus, so only the real window can show whether the cap
+//! (`INPUT_MAX_HEIGHT`, scaled with the text) and the resize during the
+//! opening glide leave room for the whole menu.
 //!
-//! - `barMenuInside`: the token's menu, opened the moment the bar starts to
-//!   open (while it glides) and again under a four-line question, ends
-//!   inside the window both times.
+//! - `barMenuInside`: the token's menu, opened (Alt+Down in the field, as a
+//!   person opens it) the moment the bar starts to open, while it glides,
+//!   and again under a four-line question, ends inside the window both
+//!   times. The bar page's `menu` probe answers `{ open, inside }`, or a
+//!   bare `true` for a menu that is open in a window of its own.
 
 use std::time::Duration;
 
-use serde_json::{json, Value};
+use serde_json::Value;
 
-use crate::selftest::Cx;
+use crate::selftest::{Cx, Input};
 use crate::windows::{self, OVERLAY};
 
 const WAIT: Duration = Duration::from_secs(5);
-
-const MODE_JS: &str = "document.body.dataset.mode || ''";
-
-const TYPE_JS: &str = r#"
-(() => {
-  const i = document.getElementById('query-input');
-  i.focus();
-  i.value = $TEXT;
-  i.dispatchEvent(new Event('input', { bubbles: true }));
-  return i.value;
-})()
-"#;
-
-const OPEN_MENU_JS: &str = r#"
-(() => {
-  const m = document.getElementById('intent-menu');
-  if (m.hidden) document.getElementById('intent').click();
-  return !m.hidden;
-})()
-"#;
-
-const CLOSE_MENU_JS: &str = r#"
-(() => {
-  const m = document.getElementById('intent-menu');
-  if (!m.hidden) document.getElementById('intent').click();
-  return m.hidden;
-})()
-"#;
-
-// "ok", or where the menu is against the window.
-const INSIDE_JS: &str = r#"
-(() => {
-  const m = document.getElementById('intent-menu');
-  if (m.hidden) return 'menu hidden';
-  const r = m.getBoundingClientRect();
-  const w = document.documentElement.clientWidth;
-  const h = document.documentElement.clientHeight;
-  const ok = r.height > 0 && r.top >= -0.5 && r.left >= -0.5 && r.bottom <= h + 0.5 && r.right <= w + 0.5;
-  return ok ? 'ok' : `menu ${Math.round(r.left)},${Math.round(r.top)} to ${Math.round(r.right)},${Math.round(r.bottom)} in ${w}x${h}`;
-})()
-"#;
 
 pub fn run(cx: &mut Cx) {
     bar_menu_inside(cx);
 }
 
-fn page(cx: &Cx, js: &str) -> Value {
-    cx.eval(OVERLAY, js).unwrap_or(Value::Null)
-}
-
-fn text(v: &Value) -> String {
-    v.as_str().unwrap_or_default().to_string()
+fn page(cx: &Cx, key: &str) -> Value {
+    cx.probe(OVERLAY, key).unwrap_or(Value::Null)
 }
 
 fn mode(cx: &Cx) -> String {
-    text(&page(cx, MODE_JS))
+    page(cx, "mode").as_str().unwrap_or_default().to_string()
 }
 
+/// (open, inside) from the bar's `menu` probe.
+fn menu(cx: &Cx) -> (bool, bool) {
+    match page(cx, "menu") {
+        Value::Bool(open) => (open, open),
+        Value::Object(m) => {
+            let open = m.get("open") == Some(&Value::Bool(true));
+            (open, open && m.get("inside") == Some(&Value::Bool(true)))
+        }
+        _ => (false, false),
+    }
+}
+
+/// "ok", or what the menu probe said.
 fn inside_after_resize(cx: &Cx) -> String {
     // The glide (260 ms), the deferred resize and the menu's drop-in.
-    let _ = cx.wait_for(Duration::from_millis(1500), || {
-        text(&page(cx, INSIDE_JS)) == "ok"
-    });
-    text(&page(cx, INSIDE_JS))
+    let ok = cx.wait_for(Duration::from_millis(1500), || menu(cx) == (true, true));
+    if ok {
+        "ok".into()
+    } else {
+        page(cx, "menu").to_string()
+    }
+}
+
+/// The field focused, then Alt+Down: the token's menu.
+fn open_menu(cx: &Cx) -> bool {
+    let focused = || page(cx, "focused-input") == Value::Bool(true);
+    let _ = cx.wait_for(Duration::from_secs(2), focused);
+    let _ = cx.input(Input::Key("Alt+Down"));
+    cx.wait_for(Duration::from_secs(1), || menu(cx).0)
+}
+
+fn close_menu(cx: &Cx) {
+    if menu(cx).0 {
+        let _ = cx.input(Input::Key("Escape"));
+        let _ = cx.wait_for(Duration::from_secs(1), || !menu(cx).0);
+    }
+}
+
+/// Empties the field with real keys, then types `value`.
+fn type_text(cx: &Cx, value: &str) {
+    let _ = cx.input(Input::Key("Ctrl+A"));
+    let _ = cx.input(Input::Key("Delete"));
+    if !value.is_empty() {
+        let _ = cx.input(Input::Text(value));
+    }
 }
 
 fn bar_menu_inside(cx: &Cx) {
@@ -87,21 +83,28 @@ fn bar_menu_inside(cx: &Cx) {
     let _ = cx.wait_for(WAIT, || mode(cx) == "pill");
     cx.sleep(400);
 
-    // Opened while the bar is still gliding open.
-    cx.on_main(|app| windows::open_bar(app, None, None));
+    // Opened while the bar is still gliding open, by the hotkey so the bar
+    // has the keyboard.
+    let hotkey = crate::store::get().shortcut("captureQuery");
+    if cx.input(Input::Key(&hotkey)).is_err() {
+        cx.on_main(|app| windows::open_bar(app, None, None));
+    }
     let _ = cx.wait_for(WAIT, || mode(cx) == "panel");
-    let opened = page(cx, OPEN_MENU_JS) == json!(true);
+    let opened = open_menu(cx);
     let gliding = inside_after_resize(cx);
-    page(cx, CLOSE_MENU_JS);
+    close_menu(cx);
 
-    // Under a question of four lines.
-    let lines = json!("one\ntwo\nthree\nfour").to_string();
-    page(cx, &TYPE_JS.replace("$TEXT", &lines));
+    // Under a question of four lines: Shift+Enter breaks a line.
+    type_text(cx, "one");
+    for word in ["two", "three", "four"] {
+        let _ = cx.input(Input::Key("Shift+Enter"));
+        let _ = cx.input(Input::Text(word));
+    }
     cx.sleep(300);
-    page(cx, OPEN_MENU_JS);
+    open_menu(cx);
     let tall = inside_after_resize(cx);
-    page(cx, CLOSE_MENU_JS);
-    page(cx, &TYPE_JS.replace("$TEXT", "''"));
+    close_menu(cx);
+    type_text(cx, "");
 
     let ok = opened && gliding == "ok" && tall == "ok";
     cx.must(

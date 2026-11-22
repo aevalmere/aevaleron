@@ -1,0 +1,67 @@
+// The dictation pill (renderer/voice-pill.html): one solid capsule at the
+// bottom centre that says what dictation is doing. Listening shows the live
+// level as a waveform in the accent; writing, the waveform settles and
+// breathes; an error says why in two lines at most. The window is
+// see-through and never takes the mouse: nothing here is clickable.
+
+import { Theme } from "theme.slint";
+
+export component VoicePillWindow inherits Window {
+    background: transparent;
+    default-font-family: Theme.font;
+
+    // "idle", "listening", "handsfree", "working", "cleaning", "preparing",
+    // "done" or "error".
+    in property <string> state: "idle";
+    in property <string> say;
+    // The last thirteen levels, oldest first, 0..1.
+    in property <[float]> levels;
+
+    property <bool> settled: state == "working" || state == "cleaning" || state == "preparing";
+    property <color> wave-color: state == "error" ? Theme.danger : settled || state == "done" ? Theme.label-2 : Theme.accent-text;
+
+    capsule := Rectangle {
+        x: (root.width - self.width) / 2;
+        y: Theme.sp-1 + (root.state == "idle" ? 6px : 0px);
+        width: min(root.width - 2 * Theme.sp-1, row.preferred-width);
+        height: root.height - 2 * Theme.sp-1;
+        border-radius: self.height / 2;
+        background: Theme.raised;
+        opacity: root.state == "idle" ? 0 : 1;
+        animate opacity { duration: Theme.fast; }
+        animate y { duration: Theme.morph; easing: ease-out; }
+
+        row := HorizontalLayout {
+            padding-left: Theme.sp-3;
+            padding-right: Theme.sp-4;
+            spacing: Theme.sp-2;
+
+            Rectangle {
+                width: 13 * 3px + 12 * 2px;
+                // Writing: the waveform breathes, 1.1 s each way.
+                opacity: root.settled && !Theme.reduced-motion ? 0.725 + 0.275 * cos(animation-tick() / 1100ms * 180deg) : 1;
+
+                for level[i] in root.levels: Rectangle {
+                    x: i * 5px;
+                    y: (parent.height - self.height) / 2;
+                    width: 3px;
+                    height: 3px + 21px * level;
+                    border-radius: 1.5px;
+                    background: root.wave-color;
+                    animate height { duration: Theme.reduced-motion ? 0ms : 60ms; }
+                }
+            }
+
+            Text {
+                text: root.say;
+                font-size: Theme.caption;
+                font-weight: root.state == "error" ? 400 : 600;
+                color: Theme.label;
+                vertical-alignment: center;
+                wrap: word-wrap;
+                overflow: elide;
+                horizontal-stretch: 1;
+            }
+        }
+    }
+}

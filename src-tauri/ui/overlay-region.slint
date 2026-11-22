@@ -1,0 +1,262 @@
+// The area picker (renderer/region.html). The selection must read as a hole
+// in the scrim, not a box drawn on top of it: nothing tints the inside, the
+// edges sit entirely outside the chosen pixels and the corner ticks point
+// inward, so what is framed is exactly what is sent.
+//
+// This page sits over whatever is on screen, white documents and black
+// editors alike, so its colours are its own fixed dark values (region.css),
+// not the theme's. The hole is filled at alpha 1/255: invisible, but the
+// window still takes the drag there (alpha 0 lets clicks through).
+
+import { Theme } from "theme.slint";
+
+component Tick inherits Rectangle {
+    // Which corner: the L opens toward the inside of the selection.
+    in property <bool> right;
+    in property <bool> bottom;
+
+    width: 15px;
+    height: 15px;
+
+    Rectangle {
+        x: 0px;
+        y: root.bottom ? parent.height - 3px : 0px;
+        width: parent.width;
+        height: 3px;
+        background: #86AAD4;
+    }
+
+    Rectangle {
+        x: root.right ? parent.width - 3px : 0px;
+        y: 0px;
+        width: 3px;
+        height: parent.height;
+        background: #86AAD4;
+    }
+}
+
+component Cap inherits Rectangle {
+    in property <string> text;
+
+    width: cap-text.preferred-width + 16px;
+    height: cap-text.preferred-height + 4px;
+    border-radius: 6px;
+    background: #F7F3EA12;
+
+    cap-text := Text {
+        text: root.text;
+        font-size: 12px;
+        font-weight: 600;
+        color: #C9D4E2;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+}
+
+export component RegionWindow inherits Window {
+    background: transparent;
+    default-font-family: Theme.font;
+
+    // A box exists (dragged or put there from the keyboard).
+    in property <bool> has-sel: false;
+    // The mouse is down: the hint gets out of the way.
+    in property <bool> dragging: false;
+    in property <length> sel-x;
+    in property <length> sel-y;
+    in property <length> sel-w;
+    in property <length> sel-h;
+    in property <string> size-text;
+    in property <bool> too-small: false;
+    in property <string> hint-text: "Drag to select an area";
+
+    callback press(length, length);
+    callback drag(length, length);
+    callback release(length, length);
+    callback cancel();
+
+    property <color> scrim: #0A0F176B;
+    property <color> chip-fill: #121A26E0;
+
+    // Before the first drag the whole screen is dimmed.
+    if !root.has-sel: Rectangle {
+        width: root.width;
+        height: root.height;
+        background: root.scrim;
+    }
+
+    if root.has-sel: Rectangle {
+        width: root.width;
+        height: root.height;
+
+        // Top, bottom, left, right of the hole, and the hole itself.
+        Rectangle {
+            x: 0px;
+            y: 0px;
+            width: root.width;
+            height: root.sel-y;
+            background: root.scrim;
+        }
+
+        Rectangle {
+            x: 0px;
+            y: root.sel-y + root.sel-h;
+            width: root.width;
+            height: max(0px, root.height - root.sel-y - root.sel-h);
+            background: root.scrim;
+        }
+
+        Rectangle {
+            x: 0px;
+            y: root.sel-y;
+            width: root.sel-x;
+            height: root.sel-h;
+            background: root.scrim;
+        }
+
+        Rectangle {
+            x: root.sel-x + root.sel-w;
+            y: root.sel-y;
+            width: max(0px, root.width - root.sel-x - root.sel-w);
+            height: root.sel-h;
+            background: root.scrim;
+        }
+
+        Rectangle {
+            x: root.sel-x;
+            y: root.sel-y;
+            width: root.sel-w;
+            height: root.sel-h;
+            background: #00000001;
+        }
+
+        // Two-tone edges just outside the selection: a pale line with a dark
+        // one outside it, legible on a white page and on a black editor.
+        Rectangle {
+            x: root.sel-x - 2px;
+            y: root.sel-y - 2px;
+            width: root.sel-w + 4px;
+            height: root.sel-h + 4px;
+            border-width: 1px;
+            border-color: #0B0C108C;
+        }
+
+        Rectangle {
+            x: root.sel-x - 1px;
+            y: root.sel-y - 1px;
+            width: root.sel-w + 2px;
+            height: root.sel-h + 2px;
+            border-width: 1px;
+            border-color: #C9D4E2;
+        }
+
+        Tick {
+            x: root.sel-x - 3px;
+            y: root.sel-y - 3px;
+        }
+
+        Tick {
+            x: root.sel-x + root.sel-w + 3px - self.width;
+            y: root.sel-y - 3px;
+            right: true;
+        }
+
+        Tick {
+            x: root.sel-x - 3px;
+            y: root.sel-y + root.sel-h + 3px - self.height;
+            bottom: true;
+        }
+
+        Tick {
+            x: root.sel-x + root.sel-w + 3px - self.width;
+            y: root.sel-y + root.sel-h + 3px - self.height;
+            right: true;
+            bottom: true;
+        }
+
+        // The size: under the selection, above it when there is no room
+        // below, never off the side.
+        Rectangle {
+            property <length> below: root.sel-y + root.sel-h + 10px;
+            x: max(0px, min(root.sel-x, root.width - self.width));
+            y: self.below + self.height > root.height ? max(0px, root.sel-y - self.height - 10px) : self.below;
+            width: size-label.preferred-width + 24px;
+            height: size-label.preferred-height + 8px;
+            border-radius: self.height / 2;
+            background: root.chip-fill;
+            border-width: root.too-small ? 1px : 0px;
+            border-color: #6B2E38;
+
+            size-label := Text {
+                text: root.size-text;
+                font-size: 12px;
+                font-weight: 600;
+                color: root.too-small ? #F2A0A8 : #F7F3EA;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
+        }
+    }
+
+    TouchArea {
+        width: root.width;
+        height: root.height;
+        mouse-cursor: crosshair;
+        pointer-event(e) => {
+            if (e.kind == PointerEventKind.down) {
+                // Anything but the left button leaves without a selection,
+                // as every other screen-capture tool on Windows does.
+                if (e.button == PointerEventButton.left) {
+                    root.press(self.mouse-x, self.mouse-y);
+                } else {
+                    root.cancel();
+                }
+            } else if (e.kind == PointerEventKind.up && e.button == PointerEventButton.left) {
+                root.release(self.mouse-x, self.mouse-y);
+            }
+        }
+        moved => {
+            root.drag(self.mouse-x, self.mouse-y);
+        }
+    }
+
+    // The one line: what the drag does and the keys.
+    Rectangle {
+        x: (root.width - self.width) / 2;
+        y: 24px;
+        width: hint-row.preferred-width;
+        height: hint-row.preferred-height;
+        border-radius: self.height / 2;
+        background: root.chip-fill;
+        opacity: root.dragging ? 0 : 1;
+        animate opacity { duration: Theme.reduced-motion ? 0ms : 140ms; }
+
+        hint-row := HorizontalLayout {
+            padding-top: 8px;
+            padding-bottom: 8px;
+            padding-left: 16px;
+            padding-right: 16px;
+            spacing: 12px;
+
+            Text {
+                text: root.hint-text;
+                font-size: 13px;
+                color: #F7F3EA;
+                vertical-alignment: center;
+            }
+
+            VerticalLayout {
+                alignment: center;
+                Cap {
+                    text: "Esc";
+                }
+            }
+
+            Text {
+                text: "Arrows move, Alt+arrows resize";
+                font-size: 12px;
+                color: #C9D4E2;
+                vertical-alignment: center;
+            }
+        }
+    }
+}

@@ -143,7 +143,7 @@ impl Doorbell {
 /// app is built.
 pub fn serve(name: String) -> Doorbell {
     let bell = Doorbell::default();
-    tauri::async_runtime::spawn(listen(pipe_path(&name), bell.clone()));
+    crate::shell::async_runtime::spawn(listen(pipe_path(&name), bell.clone()));
     bell
 }
 
@@ -160,7 +160,7 @@ async fn listen(path: String, bell: Doorbell) {
         let next = create(&path, false).await;
         let client = std::mem::replace(&mut server, next);
         let b = bell.clone();
-        tauri::async_runtime::spawn(async move {
+        crate::shell::async_runtime::spawn(async move {
             if reads_open(client).await {
                 b.ring();
             }

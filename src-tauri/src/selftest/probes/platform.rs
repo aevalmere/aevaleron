@@ -11,7 +11,6 @@ use std::ptr::{null, null_mut};
 use std::time::Duration;
 
 use serde_json::{json, Map, Value};
-use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Shortcut};
 use windows_sys::Win32::Foundation::{BOOL, HWND, LPARAM, TRUE};
 use windows_sys::Win32::System::Com::CoTaskMemFree;
 use windows_sys::Win32::System::Threading::GetCurrentProcessId;
@@ -23,7 +22,7 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{
 };
 
 use crate::host::menu;
-use crate::selftest::{Cx, Input};
+use crate::selftest::{input, Cx, Input};
 use crate::state::{shared, Mode};
 use crate::tray::{self, Manual};
 use crate::windows::{self, flags, OVERLAY};
@@ -60,7 +59,6 @@ pub fn run(cx: &mut Cx) {
     context_menus(cx);
     context_menu_editable(cx);
     launch_at_login(cx);
-    navigation_blocked(cx);
     update_labels(cx);
     // Last: a second copy of the app comes up and takes the screen for a
     // moment, which the other checks should not have to share.
@@ -232,18 +230,14 @@ fn quit_on_last_close(cx: &Cx) {
 
 // --------------------------------------------------------------- hotkeys
 
-fn chord_held(cx: &Cx, chord: &str) -> bool {
-    hotkeys::parse(chord).is_ok_and(|(mods, code)| {
-        cx.app
-            .global_shortcut()
-            .is_registered(Shortcut::new(Some(mods), code))
-    })
+/// Whether the chord is held globally. Windows is asked, not our own table,
+/// so this sees what a person's key press would hit.
+fn chord_held(chord: &str) -> bool {
+    input::hotkey_taken(chord).unwrap_or(false)
 }
 
-fn key_held(cx: &Cx, code: Code) -> bool {
-    cx.app
-        .global_shortcut()
-        .is_registered(Shortcut::new(None, code))
+fn key_held(key: &str) -> bool {
+    chord_held(key)
 }
 
 fn shortcut_labels(cx: &Cx) {
@@ -262,10 +256,10 @@ fn shortcut_labels(cx: &Cx) {
 }
 
 fn global_keys(cx: &Cx) {
-    let idle = key_held(cx, Code::Escape);
+    let idle = key_held("Escape");
     open_bar(cx);
-    let enter = key_held(cx, Code::Enter);
-    let bar = key_held(cx, Code::Escape);
+    let enter = key_held("Enter");
+    let bar = key_held("Escape");
     close_bar(cx);
     cx.must("noGlobalEnter", !enter, "Enter is registered globally");
     let why = format!("bar={bar} idle={idle}");
@@ -281,7 +275,7 @@ fn hud_with_escape(cx: &Cx) -> bool {
     if !in_hud(cx) {
         windows::enter_hud(&cx.app);
     }
-    cx.wait_for(3 * SECOND, || key_held(cx, Code::Escape))
+    cx.wait_for(3 * SECOND, || key_held("Escape"))
 }
 
 /// KEY-09, B-011: two injected Escapes that overlap never reach our global
@@ -295,12 +289,12 @@ fn escape_suspend(cx: &Cx) {
     }
     let before = hotkeys::escape_fired();
     hotkeys::suspend_escape(app);
-    let off = !key_held(cx, Code::Escape);
+    let off = !key_held("Escape");
     let first = cx.input(Input::Key("Escape"));
     // The second key starts before the first has resumed.
     hotkeys::suspend_escape(app);
     hotkeys::resume_escape(app);
-    let still_off = !key_held(cx, Code::Escape);
+    let still_off = !key_held("Escape");
     let second = cx.input(Input::Key("Escape"));
     cx.sleep(60);
     hotkeys::resume_escape(app);
@@ -333,11 +327,11 @@ fn escape_suspend(cx: &Cx) {
 
 /// KEY-11: recording a combo suspends every global shortcut.
 fn capture_mode(cx: &Cx) {
-    let before = chord_held(cx, MAIN_CHORD);
+    let before = chord_held(MAIN_CHORD);
     hotkeys::set_capture_mode(&cx.app, true);
-    let let_go = cx.wait_for(2 * SECOND, || !chord_held(cx, MAIN_CHORD));
+    let let_go = cx.wait_for(2 * SECOND, || !chord_held(MAIN_CHORD));
     hotkeys::set_capture_mode(&cx.app, false);
-    let back = cx.wait_for(2 * SECOND, || chord_held(cx, MAIN_CHORD));
+    let back = cx.wait_for(2 * SECOND, || chord_held(MAIN_CHORD));
     let why = format!("before {before}, let go {let_go}, back {back}");
     cx.must("captureMode", before && let_go && back, why);
 }
@@ -351,7 +345,7 @@ fn shortcut_set(cx: &Cx) {
     let clash = hotkeys::set(app, "captureRegion", MAIN_CHORD);
     let clash_text = clash["error"].as_str().unwrap_or_default();
     let good = hotkeys::set(app, "captureRegion", chord);
-    let held = chord_held(cx, chord);
+    let held = chord_held(chord);
     let ok = unknown["error"] == "Unknown action."
         && no_modifier["ok"] == false
         && clash_text.starts_with("Already used by")
@@ -362,7 +356,7 @@ fn shortcut_set(cx: &Cx) {
     cx.must("shortcutSet", ok, why);
 
     let reset = hotkeys::reset(app);
-    let released = !chord_held(cx, chord);
+    let released = !chord_held(chord);
     let ok = reset["ok"] == true
         && reset["shortcuts"]["captureRegion"] == ""
         && reset["active"]["captureRegion"].is_null()
@@ -443,7 +437,7 @@ fn tray_data(cx: &Cx) {
         && accel("capture").as_deref() == Some(MAIN_CHORD)
         && accel("region").as_deref() == Some("Ctrl+Alt+Shift+J")
         && accel("agent").is_none();
-    let registered = chord_held(cx, "Ctrl+Alt+Shift+J");
+    let registered = chord_held("Ctrl+Alt+Shift+J");
     let why = format!("{items:?} registered {registered}");
     cx.must("trayAccel", shown && !registered, why);
 
@@ -582,7 +576,7 @@ fn deliberate_panic(message: &str) {
 
 fn crash_labels(cx: &Cx) {
     const TASK: &str = "smoke: deliberate task panic";
-    tauri::async_runtime::spawn(async { deliberate_panic(TASK) });
+    crate::shell::async_runtime::spawn(async { deliberate_panic(TASK) });
     let logged = cx.wait_for(3 * SECOND, || log_has(TASK));
     cx.must("crashLogged", logged, "task panic not in errors.log");
 
@@ -656,37 +650,38 @@ fn dismiss_menu(cx: &Cx) -> bool {
     cx.wait_for(2 * SECOND, || open_menu().is_none())
 }
 
-/// Runs a script that right-clicks by event, waits for the native menu, then
-/// closes it. The scripts wait 50 ms first, so `eval` has its answer before
-/// the menu's modal loop starts.
-fn menu_for(cx: &Cx, script: &str) -> Result<bool, String> {
-    let sent = cx.eval(OVERLAY, script);
+/// Starts a right click (`open`), waits for the native menu, then closes it.
+fn menu_for(cx: &Cx, open: impl FnOnce() -> Result<(), String>) -> Result<bool, String> {
+    let sent = open();
     let shown = cx.wait_for(3 * SECOND, || open_menu().is_some());
     let gone = dismiss_menu(cx);
-    sent.map(|_| shown && gone)
+    sent.map(|()| shown && gone)
 }
 
-/// WIN-14, B-077: a text field and a selection each get a native menu from
-/// the bridge, with the templates main.js used.
+/// The middle of the bar's field, in physical pixels.
+fn bar_field(cx: &Cx) -> (i32, i32) {
+    let r = windows::screen::dip_to_px(windows::bar_rect(&cx.app));
+    let x = (r.x + r.width / 2.0).round() as i32;
+    let y = (r.y + r.height / 2.0).round() as i32;
+    (x, y)
+}
+
+/// WIN-14, B-077: a text field and a selection each get a native menu, with
+/// the templates main.js used.
 fn context_menu_editable(cx: &Cx) {
     let data = menu::edit_template("edit") == ["cut", "copy", "paste", "-", "selectAll"]
         && menu::edit_template("selection") == ["copy", "selectAll"];
     let opened = open_bar(cx);
-    let field = menu_for(
-        cx,
-        "(() => { setTimeout(() => { document.getElementById('query-input').dispatchEvent(\
-         new MouseEvent('contextmenu', { bubbles: true, cancelable: true })); }, 50); \
-         return true; })()",
-    );
-    let selection = menu_for(
-        cx,
-        "(() => { setTimeout(() => { const s = document.createElement('span'); \
-         s.textContent = 'smoke selection'; s.style.userSelect = 'text'; \
-         document.body.appendChild(s); getSelection().selectAllChildren(s); \
-         s.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true })); \
-         setTimeout(() => { getSelection().removeAllRanges(); s.remove(); }, 0); }, 50); \
-         return true; })()",
-    );
+    // A real right click on the bar's field: the page sends the edit menu.
+    let at = bar_field(cx);
+    let field = menu_for(cx, || cx.input(Input::RightClick(at.0, at.1)));
+    // A native page has no free selection to click, so the selection menu is
+    // asked for the way a page asks.
+    let app = cx.app.clone();
+    let selection = menu_for(cx, move || {
+        menu::popup(&app, OVERLAY, &json!({ "kind": "selection" }));
+        Ok(())
+    });
     close_bar(cx);
     let ok = data && opened && field == Ok(true) && selection == Ok(true);
     let why = format!("template {data}, bar {opened}, field {field:?}, selection {selection:?}");
@@ -721,20 +716,6 @@ fn launch_at_login(cx: &Cx) {
         && approved.as_deref() == Some(&autostart::APPROVED_ON[..]);
     let why = format!("off {off:?}, on {on:?}, want {want:?}, approved {approved:?}");
     cx.must("launchAtLogin", ok, why);
-}
-
-/// B-078: a page cannot navigate off the app.
-fn navigation_blocked(cx: &Cx) {
-    let before = cx.eval(OVERLAY, "location.href");
-    let sent = cx.eval(
-        OVERLAY,
-        "(() => { location.href = 'https://example.com/'; return true; })()",
-    );
-    cx.sleep(1000);
-    let after = cx.eval(OVERLAY, "location.href");
-    let ok = sent.is_ok() && before.is_ok() && before == after;
-    let why = format!("{before:?} {sent:?} {after:?}");
-    cx.must("navigationBlocked", ok, why);
 }
 
 // ---------------------------------------------------------------- updater

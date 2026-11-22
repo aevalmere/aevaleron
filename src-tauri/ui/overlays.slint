@@ -1,25 +1,12 @@
-// Stubs until these pages are ported (lane native-ui, stage 2).
+// The see-through overlays (src/ui/overlays.rs): the dictation pill, the
+// area picker, the lens and the buddy, one file each; and the blank page
+// for any page path with no native page.
 import { Theme } from "theme.slint";
 
-export component VoicePillWindow inherits Window {
-    background: transparent;
-    default-font-family: Theme.font;
-}
-
-export component RegionWindow inherits Window {
-    background: transparent;
-    default-font-family: Theme.font;
-}
-
-export component LensWindow inherits Window {
-    background: transparent;
-    default-font-family: Theme.font;
-}
-
-export component BuddyWindow inherits Window {
-    background: transparent;
-    default-font-family: Theme.font;
-}
+export { VoicePillWindow } from "overlay-pill.slint";
+export { RegionWindow } from "overlay-region.slint";
+export { LensWindow } from "overlay-lens.slint";
+export { BuddyWindow, BuddyAction } from "overlay-buddy.slint";
 
 // A window whose page has no native port: nothing is drawn.
 export component BlankWindow inherits Window {

@@ -20,7 +20,8 @@
 // Environment: CI_WORKFLOW (folder name), CI_STATUS (job.status), CI_STEPS
 // (one "Step name|outcome|log file" line per step, in order), CI_TOKEN (a
 // token with contents: write), optional CI_LOGS (default $RUNNER_TEMP/ci-logs),
-// CI_NOTE (one more line for the summary) and CI_REMOTE (a different remote,
+// CI_NOTE (one more line for the summary), CI_SHA and CI_REF (in place of
+// GITHUB_SHA and GITHUB_REF_NAME) and CI_REMOTE (a different remote,
 // for trying this out), plus the runner's GITHUB_* variables.
 import fs from 'node:fs';
 import os from 'node:os';
@@ -44,8 +45,10 @@ function need(name) {
 }
 
 const workflow = need('CI_WORKFLOW');
-const sha = need('GITHUB_SHA');
-const ref = need('GITHUB_REF_NAME');
+// A workflow_run job (ui-shots.yml) runs on the default branch, so it names
+// the commit and branch it reports on itself.
+const sha = env.CI_SHA || need('GITHUB_SHA');
+const ref = env.CI_REF || need('GITHUB_REF_NAME');
 const repo = need('GITHUB_REPOSITORY');
 const runId = need('GITHUB_RUN_ID');
 const attempt = env.GITHUB_RUN_ATTEMPT || '1';
@@ -66,7 +69,7 @@ const ANSI = /\x1b\[[0-?]*[ -/]*[@-~]/g;
 const BLOCK = /^(error|warning)(\[[\w-]+\])?: |^Diff in |panicked at /;
 const STATUS = /^\s+(Compiling|Checking|Finished|Running|Doc-tests|Fresh) /;
 const LINE =
-  /^test .+ \.\.\. FAILED$|^test result: FAILED|=FAIL|\] pageerror|\] failed: |^\s*\w*Error\b[: ]|^npm (ERR!|error)|timed out/;
+  /^test .+ \.\.\. FAILED$|^test result: FAILED|=FAIL|^\[CHECK\] FAIL |\] pageerror|\] failed: |^\s*\w*Error\b[: ]|^npm (ERR!|error)|timed out/;
 
 function readLog(file) {
   const buf = fs.readFileSync(file);
@@ -110,6 +113,10 @@ const steps = (env.CI_STEPS || '')
 
 const files = new Map();
 const errors = [];
+// "[METRIC] name=value" lines from any log (tools/native-install-check.ps1):
+// the last value of each name, for the summary's metrics table.
+const METRIC = /^\[METRIC\] ([\w.-]+)=(.*)$/;
+const metrics = {};
 const present = fs.existsSync(logsDir)
   ? fs.readdirSync(logsDir).filter((f) => fs.statSync(path.join(logsDir, f)).isFile()).sort()
   : [];
@@ -121,6 +128,10 @@ for (const name of new Set([...steps.map((s) => s.log).filter(Boolean), ...prese
   }
   const lines = readLog(file);
   files.set(name, lines.length ? `${lines.join('\n')}\n` : '');
+  for (const l of lines) {
+    const m = METRIC.exec(l.trim());
+    if (m) metrics[m[1]] = m[2].trim();
+  }
   const errs = errorLines(lines);
   if (errs.length) errors.push(`== ${name} ==`, ...errs, '');
 }
@@ -143,6 +154,7 @@ const meta = {
   failed,
   finished,
   error_lines: errorCount,
+  metrics,
   steps,
 };
 files.set('meta.json', `${JSON.stringify(meta, null, 2)}\n`);
@@ -166,6 +178,9 @@ files.set(
     '|---|---|---|',
     ...steps.map((s) => `| ${cell(s.name)} | ${s.outcome} | ${s.log ? `[${s.log}](${s.log})` : ''} |`),
     '',
+    ...(Object.keys(metrics).length
+      ? ['| Metric | Value |', '|---|---|', ...Object.entries(metrics).map(([k, v]) => `| ${cell(k)} | ${cell(v)} |`), '']
+      : []),
     `errors.txt: ${errorCount} error and warning lines from the logs.`,
     '',
   ].join('\n'),
@@ -174,7 +189,8 @@ files.set(
 const README = `# ci-logs
 
 Results of every CI run on rust-rewrite and rust/** (workflows rust and
-ui-shots), written by tools/ci-publish.mjs at the end of each run, pass or
+ui-shots), with a metrics table when a log printed "[METRIC] name=value"
+lines, written by tools/ci-publish.mjs at the end of each run, pass or
 fail. Wait for a push's results with git alone:
 
     node tools/ci-wait.mjs <sha> [rust|ui-shots] [--timeout-min 30]

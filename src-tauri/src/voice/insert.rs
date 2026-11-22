@@ -95,6 +95,17 @@ pub fn unicode_inputs(text: &str) -> Vec<km::INPUT> {
     out
 }
 
+/// Ctrl plus `vk`, to the window that has the keyboard: the edit menu's
+/// Cut, Copy, Paste and Select all (host/menu.rs).
+pub fn ctrl_chord(vk: u16) -> Result<(), String> {
+    // SAFETY: a plain lookup.
+    let sc = unsafe { km::MapVirtualKeyW(VK_CONTROL as u32, km::MAPVK_VK_TO_VSC) } as u16;
+    let mut events = vec![key(VK_CONTROL, sc, 0)];
+    events.extend(tap(vk));
+    events.push(key(VK_CONTROL, sc, km::KEYEVENTF_KEYUP));
+    send(&events)
+}
+
 /// Stops the Start menu from opening when a held Win key is let go.
 pub fn mask_start_menu() {
     let _ = send(&tap(VK_MASK));

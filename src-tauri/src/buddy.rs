@@ -18,10 +18,10 @@ use std::sync::{Arc, Mutex, Once};
 use std::time::{Duration, Instant};
 
 use serde_json::{json, Value};
-use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
 
 use crate::capture::{self, screen, Rect};
 use crate::desktop::win;
+use crate::shell::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
 use crate::windows::flags;
 
 pub const LABEL: &str = "buddy";
@@ -290,7 +290,7 @@ fn display_for_window(name: &str) -> screen::Display {
     screen::primary(&list)
 }
 
-fn window() -> Option<tauri::WebviewWindow> {
+fn window() -> Option<crate::shell::WebviewWindow> {
     app()?.get_webview_window(LABEL)
 }
 
@@ -334,7 +334,7 @@ fn create_window(display: &screen::Display) {
         s.focusable = false;
     });
     let phys = display.phys;
-    // Built off the event loop thread: WebView2 creation waits on it.
+    // Built off the event loop thread: building waits on it.
     let build = move || {
         // A window on its way out still holds the label.
         let deadline = Instant::now() + Duration::from_secs(1);
@@ -354,13 +354,11 @@ fn create_window(display: &screen::Display) {
                 .skip_taskbar(true)
                 .content_protected(true)
                 .visible(false)
-                .data_directory(crate::paths::webview_data_dir())
-                .initialization_script(crate::ipc::bridge_script())
                 .on_page_load(|_, p| match p.event() {
                     // A reload starts over; `buddy:ready` ends the wait.
-                    tauri::webview::PageLoadEvent::Started => with(|s| s.ready = false),
+                    crate::shell::webview::PageLoadEvent::Started => with(|s| s.ready = false),
                     // However it got here, a new page lets the mouse through.
-                    tauri::webview::PageLoadEvent::Finished => set_click_through(true),
+                    crate::shell::webview::PageLoadEvent::Finished => set_click_through(true),
                 })
                 .build();
         if let Ok(w) = built {
@@ -370,11 +368,10 @@ fn create_window(display: &screen::Display) {
             win::set_mouse_through(raw, true);
             win::show_inactive(raw);
             w.on_window_event(|e| {
-                if matches!(e, tauri::WindowEvent::Destroyed) {
+                if matches!(e, crate::shell::WindowEvent::Destroyed) {
                     with(|s| s.destroying = false);
                 }
             });
-            crate::crash::guard_webview(&w, |_, _| browser_gone());
             start_forwarding();
         }
     };
@@ -488,14 +485,6 @@ pub fn destroy() {
     }
 }
 
-/// The browser process died and the webview with it: the session is over.
-fn browser_gone() {
-    std::thread::spawn(|| {
-        cancel();
-        destroy();
-    });
-}
-
 /// The pointer's physical position in page coordinates.
 fn to_page(x: i32, y: i32, phys: screen::PxRect, scale: f64) -> (f64, f64) {
     ((x - phys.x) as f64 / scale, (y - phys.y) as f64 / scale)
@@ -535,11 +524,11 @@ fn forward_loop() {
             FORWARD_IDLE_MS
         };
         std::thread::sleep(Duration::from_millis(nap));
-        let Some(w) = window().filter(|_| is_active()) else {
+        if window().filter(|_| is_active()).is_none() {
             last = None;
             inside = false;
             continue;
-        };
+        }
         let (ignoring, phys, scale, heard, bubble) =
             with(|s| (s.ignoring, s.phys, s.scale, s.heard, s.callout));
         let at = screen::cursor_phys();
@@ -561,12 +550,12 @@ fn forward_loop() {
         last = Some((x, y));
         let now_inside = phys.contains(x, y);
         if now_inside {
+            // The page hears the pointer it cannot see while the mouse
+            // passes through it (in DIPs from its top left).
             let (cx, cy) = to_page(x, y, phys, scale);
-            let _ = w.eval(format!(
-                "document.dispatchEvent(new MouseEvent('mousemove',{{clientX:{cx},clientY:{cy},bubbles:true}}))"
-            ));
+            emit_to(LABEL, "buddy:pointer", json!({ "x": cx, "y": cy }));
         } else if inside {
-            let _ = w.eval("document.dispatchEvent(new MouseEvent('mouseleave'))");
+            emit_to(LABEL, "buddy:pointer", json!({ "leave": true }));
         }
         inside = now_inside;
     }

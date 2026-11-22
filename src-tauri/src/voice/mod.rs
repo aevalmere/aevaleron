@@ -35,7 +35,8 @@ use std::time::{Duration, Instant};
 
 use parking_lot::Mutex;
 use serde_json::{json, Value};
-use tauri::AppHandle;
+
+use crate::shell::AppHandle;
 
 pub const NOTHING_HEARD: &str = "I didn't hear anything. Hold the key and speak.";
 /// A shorter hold is a tap of the chord, not dictation.
@@ -303,13 +304,13 @@ pub fn finish(app: &AppHandle, origin: Origin) {
     emit_state(app, origin, "working", json!({}));
     let app = app.clone();
     let writing = Writing::new();
-    tauri::async_runtime::spawn(async move {
+    crate::shell::async_runtime::spawn(async move {
         let _writing = writing;
         let Live {
             recorder, streamer, ..
         } = live;
         let mut t = Timings::default();
-        let audio = tauri::async_runtime::spawn_blocking(move || recorder.finish()).await;
+        let audio = crate::shell::async_runtime::spawn_blocking(move || recorder.finish()).await;
         let audio = match audio {
             Ok(Ok(a)) => a,
             Ok(Err(e)) => return fail(&app, origin, &e, since),
@@ -318,7 +319,7 @@ pub fn finish(app: &AppHandle, origin: Origin) {
         t.stop_ms = released.elapsed().as_millis() as u64;
         let waited = Instant::now();
         let early = match streamer {
-            Some(st) => tauri::async_runtime::spawn_blocking(move || st.finish())
+            Some(st) => crate::shell::async_runtime::spawn_blocking(move || st.finish())
                 .await
                 .unwrap_or_default(),
             None => stream::Done::default(),
@@ -462,7 +463,7 @@ async fn deliver(
         Origin::Dictation => {
             let t = text.clone();
             let began = Instant::now();
-            let put = tauri::async_runtime::spawn_blocking(move || insert::insert(&t)).await;
+            let put = crate::shell::async_runtime::spawn_blocking(move || insert::insert(&t)).await;
             timing.insert_ms = began.elapsed().as_millis() as u64;
             match put {
                 Ok(Ok(_)) => {

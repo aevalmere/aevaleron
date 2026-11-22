@@ -1,0 +1,57 @@
+// The lens (renderer/lens.html): while the agent runs, a 2 px frame in the
+// signal blue just inside the edges of the display it controls, with a dark
+// outer line so it still reads on a dark editor, and its chip at the top
+// centre. Solid, not glowing, not pulsing: it is information. The window is
+// see-through and click-through.
+
+import { Theme } from "theme.slint";
+
+export component LensWindow inherits Window {
+    background: transparent;
+    default-font-family: Theme.font;
+
+    in property <bool> frame-on: false;
+    in property <string> chip;
+
+    Rectangle {
+        x: 0px;
+        y: 0px;
+        width: root.width;
+        height: root.height;
+        border-radius: Theme.r-plate + 1px;
+        border-width: 1px;
+        border-color: #00000080;
+        opacity: root.frame-on ? 1 : 0;
+        animate opacity { duration: Theme.fast; }
+
+        Rectangle {
+            x: 1px;
+            y: 1px;
+            width: parent.width - 2px;
+            height: parent.height - 2px;
+            border-radius: Theme.r-plate;
+            border-width: 2px;
+            border-color: Theme.signal;
+        }
+    }
+
+    Rectangle {
+        x: (root.width - self.width) / 2;
+        y: Theme.sp-3;
+        width: chip-text.preferred-width + 2 * Theme.sp-3;
+        height: chip-text.preferred-height + 2 * Theme.sp-2;
+        border-radius: self.height / 2;
+        background: Theme.raised;
+        opacity: root.frame-on && root.chip != "" ? 1 : 0;
+        animate opacity { duration: Theme.fast; }
+
+        chip-text := Text {
+            text: root.chip;
+            font-size: Theme.row;
+            font-weight: 600;
+            color: Theme.label;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+        }
+    }
+}

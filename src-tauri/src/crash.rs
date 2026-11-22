@@ -7,9 +7,8 @@
 //! log keeps its newest 128 KB once it passes 256 KB.
 //!
 //! - `guard` and `guard_async` (K-01) run a body, catch its panic, log it
-//!   with the caller's scope and keep the app running.
-//! - `guard_webview` (K-02) reloads a page whose WebView2 renderer died and
-//!   calls back when the browser process itself is gone.
+//!   with the caller's scope and keep the app running. (K-02, the WebView2
+//!   renderer watch, went with WebView2: the pages are native now.)
 //! - A panic on the main thread outside a guard cannot be survived: it
 //!   unwinds into a Win32 window procedure, and Rust aborts the process
 //!   there. The toast says so, and is shown before the abort.
@@ -22,7 +21,7 @@ use std::io::Write;
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, OnceLock};
+use std::sync::OnceLock;
 use std::task::Poll;
 use std::thread::{self, ThreadId};
 use std::time::Duration;
@@ -238,138 +237,6 @@ pub async fn guard_async<T>(scope: &str, fut: impl Future<Output = T>) -> Option
     }
 }
 
-/// What a WebView2 `ProcessFailed` event asks of us.
-#[derive(Debug, PartialEq, Eq)]
-enum Failure {
-    /// The page's renderer died or hung: reload it.
-    Reload,
-    /// The browser process is gone and the webview with it: the owner
-    /// recreates the window.
-    BrowserGone,
-    /// A helper process (GPU, utility) that WebView2 restarts by itself.
-    Other,
-}
-
-/// COREWEBVIEW2_PROCESS_FAILED_KIND values.
-fn failure_of(kind: i32) -> (Failure, &'static str) {
-    match kind {
-        0 => (Failure::BrowserGone, "browser-process-exited"),
-        1 => (Failure::Reload, "render-process-exited"),
-        2 => (Failure::Reload, "render-process-unresponsive"),
-        3 => (Failure::Reload, "frame-render-process-exited"),
-        4 => (Failure::Other, "utility-process-exited"),
-        5 => (Failure::Other, "sandbox-helper-process-exited"),
-        6 => (Failure::Other, "gpu-process-exited"),
-        _ => (Failure::Other, "other-process-exited"),
-    }
-}
-
-/// COREWEBVIEW2_PROCESS_FAILED_REASON values.
-fn reason_of(reason: i32) -> &'static str {
-    match reason {
-        0 => "unexpected",
-        1 => "unresponsive",
-        2 => "terminated",
-        3 => "crashed",
-        4 => "launch-failed",
-        5 => "out-of-memory",
-        6 => "profile-deleted",
-        _ => "unknown",
-    }
-}
-
-pub type OnBrowserExit = Arc<dyn Fn(&tauri::AppHandle, &str) + Send + Sync + 'static>;
-
-/// K-02: watches `window`'s WebView2 for dead processes. A renderer that
-/// exited, hung or lost a frame is logged, announced once and reloaded, so
-/// the window never sits there as a blank rectangle that eats clicks. When
-/// the browser process exits, the webview is beyond reloading:
-/// `on_browser_exit(app, label)` runs on the main thread so the owner can
-/// recreate the window.
-pub fn guard_webview(
-    window: &tauri::WebviewWindow,
-    on_browser_exit: impl Fn(&tauri::AppHandle, &str) + Send + Sync + 'static,
-) {
-    use tauri::Manager;
-    let app = window.app_handle().clone();
-    let label = window.label().to_string();
-    let on_exit: OnBrowserExit = Arc::new(on_browser_exit);
-    let l2 = label.clone();
-    let res = window.with_webview(move |pw| {
-        if let Err(e) = webview::watch(&pw, app, l2.clone(), on_exit) {
-            write("renderer", &format!("{l2} not watched for crashes: {e}"));
-        }
-    });
-    if let Err(e) = res {
-        write("renderer", &format!("{label} not watched for crashes: {e}"));
-    }
-}
-
-mod webview {
-    use webview2_com::Microsoft::Web::WebView2::Win32::{
-        ICoreWebView2ProcessFailedEventArgs2, COREWEBVIEW2_PROCESS_FAILED_KIND,
-        COREWEBVIEW2_PROCESS_FAILED_REASON,
-    };
-    use webview2_com::ProcessFailedEventHandler;
-    use windows::core::Interface;
-
-    use super::{announce, failure_of, guard, reason_of, write, Failure, OnBrowserExit};
-
-    /// Adds the ProcessFailed handler. Runs on the main thread, inside
-    /// `with_webview`, as every WebView2 call must.
-    pub fn watch(
-        pw: &tauri::webview::PlatformWebview,
-        app: tauri::AppHandle,
-        label: String,
-        on_exit: OnBrowserExit,
-    ) -> windows::core::Result<()> {
-        // SAFETY: COM calls on the webview's own thread; the controller is
-        // alive for the duration of `with_webview`.
-        let core = unsafe { pw.controller().CoreWebView2()? };
-        let handler = ProcessFailedEventHandler::create(Box::new(move |sender, args| {
-            let Some(args) = args else {
-                return Ok(());
-            };
-            let mut kind = COREWEBVIEW2_PROCESS_FAILED_KIND::default();
-            // SAFETY: an out pointer to a live local.
-            unsafe { args.ProcessFailedKind(&mut kind)? };
-            let mut reason = COREWEBVIEW2_PROCESS_FAILED_REASON::default();
-            if let Ok(a2) = args.cast::<ICoreWebView2ProcessFailedEventArgs2>() {
-                // SAFETY: as above.
-                let _ = unsafe { a2.Reason(&mut reason) };
-            }
-            let (what, kind_name) = failure_of(kind.0);
-            let detail = format!("{label} {kind_name} {}", reason_of(reason.0));
-            guard("renderer", || match what {
-                Failure::Reload => {
-                    write("renderer", &detail);
-                    announce();
-                    if let Some(webview) = sender.as_ref() {
-                        // SAFETY: the event's own webview, on its thread.
-                        if let Err(e) = unsafe { webview.Reload() } {
-                            write("renderer", &format!("{label} reload failed: {e}"));
-                        }
-                    }
-                }
-                Failure::BrowserGone => {
-                    write("renderer", &detail);
-                    announce();
-                    let (a, l, f) = (app.clone(), label.clone(), on_exit.clone());
-                    let _ = app.run_on_main_thread(move || {
-                        guard("renderer.recreate", || f(&a, &l));
-                    });
-                }
-                Failure::Other => eprintln!("[aevaleron] renderer: {detail}"),
-            });
-            Ok(())
-        }));
-        let mut token = 0i64;
-        // SAFETY: a live handler and an out pointer to a live local.
-        unsafe { core.add_ProcessFailed(&handler, &mut token)? };
-        Ok(())
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -451,16 +318,5 @@ mod tests {
             HAS_TO_RESTART.0,
             "Aevaleron hit a problem and has to restart."
         );
-    }
-
-    #[test]
-    fn renderer_failures_reload_and_browser_exit_recreates() {
-        assert_eq!(failure_of(1).0, Failure::Reload);
-        assert_eq!(failure_of(2).0, Failure::Reload);
-        assert_eq!(failure_of(3).0, Failure::Reload);
-        assert_eq!(failure_of(0).0, Failure::BrowserGone);
-        assert_eq!(failure_of(6).0, Failure::Other);
-        assert_eq!(failure_of(1).1, "render-process-exited");
-        assert_eq!(reason_of(3), "crashed");
     }
 }

@@ -109,7 +109,7 @@ pub fn upgrade(s: &VoiceSettings) {
         }
         return;
     }
-    tauri::async_runtime::spawn(async move {
+    crate::shell::async_runtime::spawn(async move {
         if model::ensure(m, &|_, _| {}).await.is_err() {
             return;
         }
@@ -118,7 +118,7 @@ pub fn upgrade(s: &VoiceSettings) {
         let old = model::legacy_for(m).any(|l| whisper::loaded(&model::path(l)));
         if old {
             let new = model::path(m);
-            let swap = tauri::async_runtime::spawn_blocking(move || {
+            let swap = crate::shell::async_runtime::spawn_blocking(move || {
                 whisper::unload();
                 whisper::preload(&new)
             });
@@ -139,7 +139,7 @@ pub fn fetch(s: &VoiceSettings) {
     if model::ready(m) || FETCHING.swap(true, Ordering::SeqCst) {
         return;
     }
-    tauri::async_runtime::spawn(async move {
+    crate::shell::async_runtime::spawn(async move {
         let got = model::ensure(m, &|_, _| {}).await;
         FETCHING.store(false, Ordering::SeqCst);
         if got.is_err() {
@@ -149,7 +149,7 @@ pub fn fetch(s: &VoiceSettings) {
         let chosen = spec(&now).is_some_and(|x| x.id == m.id);
         if chosen && (now.dictation || now.wake) && whisper::cpu_ok() {
             let new = model::path(m);
-            let load = tauri::async_runtime::spawn_blocking(move || {
+            let load = crate::shell::async_runtime::spawn_blocking(move || {
                 if whisper::preload(&new) {
                     tune_soon(new);
                 }
@@ -239,14 +239,14 @@ pub async fn transcribe(
         // An earlier build's file. Should this engine not read it, its
         // replacement is fetched now rather than in the background.
         let old = path.clone();
-        let reads = tauri::async_runtime::spawn_blocking(move || whisper::preload(&old));
+        let reads = crate::shell::async_runtime::spawn_blocking(move || whisper::preload(&old));
         if !reads.await.unwrap_or(false) {
             path = model::ensure(m, on_progress).await?;
         }
     }
     let language = s.language.clone();
     let name = path.file_name().map(|n| n.to_string_lossy().into_owned());
-    let text = tauri::async_runtime::spawn_blocking(move || {
+    let text = crate::shell::async_runtime::spawn_blocking(move || {
         let rest = samples.get(early.upto..).unwrap_or_default();
         let tail = match piece(&path, rest) {
             Some(speech) => whisper::transcribe_after(&path, speech, &language, &early.text)?,

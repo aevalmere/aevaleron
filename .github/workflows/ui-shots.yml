@@ -1,41 +1,38 @@
-# Renderer checks and screenshots for the Tauri rewrite (split d). The pages
-# run in Microsoft Edge, the engine WebView2 embeds, with a stand-in for
-# window.aeval (tools/ui-shots). Each lane's scenes live in
-# tools/ui-shots/lanes/<lane>.mjs and run at 100% and 150%. Screenshots go to
-# the `shots` branch under rust-d-ui/<ref with / as ->/, readable without auth
-# at raw.githubusercontent.com/<repo>/shots/rust-d-ui/<ref>/latest/<name>.png
-# Results and logs land on the ci-logs branch under <ref>/<sha>/ui-shots/;
-# wait for them with `node tools/ci-wait.mjs <sha> ui-shots`.
+# Native screenshots (lane native-ui). The exe shoots itself: with
+# AEVAL_SHOT_DIR set, src-tauri/src/shots.rs opens the bar, an answer from the
+# fake model (AEVAL_FAKE_LLM), Settings and History, writes every shown page
+# as <label>-<theme>.png in light and dark, and quits. Nothing is compiled
+# here: the exe is rust.yml's `aevaleron-native-exe` artifact. rust.yml calls
+# this workflow as its `shots` job after the build on every push to
+# rust/native-ui; run on demand (workflow_dispatch), it takes the artifact
+# of the newest rust run for the commit, else for the branch.
+#
+# The PNGs are the `native-ui-shots` artifact, and go to the `shots` branch
+# under native-ui/<ref with / as ->/, readable without auth at
+# raw.githubusercontent.com/<repo>/shots/native-ui/<ref>/latest/<name>.png.
+# Results land on the ci-logs branch under <ref>/<sha>/ui-shots/; wait for
+# them with `node tools/ci-wait.mjs <sha> ui-shots`.
 name: ui-shots
 
 on:
-  push:
-    branches: [rust-rewrite, "rust/**"]
-    paths:
-      - "renderer/**"
-      - "settings/**"
-      - "history/**"
-      - "src-tauri/bridge/**"
-      - "tools/ui-shots/**"
-      - "lib/backdrop-fixture.html"
-      - "src-tauri/src/**/*.css"
-      - ".github/workflows/ui-shots.yml"
+  workflow_call:
   workflow_dispatch:
-
-concurrency:
-  group: ui-shots-${{ github.ref }}
-  cancel-in-progress: true
 
 permissions:
   contents: write
+  actions: read
 
 jobs:
   shots:
     runs-on: windows-latest
-    timeout-minutes: 30
+    timeout-minutes: 20
     defaults:
       run:
         shell: pwsh
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      SHA: ${{ github.sha }}
+      REF: ${{ github.ref_name }}
     steps:
       - id: checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -45,68 +42,91 @@ jobs:
         with:
           node-version: 20
 
-      - name: Bridge unit checks
-        id: bridge
+      # Called from rust.yml: the artifact of this same run.
+      - name: Download the exe from this run
+        id: artifact
+        if: github.event_name != 'workflow_dispatch'
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: aevaleron-native-exe
+          path: app
+
+      # On demand, or when that failed: the newest rust run for this commit,
+      # else for this branch.
+      - name: Download the exe
+        id: download
+        if: steps.artifact.outcome != 'success'
         run: |
-          $log = Join-Path $env:RUNNER_TEMP 'ci-logs\bridge.log'
+          $log = Join-Path $env:RUNNER_TEMP 'ci-logs\download.log'
           New-Item -ItemType Directory -Force (Split-Path $log) | Out-Null
-          node tools/ui-shots/bridge.test.mjs 2>&1 | Tee-Object -FilePath $log
-          $code = $LASTEXITCODE
-          Get-Content $log | Where-Object { $_ -match '=FAIL' } | ForEach-Object { "::error title=bridge::$_" }
-          exit $code
+          $id = gh run list --repo $env:GITHUB_REPOSITORY --workflow rust.yml --commit $env:SHA --limit 1 --json databaseId -q '.[0].databaseId'
+          if (-not $id) {
+            $id = gh run list --repo $env:GITHUB_REPOSITORY --workflow rust.yml --branch $env:REF --status completed --limit 1 --json databaseId -q '.[0].databaseId'
+          }
+          if (-not $id) { "no rust run for $env:SHA or $env:REF" | Tee-Object -FilePath $log; exit 1 }
+          "rust run $id" | Tee-Object -FilePath $log
+          gh run download $id --repo $env:GITHUB_REPOSITORY -n aevaleron-native-exe -D app 2>&1 | Tee-Object -Append -FilePath $log
+          if (-not (Test-Path app\aevaleron.exe)) { "the run has no aevaleron-native-exe artifact" | Tee-Object -Append -FilePath $log; exit 1 }
+          Get-ChildItem -Recurse app | ForEach-Object { $_.FullName } | Tee-Object -Append -FilePath $log
 
-      # Playwright drives the runner's Edge. axe-core audits every window of
-      # every scene for WCAG 2.2 A and AA failures (shots.mjs --axe).
-      - name: Install Playwright and axe-core
-        id: playwright
-        run: |
-          $log = Join-Path $env:RUNNER_TEMP 'ci-logs\playwright.log'
-          cmd /c "npm install --no-save --no-audit --no-fund --prefix tools/ui-shots playwright@1.48.2 axe-core@4.10.2 2>&1" | Tee-Object -FilePath $log
-          exit $LASTEXITCODE
-
-      - name: Screenshots and renderer checks
+      - name: Screenshots
         id: shots
         run: |
           $log = Join-Path $env:RUNNER_TEMP 'ci-logs\shots.log'
-          $axe = Join-Path $env:RUNNER_TEMP 'ci-logs\axe.json'
-          node tools/ui-shots/shots.mjs out/ui-shots --channel=msedge "--axe=$axe" 2>&1 | Tee-Object -FilePath $log
-          $code = $LASTEXITCODE
-          $fails = Get-Content $log | Where-Object { $_ -match '=FAIL|\] pageerror' }
-          $fails | ForEach-Object { "::error title=ui-shots::$($_.Replace('%','%25'))" }
-          if ($code -ne 0) {
-            $tail = (Get-Content $log -Tail 40) -join "`n"
-            "::error title=ui-shots log tail::$($tail.Replace('%','%25').Replace("`r",'').Replace("`n",'%0A'))"
-          }
-          "::notice title=ui-shots::$((Get-Content $log | Where-Object { $_ -match '^\[UI\] (glob|done)' }) -join '%0A')"
-          exit $code
+          New-Item -ItemType Directory -Force (Split-Path $log) | Out-Null
+          $dir = Join-Path $PWD 'out\native-ui-shots'
+          New-Item -ItemType Directory -Force $dir | Out-Null
+          $scratch = Join-Path $env:RUNNER_TEMP 'aeval-shots'
+          New-Item -ItemType Directory -Force $scratch | Out-Null
+          $env:AEVAL_SHOT_DIR = $dir
+          # The quiet-run switch the checks use: no first-run tour, no
+          # update check.
+          $env:AEVAL_SHOT = '1'
+          $env:AEVAL_FAKE_LLM = '1'
+          $env:AEVAL_USERDATA = $scratch
+          $out = Join-Path $env:RUNNER_TEMP 'shots.out'
+          $err = Join-Path $env:RUNNER_TEMP 'shots.err'
+          $p = Start-Process app\aevaleron.exe -PassThru -RedirectStandardOutput $out -RedirectStandardError $err
+          $null = $p.Handle
+          $timedOut = -not $p.WaitForExit(300000)
+          if ($timedOut) { $p.Kill(); Write-Output '::error::shots timed out after 300 s' }
+          $code = if ($timedOut) { 'timeout' } else { $p.ExitCode }
+          @(Get-Content $out -ErrorAction SilentlyContinue) + @('--- stderr ---') + @(Get-Content $err -ErrorAction SilentlyContinue) + @("--- exit code: $code") | Set-Content $log
+          $pngs = @(Get-ChildItem $dir -Filter *.png -ErrorAction SilentlyContinue)
+          $text = (Get-Content $out -Raw -ErrorAction SilentlyContinue) + ''
+          $ok = -not $timedOut -and $code -eq 0 -and $pngs.Count -gt 0 -and $text -match '\[SHOT\] done'
+          $lines = (($text -split "`n" | Where-Object { $_ -match '^\[SHOT\]' }) -join "`n").Replace("`r", '')
+          if (-not $ok) { $lines += "`n--- stderr ---`n" + ((Get-Content $err -Tail 40 -ErrorAction SilentlyContinue) -join "`n") }
+          $level = if ($ok) { 'notice' } else { 'error' }
+          Write-Output "::$level title=native shots: $($pngs.Count) png::$($lines.Replace('%', '%25').Replace("`n", '%0A'))"
+          if (-not $ok) { Add-Content $log "shots failed: exit code $code, $($pngs.Count) png"; exit 1 }
 
       - id: upload
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
-          name: ui-shots
-          path: out/ui-shots/*.png
+          name: native-ui-shots
+          path: out/native-ui-shots/*.png
 
       # Into the shots branch beside main's folders, never touching them, one
-      # folder per branch so parallel lanes never overwrite each other:
-      # rust-d-ui/<ref with / as ->/latest and /<sha> (the five newest kept).
-      # A push that loses a race clones the new tip and tries again.
+      # folder per branch: native-ui/<ref with / as ->/latest and /<sha> (the
+      # five newest kept). A push that loses a race clones the new tip and
+      # tries again.
       - name: Publish to the shots branch
         id: publish
-        if: ${{ always() && github.event_name == 'push' }}
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        if: always()
         run: |
-          $src = Join-Path $PWD 'out\ui-shots'
+          $src = Join-Path $PWD 'out\native-ui-shots'
           if (-not (Get-ChildItem $src -Filter *.png -ErrorAction SilentlyContinue)) { "no screenshots"; exit 0 }
           $remote = "https://x-access-token:$env:GH_TOKEN@github.com/${{ github.repository }}.git"
-          $sha = '${{ github.sha }}'
-          $refDir = '${{ github.ref_name }}'.Replace('/', '-')
+          $sha = $env:SHA
+          $refDir = $env:REF.Replace('/', '-')
           for ($try = 1; $try -le 12; $try++) {
             $dir = Join-Path $env:RUNNER_TEMP "shots-$try"
             git clone --quiet --depth 1 --branch shots $remote $dir
             if ($LASTEXITCODE -ne 0) { "clone failed, retrying"; Start-Sleep -Seconds (2 + (Get-Random -Maximum 4)); continue }
-            $base = Join-Path (Join-Path $dir 'rust-d-ui') $refDir
+            $base = Join-Path (Join-Path $dir 'native-ui') $refDir
             New-Item -ItemType Directory -Force $base | Out-Null
             foreach ($d in @('latest', $sha)) {
               $t = Join-Path $base $d
@@ -119,17 +139,18 @@ jobs:
             $order | Select-Object -Skip 5 | ForEach-Object { $o = Join-Path $base $_; if (Test-Path $o) { Remove-Item -Recurse -Force $o } }
             $order | Select-Object -First 5 | Set-Content $orderFile
             git -C $dir add -A
-            git -C $dir -c user.name=github-actions -c user.email=github-actions@users.noreply.github.com commit --quiet -m "rust-d-ui/$refDir screenshots for $sha"
+            git -C $dir -c user.name=github-actions -c user.email=github-actions@users.noreply.github.com commit --quiet -m "native-ui/$refDir screenshots for $sha"
             git -C $dir push --quiet $remote HEAD:shots
-            if ($LASTEXITCODE -eq 0) { "published rust-d-ui/$refDir/$sha (try $try)"; exit 0 }
+            if ($LASTEXITCODE -eq 0) { "published native-ui/$refDir/$sha (try $try)"; exit 0 }
             "push refused (try $try), retrying on the new tip"
             Start-Sleep -Seconds (2 + (Get-Random -Maximum (3 * [Math]::Min($try, 6))))
           }
           throw 'could not publish after 12 tries'
 
       # Last, pass, fail or cancel: summary.md, errors.txt and the logs to
-      # ci-logs/<ref>/<sha>/ui-shots/ (tools/ci-publish.mjs). A failure to
-      # publish never turns a green run red.
+      # ci-logs/<ref>/<sha>/ui-shots/ (tools/ci-publish.mjs), under the rust
+      # run's commit and branch. A failure to publish never turns a green run
+      # red.
       - name: Publish to ci-logs
         if: always()
         continue-on-error: true
@@ -137,13 +158,15 @@ jobs:
           CI_WORKFLOW: ui-shots
           CI_STATUS: ${{ job.status }}
           CI_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CI_NOTE: "Screenshots: https://github.com/${{ github.repository }}/tree/shots/rust-d-ui/${{ github.ref_name }}/${{ github.sha }} (/ in the ref becomes -)"
+          CI_SHA: ${{ env.SHA }}
+          CI_REF: ${{ env.REF }}
+          CI_NOTE: "Screenshots: artifact native-ui-shots, and https://github.com/${{ github.repository }}/tree/shots/native-ui/${{ env.REF }}/${{ env.SHA }} (/ in the ref becomes -)"
           CI_STEPS: |
             Checkout|${{ steps.checkout.outcome }}
             Node|${{ steps.node.outcome }}
-            Bridge unit checks|${{ steps.bridge.outcome }}|bridge.log
-            Install Playwright|${{ steps.playwright.outcome }}|playwright.log
-            Screenshots and renderer checks|${{ steps.shots.outcome }}|shots.log
+            Download the exe from this run|${{ steps.artifact.outcome }}
+            Download the exe|${{ steps.download.outcome }}|download.log
+            Screenshots|${{ steps.shots.outcome }}|shots.log
             Upload screenshots|${{ steps.upload.outcome }}
             Publish to the shots branch|${{ steps.publish.outcome }}
         run: node tools/ci-publish.mjs

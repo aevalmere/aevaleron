@@ -10,6 +10,7 @@ use serde_json::{json, Value};
 
 use crate::desktop;
 use crate::selftest::{notepad, Cx, Input};
+use crate::windows::OVERLAY;
 use crate::voice::{
     self, capture, engine, insert, keyword, model, pill, settings, wake, wav, whisper, Origin,
 };
@@ -117,35 +118,19 @@ fn transcribes(cx: &Cx) -> bool {
 fn bar_field(cx: &Cx) {
     cx.on_main(|app| crate::windows::open_bar(app, None, None));
     cx.sleep(400);
-    let field = || {
-        cx.eval("overlay", "document.getElementById('query-input').value")
-            .ok()
-            .and_then(|v| v.as_str().map(str::to_lowercase))
-            .unwrap_or_default()
-    };
-    let mic = |what: &str| {
-        cx.eval(
-            "overlay",
-            &format!("document.getElementById('mic-btn').{what}"),
-        )
-    };
-    let _ = mic("click()");
-    let listening = cx.wait_for(Duration::from_secs(3), || {
-        mic("dataset.state") == Ok(json!("listening"))
-    });
+    let field = || bar_text(cx).to_lowercase();
+    // The mic button's own path: start, then stop.
+    let started = cx.on_main(|app| voice::start(app, Origin::Bar));
+    let listening = matches!(started, Some(Ok(())));
     cx.sleep(600);
-    let _ = mic("click()");
+    let _ = cx.on_main(|app| voice::finish(app, Origin::Bar));
     let landed = cx.wait_for(Duration::from_secs(40), || field().contains("tomorrow"));
     cx.must(
         "voiceBarField",
         listening && landed,
-        format!("listening={listening} field={:?}", field()),
+        format!("listening={started:?} field={:?}", field()),
     );
-    let _ = cx.eval(
-        "overlay",
-        "(() => { const f = document.getElementById('query-input'); f.value = ''; \
-         f.dispatchEvent(new Event('input', { bubbles: true })); return true; })()",
-    );
+    clear_bar(cx);
     cx.on_main(crate::windows::collapse_panel);
     cx.sleep(300);
 }
@@ -202,7 +187,7 @@ fn dictation(cx: &mut Cx) {
     key(WIN, false);
     let shown = cx.wait_for(Duration::from_secs(3), || {
         let up = cx.on_main(pill::visible).unwrap_or(false);
-        let state = cx.eval(pill::LABEL, "document.body.dataset.state");
+        let state = cx.probe(pill::LABEL, "state");
         up && state == Ok(json!("listening"))
     });
     cx.sleep(900);
@@ -563,10 +548,16 @@ fn legacy(cx: &Cx, speech: &[f32]) {
 
 /// What the bar's field holds.
 fn bar_text(cx: &Cx) -> String {
-    cx.eval("overlay", "document.getElementById('query-input').value")
+    cx.probe(OVERLAY, "input")
         .ok()
         .and_then(|v| v.as_str().map(str::to_string))
         .unwrap_or_default()
+}
+
+/// Empties the bar's field the way Rust fills it: `bar:prefill`.
+fn clear_bar(cx: &Cx) {
+    let empty = json!({ "text": "", "mode": "ask" });
+    cx.on_main(move |app| crate::windows::emit(app, OVERLAY, "bar:prefill", empty));
 }
 
 /// The fixture, a second of silence and the fixture again, recorded through
@@ -605,11 +596,7 @@ fn e2e(cx: &Cx, clip: &[f32], id: &str) -> (bool, Option<voice::Timings>, String
     let _ = std::fs::remove_file(&file);
     cx.sleep(300);
     let field = bar_text(cx);
-    let _ = cx.eval(
-        "overlay",
-        "(() => { const f = document.getElementById('query-input'); f.value = ''; \
-         f.dispatchEvent(new Event('input', { bubbles: true })); return true; })()",
-    );
+    clear_bar(cx);
     (matches!(started, Some(Ok(()))), timings, field)
 }
 

@@ -63,6 +63,35 @@ pub fn send(gesture: Input<'_>) -> Result<(), String> {
     }
 }
 
+/// Whether `chord` (`"Escape"`, `"Ctrl+Alt+Space"`) is held as a global
+/// hotkey now, by us or by another app: Windows refuses to register a chord
+/// that is taken. A free one is let go again at once.
+pub fn hotkey_taken(chord: &str) -> Result<bool, String> {
+    const ID: i32 = 0xAE70;
+    let keys = parse_chord(chord)?;
+    let Some(((key, _), mods)) = keys.split_last() else {
+        return Err("an empty chord".into());
+    };
+    let mut flags = km::MOD_NOREPEAT;
+    for (vk, _) in mods {
+        flags |= match *vk {
+            0x11 => km::MOD_CONTROL,
+            0x12 => km::MOD_ALT,
+            0x10 => km::MOD_SHIFT,
+            0x5B => km::MOD_WIN,
+            other => return Err(format!("{chord}: {other:#x} is not a modifier")),
+        };
+    }
+    let vk = u32::from(*key);
+    // SAFETY: a hotkey of this thread (no window), let go before returning.
+    let free = unsafe { km::RegisterHotKey(std::ptr::null_mut(), ID, flags, vk) } != 0;
+    if free {
+        // SAFETY: the hotkey this thread just registered.
+        unsafe { km::UnregisterHotKey(std::ptr::null_mut(), ID) };
+    }
+    Ok(!free)
+}
+
 /// Where the pointer is, in physical pixels.
 pub fn cursor() -> (i32, i32) {
     let mut p = POINT { x: 0, y: 0 };

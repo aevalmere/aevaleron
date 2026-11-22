@@ -3,7 +3,8 @@
 //! `None` for any other channel, which falls through to the next router.
 
 use serde_json::{json, Value};
-use tauri::AppHandle;
+
+use crate::shell::AppHandle;
 
 use super::{capture, cleanup, engine, gemini, model, ptt, settings, whisper, Origin};
 
@@ -59,7 +60,7 @@ fn taken() -> Vec<String> {
 /// Everything the Voice section shows.
 async fn snapshot() -> Value {
     let s = settings::get();
-    let devices = tauri::async_runtime::spawn_blocking(capture::devices)
+    let devices = crate::shell::async_runtime::spawn_blocking(capture::devices)
         .await
         .unwrap_or_default();
     let engines: Vec<Value> = settings::ENGINES

@@ -1,0 +1,704 @@
+// The controls Settings and History draw with (lane native-ui): plain and
+// borderless, on the Theme palette. Every one is controlled: it shows what
+// it is given and reports a change; the page decides.
+
+import { Theme, Glyph, Button } from "theme.slint";
+import { SettingsState, SetChoice, SetComboRow, SetComboView } from "settings-state.slint";
+
+// A page title and its lede.
+export component PageTitle inherits VerticalLayout {
+    in property <string> text;
+    in property <string> lede;
+    padding-top: Theme.sp-5;
+    padding-bottom: Theme.sp-2;
+    spacing: Theme.sp-1;
+    Text {
+        text: root.text;
+        font-size: Theme.page;
+        font-weight: 600;
+        color: Theme.label;
+    }
+    if root.lede != "": Text {
+        text: root.lede;
+        font-size: Theme.row;
+        color: Theme.label-2;
+        wrap: word-wrap;
+    }
+}
+
+// A group of rows on a plate.
+export component Group inherits Rectangle {
+    background: Theme.plate;
+    border-radius: Theme.r-plate;
+    VerticalLayout {
+        padding: Theme.sp-1;
+        spacing: 0px;
+        @children
+    }
+}
+
+// A paragraph: a note, a status line (empty takes no space), or an error.
+export component Note inherits Text {
+    in property <string> tone;
+    font-size: Theme.caption;
+    color: tone == "danger" ? Theme.danger : tone == "warn" ? Theme.danger : Theme.label-3;
+    wrap: word-wrap;
+}
+
+// A switch: the knob slides across a 40 x 22 track.
+export component Switch inherits Rectangle {
+    in property <bool> checked;
+    in property <bool> enabled: true;
+    callback toggled(bool);
+    width: 40px;
+    height: 22px;
+    border-radius: self.height / 2;
+    background: !root.enabled ? Theme.fill-1 : root.checked ? Theme.accent : Theme.fill-3;
+    animate background { duration: Theme.fast; }
+
+    Rectangle {
+        width: parent.height - 6px;
+        height: self.width;
+        y: 3px;
+        x: root.checked ? parent.width - self.width - 3px : 3px;
+        border-radius: self.width / 2;
+        background: root.checked ? Theme.on-accent : Theme.label-2;
+        animate x { duration: Theme.fast; }
+    }
+
+    TouchArea {
+        enabled: root.enabled;
+        mouse-cursor: pointer;
+        clicked => {
+            root.toggled(!root.checked);
+        }
+    }
+}
+
+// A line with a switch at its end; the whole line flips it.
+export component SwitchRow inherits Rectangle {
+    in property <string> text;
+    in property <string> says;
+    in property <bool> says-error;
+    in property <bool> checked;
+    in property <bool> enabled: true;
+    in property <length> indent: 0px;
+    callback toggled(bool);
+    min-height: 48px * Theme.text-scale;
+    border-radius: Theme.r-row;
+    background: row-touch.has-hover && root.enabled ? Theme.fill-1 : transparent;
+
+    row-touch := TouchArea {
+        enabled: root.enabled;
+        mouse-cursor: pointer;
+        clicked => {
+            root.toggled(!root.checked);
+        }
+    }
+
+    HorizontalLayout {
+        padding-left: Theme.sp-3 + root.indent;
+        padding-right: Theme.sp-3;
+        padding-top: Theme.sp-2;
+        padding-bottom: Theme.sp-2;
+        spacing: Theme.sp-3;
+        VerticalLayout {
+            alignment: center;
+            horizontal-stretch: 1;
+            spacing: 2px;
+            Text {
+                text: root.text;
+                font-size: Theme.row;
+                color: root.enabled ? Theme.label : Theme.label-3;
+                wrap: word-wrap;
+            }
+            if root.says != "": Text {
+                text: root.says;
+                font-size: Theme.meta;
+                color: root.says-error ? Theme.danger : Theme.label-3;
+                wrap: word-wrap;
+            }
+        }
+        VerticalLayout {
+            alignment: center;
+            Switch {
+                checked: root.checked;
+                enabled: root.enabled;
+                toggled(v) => {
+                    root.toggled(v);
+                }
+            }
+        }
+    }
+}
+
+// One option of a radio group: a ring, the name, a note under it.
+export component ChoiceOption inherits Rectangle {
+    in property <string> name;
+    in property <string> note;
+    in property <bool> checked;
+    in property <bool> enabled: true;
+    callback clicked();
+    min-height: 48px * Theme.text-scale;
+    border-radius: Theme.r-row;
+    background: root.checked ? Theme.fill-2 : opt-touch.has-hover && root.enabled ? Theme.fill-1 : transparent;
+
+    opt-touch := TouchArea {
+        enabled: root.enabled;
+        mouse-cursor: pointer;
+        clicked => {
+            root.clicked();
+        }
+    }
+
+    HorizontalLayout {
+        padding-left: Theme.sp-3;
+        padding-right: Theme.sp-3;
+        padding-top: Theme.sp-2;
+        padding-bottom: Theme.sp-2;
+        spacing: Theme.sp-3;
+        VerticalLayout {
+            alignment: center;
+            Rectangle {
+                width: 18px;
+                height: 18px;
+                border-radius: 9px;
+                background: root.checked ? Theme.accent : Theme.fill-3;
+                Rectangle {
+                    width: root.checked ? 8px : 12px;
+                    height: self.width;
+                    border-radius: self.width / 2;
+                    background: root.checked ? Theme.on-accent : Theme.plate;
+                }
+            }
+        }
+        VerticalLayout {
+            alignment: center;
+            horizontal-stretch: 1;
+            spacing: 2px;
+            Text {
+                text: root.name;
+                font-size: Theme.row;
+                font-weight: root.checked ? 600 : 400;
+                color: root.enabled ? Theme.label : Theme.label-3;
+                wrap: word-wrap;
+            }
+            if root.note != "": Text {
+                text: root.note;
+                font-size: Theme.meta;
+                color: Theme.label-3;
+                wrap: word-wrap;
+            }
+        }
+    }
+}
+
+// A radio group from a model; `group` names it to the page.
+export component ChoiceList inherits VerticalLayout {
+    in property <string> group;
+    in property <[SetChoice]> choices;
+    spacing: 2px;
+    for c in root.choices: ChoiceOption {
+        name: c.name;
+        note: c.note;
+        checked: c.checked;
+        enabled: c.enabled;
+        clicked => {
+            SettingsState.act(root.group, c.id);
+        }
+    }
+}
+
+// A segmented control: one capsule per choice.
+export component Segments inherits HorizontalLayout {
+    in property <string> group;
+    in property <[SetChoice]> choices;
+    spacing: Theme.sp-1;
+    alignment: start;
+    for c in root.choices: Rectangle {
+        height: 32px * Theme.text-scale;
+        min-width: seg-text.preferred-width + 2 * Theme.sp-4;
+        border-radius: self.height / 2;
+        background: c.checked ? Theme.accent-wash : seg-touch.has-hover ? Theme.fill-2 : Theme.fill-1;
+        seg-text := Text {
+            text: c.name;
+            font-size: Theme.row;
+            font-weight: c.checked ? 600 : 400;
+            color: c.checked ? Theme.accent-text : Theme.label;
+            vertical-alignment: center;
+            horizontal-alignment: center;
+        }
+        seg-touch := TouchArea {
+            mouse-cursor: pointer;
+            clicked => {
+                SettingsState.act(root.group, c.id);
+            }
+        }
+    }
+}
+
+// A slider from `minimum` to `maximum` in steps of `step`. It reports
+// where the pointer puts it while dragged, and the value let go on.
+export component Slider inherits Rectangle {
+    in property <float> value;
+    in property <float> minimum: 0;
+    in property <float> maximum: 1;
+    in property <float> step: 1;
+    in property <bool> enabled: true;
+    callback moved(float);
+    callback released(float);
+    height: 28px;
+    property <float> k: max(0, min(1, (root.value - root.minimum) / (root.maximum - root.minimum)));
+
+    function at(px: length) -> float {
+        let f = max(0, min(1, (px - 9px) / max(1px, root.width - 18px)));
+        return root.minimum + round((root.maximum - root.minimum) * f / root.step) * root.step;
+    }
+
+    Rectangle {
+        x: 9px;
+        y: (parent.height - self.height) / 2;
+        width: parent.width - 18px;
+        height: 4px;
+        border-radius: 2px;
+        background: Theme.fill-3;
+    }
+
+    Rectangle {
+        x: 9px;
+        y: (parent.height - self.height) / 2;
+        width: (parent.width - 18px) * root.k;
+        height: 4px;
+        border-radius: 2px;
+        background: root.enabled ? Theme.accent : Theme.label-3;
+    }
+
+    Rectangle {
+        x: (parent.width - 18px) * root.k;
+        y: (parent.height - self.height) / 2;
+        width: 18px;
+        height: 18px;
+        border-radius: 9px;
+        background: root.enabled ? Theme.accent : Theme.label-3;
+    }
+
+    slide-touch := TouchArea {
+        enabled: root.enabled;
+        mouse-cursor: pointer;
+        pointer-event(e) => {
+            if (e.button == PointerEventButton.left && e.kind == PointerEventKind.down) {
+                root.moved(root.at(self.mouse-x));
+            }
+            if (e.button == PointerEventButton.left && e.kind == PointerEventKind.up) {
+                root.released(root.at(self.mouse-x));
+            }
+        }
+        moved => {
+            if (self.pressed) {
+                root.moved(root.at(self.mouse-x));
+            }
+        }
+    }
+}
+
+// A thin progress bar, 0 to 1.
+export component Progress inherits Rectangle {
+    in property <float> value;
+    height: 4px;
+    border-radius: 2px;
+    background: Theme.fill-2;
+    Rectangle {
+        x: 0;
+        width: parent.width * max(0, min(1, root.value));
+        height: parent.height;
+        border-radius: 2px;
+        background: Theme.accent;
+    }
+}
+
+// A one-line field with a placeholder; Enter is `accepted`.
+export component TextField inherits Rectangle {
+    in property <string> placeholder;
+    in property <bool> password;
+    in property <bool> enabled: true;
+    in property <bool> mono;
+    in-out property <string> text <=> input.text;
+    out property <bool> focused: input.has-focus;
+    callback edited(string);
+    callback accepted(string);
+
+    public function focus-field() {
+        input.focus();
+    }
+
+    public function set-text(t: string) {
+        input.text = t;
+    }
+
+    horizontal-stretch: 1;
+    height: 36px * Theme.text-scale;
+    border-radius: Theme.r-row;
+    background: input.has-focus ? Theme.fill-2 : Theme.fill-1;
+
+    Text {
+        x: Theme.sp-3;
+        width: parent.width - 2 * Theme.sp-3;
+        height: parent.height;
+        visible: input.text == "";
+        text: root.placeholder;
+        font-size: Theme.row;
+        font-family: root.mono ? Theme.mono : Theme.font;
+        color: Theme.label-3;
+        vertical-alignment: center;
+        overflow: elide;
+    }
+
+    input := TextInput {
+        x: Theme.sp-3;
+        width: parent.width - 2 * Theme.sp-3;
+        height: parent.height;
+        enabled: root.enabled;
+        single-line: true;
+        input-type: root.password ? InputType.password : InputType.text;
+        font-size: Theme.row;
+        font-family: root.mono ? Theme.mono : Theme.font;
+        color: root.enabled ? Theme.label : Theme.label-3;
+        selection-background-color: Theme.selection;
+        vertical-alignment: center;
+        edited => {
+            root.edited(self.text);
+        }
+        accepted => {
+            root.accepted(self.text);
+        }
+    }
+}
+
+// A link-styled button: the accent text, a fill on hover.
+export component TextButton inherits Rectangle {
+    in property <string> text;
+    in property <bool> enabled: true;
+    in property <bool> danger;
+    callback clicked();
+    min-width: tb-label.preferred-width + 2 * Theme.sp-2;
+    height: 32px * Theme.text-scale;
+    border-radius: Theme.r-row;
+    background: tb-touch.has-hover && root.enabled ? Theme.fill-1 : transparent;
+    tb-label := Text {
+        text: root.text;
+        font-size: Theme.row;
+        color: !root.enabled ? Theme.label-3 : root.danger ? Theme.danger : Theme.accent-text;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+    tb-touch := TouchArea {
+        enabled: root.enabled;
+        mouse-cursor: pointer;
+        clicked => {
+            root.clicked();
+        }
+    }
+}
+
+// A keycap.
+export component Key inherits Rectangle {
+    in property <string> text;
+    in property <bool> empty;
+    in property <bool> live;
+    height: 26px * Theme.text-scale;
+    min-width: key-text.preferred-width + 2 * Theme.sp-2;
+    border-radius: Theme.r-key;
+    background: root.live ? Theme.accent-wash : Theme.fill-2;
+    key-text := Text {
+        text: root.text;
+        font-size: Theme.caption;
+        font-family: Theme.mono;
+        color: root.empty ? Theme.label-3 : root.live ? Theme.accent-text : Theme.label;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+}
+
+// A row that opens: the title and its value on one line, the controls
+// below while it is the open one. One row is open at a time.
+export component Disclosure inherits Rectangle {
+    in property <string> rid;
+    in property <string> title;
+    in property <string> summary;
+    property <bool> open: SettingsState.open-row == root.rid;
+    border-radius: Theme.r-row;
+
+    VerticalLayout {
+        Rectangle {
+            min-height: 48px * Theme.text-scale;
+            border-radius: Theme.r-row;
+            background: head-touch.has-hover ? Theme.fill-1 : transparent;
+            head-touch := TouchArea {
+                mouse-cursor: pointer;
+                clicked => {
+                    SettingsState.combo-open = "";
+                    SettingsState.open-row = root.open ? "" : root.rid;
+                }
+            }
+            HorizontalLayout {
+                padding-left: Theme.sp-3;
+                padding-right: Theme.sp-3;
+                spacing: Theme.sp-3;
+                Text {
+                    text: root.title;
+                    font-size: Theme.row;
+                    font-weight: 600;
+                    color: Theme.label;
+                    vertical-alignment: center;
+                }
+                Text {
+                    text: root.summary;
+                    horizontal-stretch: 1;
+                    horizontal-alignment: right;
+                    overflow: elide;
+                    font-size: Theme.row;
+                    color: Theme.label-2;
+                    vertical-alignment: center;
+                }
+                Text {
+                    text: root.open ? Glyph.up : Glyph.down;
+                    font-family: Theme.icons;
+                    font-size: 10px * Theme.text-scale;
+                    color: Theme.label-3;
+                    vertical-alignment: center;
+                }
+            }
+        }
+        Rectangle {
+            clip: true;
+            height: root.open ? body.preferred-height : 0px;
+            body := VerticalLayout {
+                padding-left: Theme.sp-3;
+                padding-right: Theme.sp-3;
+                padding-bottom: Theme.sp-4;
+                spacing: Theme.sp-3;
+                @children
+            }
+        }
+    }
+}
+
+// A row that only says something: a title, maybe a value, a note.
+export component StaticRow inherits VerticalLayout {
+    in property <string> title;
+    in property <string> summary;
+    in property <string> note;
+    padding-left: Theme.sp-3;
+    padding-right: Theme.sp-3;
+    padding-top: Theme.sp-3;
+    padding-bottom: Theme.sp-3;
+    spacing: Theme.sp-1;
+    HorizontalLayout {
+        spacing: Theme.sp-3;
+        Text {
+            text: root.title;
+            font-size: Theme.row;
+            font-weight: 600;
+            color: Theme.label;
+        }
+        Text {
+            text: root.summary;
+            horizontal-stretch: 1;
+            horizontal-alignment: right;
+            font-size: Theme.row;
+            color: Theme.label-2;
+        }
+    }
+    if root.note != "": Note {
+        text: root.note;
+    }
+}
+
+// A row with a value and one button that says what it does.
+export component ActionRow inherits Rectangle {
+    in property <string> title;
+    in property <string> summary;
+    in property <string> button;
+    callback clicked();
+    min-height: 48px * Theme.text-scale;
+    HorizontalLayout {
+        padding-left: Theme.sp-3;
+        padding-right: Theme.sp-2;
+        spacing: Theme.sp-3;
+        Text {
+            text: root.title;
+            font-size: Theme.row;
+            font-weight: 600;
+            color: Theme.label;
+            vertical-alignment: center;
+        }
+        Text {
+            text: root.summary;
+            horizontal-stretch: 1;
+            horizontal-alignment: right;
+            overflow: elide;
+            font-size: Theme.row;
+            color: Theme.label-2;
+            vertical-alignment: center;
+        }
+        VerticalLayout {
+            alignment: center;
+            Button {
+                text: root.button;
+                clicked => {
+                    root.clicked();
+                }
+            }
+        }
+    }
+}
+
+// The list under an open picker. It keeps the marked option in view.
+component ComboList inherits Rectangle {
+    in property <[SetComboRow]> rows;
+    in property <string> cid;
+    property <length> want: SettingsState.combo-scroll;
+    property <length> row-h: 44px * Theme.text-scale;
+    background: Theme.raised;
+    border-radius: Theme.r-card;
+    height: min(list.preferred-height + 2 * Theme.sp-1, 320px * Theme.text-scale);
+    clip: true;
+
+    function keep() {
+        fl.viewport-y = max(fl.height - fl.viewport-height, min(0px, fl.height / 2 - root.want));
+    }
+
+    changed want => {
+        root.keep();
+    }
+    init => {
+        root.keep();
+    }
+
+    fl := Flickable {
+        x: 0;
+        y: 0;
+        width: parent.width;
+        height: parent.height;
+        viewport-width: self.width;
+        viewport-height: list.preferred-height + 2 * Theme.sp-1;
+        list := VerticalLayout {
+            x: 0;
+            y: Theme.sp-1;
+            width: fl.width;
+            padding-left: Theme.sp-1;
+            padding-right: Theme.sp-1;
+            for r[i] in root.rows: Rectangle {
+                height: r.header ? 28px * Theme.text-scale : root.row-h;
+                border-radius: Theme.r-row;
+                background: r.header ? transparent : i == SettingsState.combo-mark || opt-touch.has-hover ? Theme.fill-2 : transparent;
+                if r.header: Text {
+                    x: Theme.sp-3;
+                    width: parent.width - 2 * Theme.sp-3;
+                    height: parent.height;
+                    text: r.name;
+                    font-size: Theme.meta;
+                    font-weight: 600;
+                    color: Theme.label-3;
+                    vertical-alignment: bottom;
+                }
+                opt-touch := TouchArea {
+                    enabled: !r.header;
+                    mouse-cursor: pointer;
+                    clicked => {
+                        SettingsState.pick(root.cid, r.id);
+                    }
+                }
+                if !r.header: HorizontalLayout {
+                    padding-left: Theme.sp-3;
+                    padding-right: Theme.sp-3;
+                    spacing: Theme.sp-2;
+                    VerticalLayout {
+                        alignment: center;
+                        horizontal-stretch: 1;
+                        Text {
+                            text: r.name;
+                            font-size: Theme.row;
+                            color: Theme.label;
+                            overflow: elide;
+                        }
+                        if r.detail != "": Text {
+                            text: r.detail;
+                            font-size: Theme.meta;
+                            color: Theme.label-3;
+                            overflow: elide;
+                        }
+                    }
+                    Text {
+                        text: r.checked ? Glyph.check : "";
+                        font-family: Theme.icons;
+                        font-size: 12px * Theme.text-scale;
+                        color: Theme.accent-text;
+                        vertical-alignment: center;
+                        width: 14px * Theme.text-scale;
+                    }
+                }
+            }
+        }
+    }
+}
+
+// A picker that opens in place, under its button: never cut off by the
+// window, since it is part of the page.
+export component Combo inherits VerticalLayout {
+    in property <string> cid;
+    in property <SetComboView> view;
+    in property <bool> enabled: true;
+    property <bool> open: SettingsState.combo-open == root.cid;
+    spacing: Theme.sp-1;
+
+    Rectangle {
+        min-height: 44px * Theme.text-scale;
+        border-radius: Theme.r-plate;
+        background: !root.enabled ? Theme.fill-1 : combo-touch.has-hover || root.open ? Theme.fill-2 : Theme.fill-1;
+        combo-touch := TouchArea {
+            enabled: root.enabled;
+            mouse-cursor: pointer;
+            clicked => {
+                SettingsState.act("combo", root.cid);
+            }
+        }
+        HorizontalLayout {
+            padding-left: Theme.sp-3;
+            padding-right: Theme.sp-3;
+            padding-top: Theme.sp-1;
+            padding-bottom: Theme.sp-1;
+            spacing: Theme.sp-2;
+            VerticalLayout {
+                alignment: center;
+                horizontal-stretch: 1;
+                Text {
+                    text: root.view.label;
+                    font-size: Theme.row;
+                    color: root.enabled ? Theme.label : Theme.label-3;
+                    overflow: elide;
+                }
+                if root.view.detail != "": Text {
+                    text: root.view.detail;
+                    font-size: Theme.meta;
+                    color: Theme.label-3;
+                    overflow: elide;
+                }
+            }
+            Text {
+                text: root.open ? Glyph.up : Glyph.down;
+                font-family: Theme.icons;
+                font-size: 10px * Theme.text-scale;
+                color: Theme.label-3;
+                vertical-alignment: center;
+            }
+        }
+    }
+    if root.open: ComboList {
+        rows: root.view.rows;
+        cid: root.cid;
+    }
+    if root.view.note != "": Note {
+        text: root.view.note;
+    }
+}

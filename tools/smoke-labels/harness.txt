@@ -5,7 +5,8 @@
 # to get green.
 version
 scaffold.bridge
-selftest.eval
+# native-ui: selftest.eval became selftest.probe (no webview to run script in)
+selftest.probe
 selftest.input
 probe.harness
 probe.platform
@@ -22,4 +23,10 @@ glassGates
 v2desktop
 v2NotepadOpen
 v2NotepadClosed
+nativeWindows
+processCount
+noWebView2
+idlePrivateMB
+idleCpuPct
+hotkeyToFocusMs
 done

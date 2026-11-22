@@ -1,3 +1,8 @@
+# Native UI lane: there is no tauri-bundler any more; rust.yml and
+# release.yml run this folder's makensis.exe on src-tauri/installer.nsi
+# themselves. The folder keeps the bundler's layout and hashes below so the
+# cached copy stays valid and the NSIS release stays pinned.
+#
 # Fills %LOCALAPPDATA%\tauri\NSIS with the toolset `tauri build --bundles
 # nsis` wants, so the bundler finds it complete and downloads nothing. Left
 # to itself the bundler fetches NSIS and nsis_tauri_utils.dll from github.com

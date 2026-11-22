@@ -1,7 +1,238 @@
-// Stub until this page is ported (lane native-ui, stage 2).
-import { Theme } from "theme.slint";
+// Settings (settings/settings.html), native (lane native-ui). One column
+// of pages, each a title and grouped rows; from 560 px wide a rail names
+// the pages and lights the one in view. The title area moves the window
+// and a double click maximizes it. The state is SettingsState
+// (settings-state.slint); src/ui/settings/ drives it.
+
+import { Theme, Glyph, IconButton } from "theme.slint";
+import { SettingsState } from "settings-state.slint";
+import { TextButton } from "settings-widgets.slint";
+import { ProvidersPage, ModelsPage } from "settings-providers.slint";
+import { VoicePage, WatchPage } from "settings-voice.slint";
+import { AnswersPage, TasksPage, PrivacyPage, ShortcutsPage, GeneralPage } from "settings-pages.slint";
 
 export component SettingsWindow inherits Window {
     background: Theme.base;
     default-font-family: Theme.font;
+    default-font-size: Theme.row;
+    min-width: 380px;
+    min-height: 320px;
+
+    callback drag();
+    callback maximize();
+    callback close-clicked();
+    callback quit-clicked();
+
+    // The page in view: the last whose top is above the column's top,
+    // or the last page once the column is scrolled to its end.
+    property <length> top: -flick.viewport-y + 24px;
+    property <bool> at-end: flick.viewport-height > flick.height && flick.viewport-y <= flick.height - flick.viewport-height + 4px;
+    out property <string> current-page: root.at-end ? "pg-general"
+        : root.top >= pg-general.y ? "pg-general"
+        : root.top >= pg-shortcuts.y ? "pg-shortcuts"
+        : root.top >= pg-privacy.y ? "pg-privacy"
+        : root.top >= pg-watch.y ? "pg-watch"
+        : root.top >= pg-voice.y ? "pg-voice"
+        : root.top >= pg-agent.y ? "pg-agent"
+        : root.top >= pg-answers.y ? "pg-answers"
+        : root.top >= pg-models.y ? "pg-models"
+        : "pg-providers";
+
+    function scroll-to(y: length) {
+        flick.viewport-y = max(min(0px, flick.height - flick.viewport-height), -y);
+    }
+
+    // Scrolls the column to a page by its id (settings:section).
+    public function jump(id: string) {
+        if (id == "pg-providers") {
+            root.scroll-to(pg-providers.y);
+        } else if (id == "pg-models") {
+            root.scroll-to(pg-models.y);
+        } else if (id == "pg-answers") {
+            root.scroll-to(pg-answers.y);
+        } else if (id == "pg-agent") {
+            root.scroll-to(pg-agent.y);
+        } else if (id == "pg-voice") {
+            root.scroll-to(pg-voice.y);
+        } else if (id == "pg-watch") {
+            root.scroll-to(pg-watch.y);
+        } else if (id == "pg-privacy") {
+            root.scroll-to(pg-privacy.y);
+        } else if (id == "pg-shortcuts") {
+            root.scroll-to(pg-shortcuts.y);
+        } else if (id == "pg-general") {
+            root.scroll-to(pg-general.y);
+        }
+    }
+
+    // Scrolls by a step (PageUp and PageDown, Home and End from Rust).
+    public function scroll-by(dy: length) {
+        root.scroll-to(-flick.viewport-y + dy);
+    }
+
+    VerticalLayout {
+        // The title area: drag to move, double-click to maximize.
+        Rectangle {
+            height: 48px;
+            TouchArea {
+                pointer-event(e) => {
+                    if (e.button == PointerEventButton.left && e.kind == PointerEventKind.down) {
+                        root.drag();
+                    }
+                }
+                double-clicked => {
+                    root.maximize();
+                }
+            }
+            HorizontalLayout {
+                padding-left: Theme.sp-5;
+                padding-right: Theme.sp-3;
+                Text {
+                    text: "Settings";
+                    font-size: Theme.title;
+                    font-weight: 600;
+                    color: Theme.label;
+                    vertical-alignment: center;
+                    horizontal-stretch: 1;
+                }
+                VerticalLayout {
+                    alignment: center;
+                    IconButton {
+                        glyph: Glyph.close;
+                        tip: "Close settings";
+                        size: 28px;
+                        glyph-size: 11px;
+                        clicked => {
+                            root.close-clicked();
+                        }
+                    }
+                }
+            }
+        }
+
+        HorizontalLayout {
+            vertical-stretch: 1;
+            if root.width >= 560px: VerticalLayout {
+                width: 176px;
+                padding-left: Theme.sp-3;
+                padding-right: Theme.sp-1;
+                padding-top: Theme.sp-3;
+                spacing: 2px;
+                alignment: start;
+                for p in [
+                    { id: "pg-providers", name: "Providers" },
+                    { id: "pg-models", name: "Models" },
+                    { id: "pg-answers", name: "Answers" },
+                    { id: "pg-agent", name: "Tasks" },
+                    { id: "pg-voice", name: "Voice" },
+                    { id: "pg-watch", name: "Agents" },
+                    { id: "pg-privacy", name: "Privacy" },
+                    { id: "pg-shortcuts", name: "Shortcuts" },
+                    { id: "pg-general", name: "General" },
+                ]: Rectangle {
+                    height: 36px * Theme.text-scale;
+                    border-radius: Theme.r-row;
+                    background: root.current-page == p.id ? Theme.fill-2 : rail-touch.has-hover ? Theme.fill-1 : transparent;
+                    Rectangle {
+                        x: 0;
+                        width: 2px;
+                        height: parent.height - 16px;
+                        border-radius: 1px;
+                        background: root.current-page == p.id ? Theme.accent : transparent;
+                    }
+                    Text {
+                        x: Theme.sp-3;
+                        width: parent.width - Theme.sp-4;
+                        height: parent.height;
+                        text: p.name;
+                        font-size: Theme.row;
+                        font-weight: root.current-page == p.id ? 600 : 400;
+                        color: root.current-page == p.id ? Theme.label : Theme.label-2;
+                        vertical-alignment: center;
+                    }
+                    rail-touch := TouchArea {
+                        mouse-cursor: pointer;
+                        clicked => {
+                            root.jump(p.id);
+                        }
+                    }
+                }
+            }
+
+            Rectangle {
+                horizontal-stretch: 1;
+                clip: true;
+                flick := Flickable {
+                    x: 0;
+                    y: 0;
+                    width: parent.width;
+                    height: parent.height;
+                    viewport-width: self.width;
+                    viewport-height: col.preferred-height;
+                    col := VerticalLayout {
+                        width: min(flick.width, 760px);
+                        x: (flick.width - self.width) / 2;
+                        y: 0;
+                        padding-left: Theme.sp-5;
+                        padding-right: Theme.sp-5;
+                        padding-bottom: Theme.sp-6;
+                        spacing: Theme.sp-4;
+                        pg-providers := ProvidersPage { }
+                        pg-models := ModelsPage { }
+                        pg-answers := AnswersPage { }
+                        pg-agent := TasksPage { }
+                        pg-voice := VoicePage { }
+                        pg-watch := WatchPage { }
+                        pg-privacy := PrivacyPage { }
+                        pg-shortcuts := ShortcutsPage { }
+                        pg-general := GeneralPage { }
+                    }
+                }
+                // Where the column is: a thin bar at the right edge.
+                if flick.viewport-height > flick.height: Rectangle {
+                    x: parent.width - 6px;
+                    y: (parent.height - self.height) * (-flick.viewport-y / max(1px, flick.viewport-height - flick.height));
+                    width: 3px;
+                    height: max(32px, parent.height * flick.height / flick.viewport-height);
+                    border-radius: 1.5px;
+                    background: Theme.fill-3;
+                }
+            }
+        }
+
+        // The footer: the version, a restart when one waits, and Quit.
+        HorizontalLayout {
+            height: 40px;
+            padding-left: Theme.sp-5;
+            padding-right: Theme.sp-3;
+            spacing: Theme.sp-2;
+            Text {
+                text: "Aevaleron " + SettingsState.version;
+                font-size: Theme.caption;
+                color: Theme.label-3;
+                vertical-alignment: center;
+            }
+            if SettingsState.update-btn-shown: VerticalLayout {
+                alignment: center;
+                TextButton {
+                    text: "Restart to update";
+                    clicked => {
+                        SettingsState.act("update-restart", "");
+                    }
+                }
+            }
+            Rectangle {
+                horizontal-stretch: 1;
+            }
+            VerticalLayout {
+                alignment: center;
+                TextButton {
+                    text: "Quit";
+                    clicked => {
+                        root.quit-clicked();
+                    }
+                }
+            }
+        }
+    }
 }

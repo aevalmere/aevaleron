@@ -17,13 +17,13 @@ use std::sync::{Arc, OnceLock};
 
 use parking_lot::Mutex;
 use serde_json::{json, Value};
-use tauri::AppHandle;
 
 use crate::agent::run::Agent;
 use crate::llm::catalogue::Kind;
 use crate::llm::client::{KeyCheck, Llm};
 use crate::llm::settings::LlmSettings;
 use crate::llm::status::Status;
+use crate::shell::AppHandle;
 use crate::skills::Skills;
 use crate::state::{shared, Rect};
 use crate::windows::{self, outputs};
@@ -240,7 +240,7 @@ fn key_saved(_app: &AppHandle, provider: &str) {
         return;
     };
     let key = store::get().get_provider_key(p.id());
-    tauri::async_runtime::spawn(async move {
+    crate::shell::async_runtime::spawn(async move {
         let t = services().llm.test_key(p, &key).await;
         if buddy::step_index() == 0 {
             tour_key_tested(&t);
@@ -299,7 +299,7 @@ pub fn setup(app: &AppHandle) {
     let settings = Arc::new(StoreSettings);
     let desktop = Arc::new(DesktopAdapter::new(crate::desktop::client().clone()));
     let rt = tokio::runtime::Handle::try_current()
-        .unwrap_or_else(|_| tauri::async_runtime::handle().inner().clone());
+        .unwrap_or_else(|_| crate::shell::async_runtime::handle().inner().clone());
     let agent_host = Arc::new(agent::Host::new(app.clone(), llm.clone()));
     let agent = Agent::new(desktop.clone(), llm.clone(), agent_host, rt);
     let _ = SERVICES.set(Services {
@@ -311,7 +311,6 @@ pub fn setup(app: &AppHandle) {
     });
 
     desktop_ops::init_desktop_deps(app);
-    menu::init(app);
 
     let a = app.clone();
     buddy::init(
@@ -346,13 +345,6 @@ pub fn setup(app: &AppHandle) {
         },
     );
 
-    crate::backdrop::set_hooks(crate::backdrop::Hooks {
-        pace: {
-            let a = app.clone();
-            Arc::new(move || backdrop_pace(&a))
-        },
-        user_surface: Arc::new(|| store::get().get_surface().to_string()),
-    });
     crate::backdrop::set_intensity(store::get().get_glass_intensity());
 
     {
@@ -370,7 +362,7 @@ pub fn setup(app: &AppHandle) {
         h.cancel_tour = Some(Box::new(|_| buddy::cancel()));
         h.start_region = Some(Box::new(|app| {
             let a = app.clone();
-            tauri::async_runtime::spawn(async move {
+            crate::shell::async_runtime::spawn(async move {
                 apply_registrations(&a);
                 region::pick(&a).await;
                 apply_registrations(&a);
@@ -381,7 +373,7 @@ pub fn setup(app: &AppHandle) {
         h.abort_query_for = Some(Box::new(ask::abort_for));
         h.prefetch_bar_context = Some(Box::new(ask::prefetch_bar_context));
         h.warm_catalogue = Some(Box::new(|_| {
-            tauri::async_runtime::spawn(async {
+            crate::shell::async_runtime::spawn(async {
                 live_models(true).await;
             });
         }));
@@ -399,29 +391,6 @@ fn try_card() -> (&'static str, String) {
     ("agent", "open Notepad and write a haiku".to_string())
 }
 
-/// 2 Hz while anything you read or type into is up; the orb alone refreshes
-/// every few seconds (main.js backdrop pace).
-fn backdrop_pace(app: &AppHandle) -> crate::backdrop::Pace {
-    use crate::backdrop::Pace;
-    let busy = {
-        let st = shared(app);
-        let s = st.lock();
-        s.mode != crate::state::Mode::Pill || s.outputs.values().any(|o| o.active)
-    };
-    // Win32 directly: a Tauri getter off the main thread waits for it.
-    let up = |l: &str| windows::flags::hwnd_for(l).is_some_and(windows::flags::is_visible);
-    if busy
-        || up(windows::SETTINGS)
-        || up(windows::HISTORY)
-        || buddy::is_active()
-        || !crate::lens::windows(app).is_empty()
-    {
-        Pace::Fast
-    } else {
-        Pace::Slow
-    }
-}
-
 /// After a pick or a clear (main.js triggerRegionCapture / clearRegion): a
 /// new area opens the bar with its conversation; a cancel leaves the panel
 /// as it was.
@@ -434,7 +403,7 @@ fn on_region_change(app: &AppHandle, last: &Mutex<Option<Rect>>) {
         changed && now.is_some()
     };
     let a = app.clone();
-    tauri::async_runtime::spawn(async move {
+    crate::shell::async_runtime::spawn(async move {
         if picked {
             // A drawn area arrives with its shot; one set any other way has
             // none and is captured when the question goes.

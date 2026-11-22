@@ -94,6 +94,10 @@ pub fn run_all(cx: &mut Cx) {
         }
     }
     cx.close_notepad();
+    // After every lane, with the Notepad gone: the app at rest.
+    if let Err(e) = panic::catch_unwind(AssertUnwindSafe(|| harness::footprint(cx))) {
+        cx.must("footprint", false, panic_text(&*e));
+    }
     for (block, lanes) in BLOCKS {
         if block == "v2desktop" && !notepad_enabled() {
             cx.log(block, "skipped (not on CI)");

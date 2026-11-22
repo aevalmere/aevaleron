@@ -1,11 +1,11 @@
 //! CI checks for split (c), run by the built exe on the runner:
 //!
-//! - `AEVAL_CAPTURE_CHECK=1`: lib/backdrop-fixture.html fills the screen, a
+//! - `AEVAL_CAPTURE_CHECK=1`: a white window fills the screen, a
 //!   content-protected magenta window sits on top, and the production
-//!   capture path must show the fixture through it (excluded, not blanked)
+//!   capture path must show the white through it (excluded, not blanked)
 //!   with both backends; then the whole-screen and area shots are checked for
-//!   size, encoding and budget, the backdrop frames for size, and the event
-//!   loop for stalls (CAP-02..08, GLASS-01/05/06).
+//!   size, encoding and budget (CAP-02..08). The glass backdrop's frame,
+//!   cost and fixture checks (GLASS-01/05/06) went with the glass.
 //! - `AEVAL_DESKTOP_CHECK=1`: the desktop selfcheck (lib/desktop/selfcheck.js
 //!   port) with the Notepad half, against a visible window of ours.
 //!
@@ -13,25 +13,27 @@
 //! `failed: <labels>` and exits 0 or 1.
 
 use std::io::Write;
-use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 use base64::Engine as _;
-use serde_json::json;
-use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder};
+use windows_sys::Win32::Foundation::{HWND, LPARAM, LRESULT, WPARAM};
+use windows_sys::Win32::Graphics::Gdi::CreateSolidBrush;
+use windows_sys::Win32::System::LibraryLoader::GetModuleHandleW;
+use windows_sys::Win32::UI::WindowsAndMessaging::{
+    CreateWindowExW, DefWindowProcW, DispatchMessageW, GetMessageW, PostMessageW, PostQuitMessage,
+    RegisterClassExW, ShowWindow, TranslateMessage, MSG, SW_SHOWNOACTIVATE, WM_CLOSE, WM_DESTROY,
+    WNDCLASSEXW, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_POPUP,
+};
 
 use super::selfcheck::{self, Report};
-use crate::capture::{self, dxgi, encode, screen, Frame, Rect, Rgb};
-use crate::{backdrop, desktop, region};
+use crate::capture::{self, dxgi, encode, screen, Rect, Rgb};
+use crate::selftest::input::{self, Input};
+use crate::shell::{AppHandle, Manager};
+use crate::{desktop, region};
 
-/// A left-button drag in the area selector, from (40, 40) to (360, 240).
-const DRAG_JS: &str = concat!(
-    "(() => {",
-    "const at = (t, x, y) => document.dispatchEvent(",
-    "new MouseEvent(t, { clientX: x, clientY: y, button: 0, bubbles: true }));",
-    "at('mousedown', 40, 40); at('mousemove', 360, 240); at('mouseup', 360, 240);",
-    "})();"
-);
+/// COLORREF (0x00BBGGRR) of the desktop stand-in and of the protected probe.
+const WHITE: u32 = 0x00FF_FFFF;
+const MAGENTA: u32 = 0x00FF_00FF;
 
 pub fn maybe_run(app: &AppHandle) {
     let capture_check = std::env::var_os("AEVAL_CAPTURE_CHECK").is_some();
@@ -48,7 +50,7 @@ pub fn maybe_run(app: &AppHandle) {
             if capture_check {
                 capture_checks(&app, &rep);
             } else {
-                tauri::async_runtime::block_on(desktop_checks(&app, &rep));
+                crate::shell::async_runtime::block_on(desktop_checks(&app, &rep));
             }
         }));
         if result.is_err() {
@@ -66,44 +68,105 @@ pub fn maybe_run(app: &AppHandle) {
     });
 }
 
-/// A plain, capturable window showing the fixture page on `r` (physical).
-fn page_window(
-    app: &AppHandle,
-    label: &str,
-    kind: &str,
-    r: screen::PxRect,
-    protected: bool,
-) -> Option<tauri::WebviewWindow> {
-    let url = format!("http://tauri.localhost/lib/backdrop-fixture.html?kind={kind}");
-    let (tx, rx) = std::sync::mpsc::channel::<()>();
-    let tx = Mutex::new(Some(tx));
-    let win = WebviewWindowBuilder::new(app, label, WebviewUrl::External(url.parse().ok()?))
-        .title(label)
-        .decorations(false)
-        .shadow(false)
-        .resizable(false)
-        .skip_taskbar(true)
-        .always_on_top(true)
-        .focused(false)
-        .content_protected(protected)
-        .visible(false)
-        .data_directory(crate::paths::webview_data_dir())
-        .on_page_load(move |_, p| {
-            if matches!(p.event(), tauri::webview::PageLoadEvent::Finished) {
-                if let Some(tx) = tx.lock().ok().and_then(|mut t| t.take()) {
-                    let _ = tx.send(());
-                }
+/// A plain, capturable window of one colour on `r` (physical), with its
+/// own message loop on a thread of its own: what the fixture page was. It
+/// closes when dropped.
+struct Solid {
+    hwnd: isize,
+    pump: Option<std::thread::JoinHandle<()>>,
+}
+
+impl Solid {
+    fn open(name: &str, r: screen::PxRect, color: u32, protected: bool) -> Option<Solid> {
+        let (tx, rx) = std::sync::mpsc::channel::<isize>();
+        let name = name.to_string();
+        let pump = std::thread::spawn(move || {
+            let hwnd = make_solid(&name, r, color);
+            let _ = tx.send(hwnd);
+            if hwnd != 0 {
+                pump_messages();
             }
+        });
+        let hwnd = rx.recv_timeout(Duration::from_secs(5)).unwrap_or(0);
+        if hwnd == 0 {
+            return None;
+        }
+        if protected {
+            capture::exclude_window(hwnd);
+        }
+        // SAFETY: a live window of ours.
+        unsafe { ShowWindow(hwnd as HWND, SW_SHOWNOACTIVATE) };
+        std::thread::sleep(Duration::from_millis(300));
+        Some(Solid {
+            hwnd,
+            pump: Some(pump),
         })
-        .build()
-        .ok()?;
-    super::win::place(&win, r);
-    let _ = win.show();
-    let _ = rx.recv_timeout(Duration::from_secs(15));
-    if protected {
-        capture::exclude_window(capture::hwnd_of(&win));
     }
-    Some(win)
+}
+
+impl Drop for Solid {
+    fn drop(&mut self) {
+        // SAFETY: posting to a window of ours; its thread ends with it.
+        unsafe { PostMessageW(self.hwnd as HWND, WM_CLOSE, 0, 0) };
+        if let Some(t) = self.pump.take() {
+            let _ = t.join();
+        }
+    }
+}
+
+fn wide(s: &str) -> Vec<u16> {
+    s.encode_utf16().chain(std::iter::once(0)).collect()
+}
+
+/// The window, hidden, on the calling thread; 0 when it was not made.
+fn make_solid(name: &str, r: screen::PxRect, color: u32) -> isize {
+    let class = wide(&format!("AevaleronCheck{color:06X}"));
+    let title = wide(name);
+    // SAFETY: a class of our own (registering it again fails harmlessly)
+    // and a top-level window on this thread, which pumps its messages.
+    unsafe {
+        let inst = GetModuleHandleW(std::ptr::null());
+        let mut wc: WNDCLASSEXW = std::mem::zeroed();
+        wc.cbSize = std::mem::size_of::<WNDCLASSEXW>() as u32;
+        wc.lpfnWndProc = Some(solid_proc);
+        wc.hInstance = inst;
+        wc.hbrBackground = CreateSolidBrush(color);
+        wc.lpszClassName = class.as_ptr();
+        RegisterClassExW(&wc);
+        CreateWindowExW(
+            WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE,
+            class.as_ptr(),
+            title.as_ptr(),
+            WS_POPUP,
+            r.x,
+            r.y,
+            r.width.max(1),
+            r.height.max(1),
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+            inst,
+            std::ptr::null(),
+        ) as isize
+    }
+}
+
+unsafe extern "system" fn solid_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> LRESULT {
+    if msg == WM_DESTROY {
+        PostQuitMessage(0);
+        return 0;
+    }
+    DefWindowProcW(hwnd, msg, wp, lp)
+}
+
+fn pump_messages() {
+    // SAFETY: the standard pump, on the thread that owns the window.
+    unsafe {
+        let mut msg: MSG = std::mem::zeroed();
+        while GetMessageW(&mut msg, std::ptr::null_mut(), 0, 0) > 0 {
+            TranslateMessage(&msg);
+            DispatchMessageW(&msg);
+        }
+    }
 }
 
 struct Probe {
@@ -251,40 +314,6 @@ fn dxgi_open_backoff(rep: &Report, d: &screen::Display) {
     rep.must("dxgiOpensPerTick", opens <= 1 && shots == 20, &why);
 }
 
-/// B-030: one backdrop frame's work at 1080p, whatever the runner's screen
-/// is, and none at all for a frame already encoded.
-fn tick_ms(rep: &Report) {
-    let (w, h) = (1920u32, 1080u32);
-    let mut bgra = Vec::with_capacity(w as usize * h as usize * 4);
-    for y in 0..h {
-        for x in 0..w {
-            let c = ((x ^ y) % 239) as u8;
-            bgra.extend_from_slice(&[(x % 251) as u8, (y % 241) as u8, c, 255]);
-        }
-    }
-    let frame = std::sync::Arc::new(Frame {
-        width: w,
-        height: h,
-        bgra,
-    });
-    let r = screen::PxRect {
-        x: 0,
-        y: 0,
-        width: w as i32,
-        height: h as i32,
-    };
-    let at = screen::Display::from_phys(r"\\.\DISPLAY1080", false, 96, r, r);
-    let t = Instant::now();
-    let first = backdrop::encode_frame(&at, &frame);
-    let ms = t.elapsed().as_secs_f64() * 1000.0;
-    let again = backdrop::encode_frame(&at, &frame);
-    rep.log("tickMs", format!("{ms:.1}"));
-    let why = format!("{ms:.1}ms, budget 40ms");
-    rep.must("tickMs", first.is_some() && ms < 40.0, &why);
-    let reused = matches!((&first, &again), (Some(a), Some(b)) if std::sync::Arc::ptr_eq(a, b));
-    rep.must("tickReusesFrame", reused, "a second encode of one frame");
-}
-
 /// B-029: a new duplication's first frame shows the desktop, not an empty
 /// pointer-only surface. A runner without DXGI says so loudly instead.
 fn dxgi_first_frame(rep: &Report, d: &screen::Display, control: screen::PxRect) {
@@ -339,7 +368,7 @@ fn capture_checks(app: &AppHandle, rep: &Report) {
     );
 
     // ---------------------------------------------- fixture + protected probe
-    let fixture = page_window(app, "capture-fixture", "white", d.phys, false);
+    let fixture = Solid::open("capture-fixture", d.phys, WHITE, false);
     rep.must(
         "fixtureShown",
         fixture.is_some(),
@@ -351,10 +380,7 @@ fn capture_checks(app: &AppHandle, rep: &Report) {
         width: 400,
         height: 240,
     };
-    let probe_win = page_window(app, "capture-probe", "probe", pr, true);
-    if let Some(w) = &probe_win {
-        let _ = w.eval("document.documentElement.style.background='#ff00ff';document.body.style.background='#ff00ff';document.body.innerHTML='';");
-    }
+    let probe_win = Solid::open("capture-probe", pr, MAGENTA, true);
     rep.must(
         "probeShown",
         probe_win.is_some(),
@@ -570,69 +596,13 @@ fn capture_checks(app: &AppHandle, rep: &Report) {
         lz_err < 6.0 && lz_err < bx_err,
         &format!("lanczos rmse {lz_err:.2}, box {bx_err:.2}"),
     );
-
-    // ---------------------------------------------- backdrop (GLASS-01/06)
-    match backdrop::grab_all() {
-        Ok((frames, wall, enc)) => {
-            let small = frames.get(&d.id).cloned();
-            let dims = small.as_ref().and_then(|b| decode_dims(b));
-            let want = (
-                (d.bounds.width / 6.0).round() as u32,
-                (d.bounds.height / 6.0).round() as u32,
-            );
-            rep.log(
-                "glassFrame",
-                format!("{dims:?} wall={wall:.1}ms encode={enc:.1}ms"),
-            );
-            rep.must(
-                "glassFrameSize",
-                dims == Some(want),
-                &format!("got {dims:?} want {want:?}"),
-            );
-        }
-        Err(e) => rep.must("glassFrameSize", false, &e),
-    }
-    let m = backdrop::measure(10);
-    rep.log("snapCost", &m);
-    let block = m["blockP95"].as_f64().unwrap_or(999.0);
-    rep.must("snapCost", block < 25.0, &format!("blockP95={block:.1}ms"));
-    let tier = backdrop::tier();
-    rep.log("glassTier", tier);
-    rep.must("glassLive", tier == "live", &format!("tier={tier}"));
-    tick_ms(rep);
-
-    // Fixture mode (GLASS-05) goes through the same window + capture path.
-    if let Some(w) = fixture {
-        let _ = w.destroy();
-    }
-    match backdrop::use_fixture(Some("wallpaper")) {
-        Ok(()) => {
-            let s = backdrop::status();
-            rep.must(
-                "glassFixture",
-                s["fixture"] == json!("wallpaper"),
-                &s.to_string(),
-            );
-            let url = backdrop::fixture_url();
-            rep.must(
-                "glassFixtureUrl",
-                url.starts_with("http://aeval-frame.localhost/fixture-full/"),
-                &url,
-            );
-            let _ = backdrop::use_fixture(None);
-        }
-        Err(e) => rep.must("glassFixture", false, &e),
-    }
-    if let Some(w) = probe_win {
-        let _ = w.destroy();
-    }
 }
 
 fn region_drag(app: &AppHandle, rep: &Report, d: &screen::Display) {
     let (a, on) = (app.clone(), d.clone());
     let pick = std::thread::spawn(move || {
         let select = region::select(&a, Some(on));
-        tauri::async_runtime::block_on(select)
+        crate::shell::async_runtime::block_on(select)
     });
     let t = Instant::now();
     while !region::ready(app) && t.elapsed() < Duration::from_secs(8) {
@@ -640,8 +610,19 @@ fn region_drag(app: &AppHandle, rep: &Report, d: &screen::Display) {
     }
     rep.log("regionLoadMs", t.elapsed().as_millis());
     std::thread::sleep(Duration::from_millis(300));
-    if let Some(w) = app.get_webview_window(region::LABEL) {
-        let _ = w.eval(DRAG_JS);
+    // A real left-button drag from (40, 40) to (360, 240) on the display.
+    let at = |x: f64, y: f64| {
+        (
+            d.phys.x + (x * d.scale_factor).round() as i32,
+            d.phys.y + (y * d.scale_factor).round() as i32,
+        )
+    };
+    let dragged = input::send(Input::Drag {
+        from: at(40.0, 40.0),
+        to: at(360.0, 240.0),
+    });
+    if let Err(e) = &dragged {
+        rep.log("regionDragInput", e);
     }
     let t = Instant::now();
     while !pick.is_finished() && t.elapsed() < Duration::from_secs(5) {
@@ -669,14 +650,17 @@ async fn desktop_checks(app: &AppHandle, rep: &Report) {
         width: 360,
         height: 220,
     };
-    let own = page_window(app, "desktop-probe", "white", r, true);
+    let own = Solid::open("desktop-probe", r, WHITE, true);
     rep.must("ownProbeShown", own.is_some(), "probe window did not open");
     tokio::time::sleep(Duration::from_millis(800)).await;
-    let handles: Vec<String> = app
+    let mut handles: Vec<String> = app
         .webview_windows()
         .values()
         .map(|w| super::protocol::handle_str(capture::hwnd_of(w) as u64))
         .collect();
+    if let Some(w) = &own {
+        handles.push(super::protocol::handle_str(w.hwnd as u64));
+    }
     rep.log("ownHandles", handles.len());
     let ci = std::env::var("GITHUB_ACTIONS").ok();
     let asked = std::env::var("AEVAL_DESKTOP_NOTEPAD").ok();
@@ -694,9 +678,7 @@ async fn desktop_checks(app: &AppHandle, rep: &Report) {
     )
     .await;
     rep.log("desktopStatus", desktop::client().status());
-    if let Some(w) = own {
-        let _ = w.destroy();
-    }
+    drop(own);
 }
 
 /// B-115 (LIFE-16): the selfcheck types into Notepad on CI

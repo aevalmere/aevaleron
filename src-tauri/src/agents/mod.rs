@@ -28,11 +28,11 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder};
 
 use self::sessions::{CardKind, CardRequest, HookEvent, Session, SessionBook, TranscriptProbe};
 use crate::capture::{self, PxRect};
 use crate::desktop::win;
+use crate::shell::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder};
 use crate::state::Rect;
 
 /// The notification's window.
@@ -271,7 +271,7 @@ pub fn setup(app: &AppHandle) {
     if power::has_lid() {
         power::watch_lid();
     }
-    tauri::async_runtime::spawn(serve());
+    crate::shell::async_runtime::spawn(serve());
     let _ = std::thread::Builder::new()
         .name("agents-tick".into())
         .spawn(tick_loop);
@@ -311,7 +311,7 @@ async fn serve() {
         };
         let client = std::mem::replace(&mut server, next);
         if connected {
-            tauri::async_runtime::spawn(read_one(client));
+            crate::shell::async_runtime::spawn(read_one(client));
         }
     }
 }
@@ -331,7 +331,7 @@ async fn read_one(mut client: tokio::net::windows::named_pipe::NamedPipeServer) 
     };
     let _ = tokio::time::timeout(Duration::from_secs(10), read).await;
     let text = String::from_utf8_lossy(&buf).into_owned();
-    let _ = tauri::async_runtime::spawn_blocking(move || {
+    let _ = crate::shell::async_runtime::spawn_blocking(move || {
         let _ = crate::crash::guard("agents-event", || on_envelope(&text));
     })
     .await;
@@ -587,7 +587,7 @@ fn payload(st: &State, p: &Prefs) -> Value {
     })
 }
 
-fn window(app: &AppHandle) -> Option<tauri::WebviewWindow> {
+fn window(app: &AppHandle) -> Option<crate::shell::WebviewWindow> {
     if let Some(w) = app.get_webview_window(LABEL) {
         return Some(w);
     }
@@ -604,8 +604,6 @@ fn window(app: &AppHandle) -> Option<tauri::WebviewWindow> {
             .skip_taskbar(true)
             .content_protected(true)
             .visible(false)
-            .data_directory(crate::paths::webview_data_dir())
-            .initialization_script(crate::ipc::bridge_script())
             .build();
     match built {
         Ok(w) => {
@@ -620,11 +618,6 @@ fn window(app: &AppHandle) -> Option<tauri::WebviewWindow> {
             crate::windows::flags::adopt(app, &w, flags);
             crate::windows::flags::set_focusable(raw, false);
             crate::windows::flags::set_click_through(&w, true);
-            crate::crash::guard_webview(&w, |app, label| {
-                if let Some(w) = app.get_webview_window(label) {
-                    let _ = w.destroy();
-                }
-            });
             Some(w)
         }
         Err(e) => {

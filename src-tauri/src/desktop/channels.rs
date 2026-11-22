@@ -7,8 +7,8 @@
 //! click-through with forwarding (windows/flags.rs).
 
 use serde_json::Value;
-use tauri::{Manager, WebviewWindow};
 
+use crate::shell::{Manager, WebviewWindow};
 use crate::state::{shared, Mode};
 use crate::{backdrop, buddy, lens, region};
 
@@ -39,7 +39,7 @@ pub fn route(
                 return ok;
             }
             if !shared(&app).call(&app, |h| h.start_region.as_ref()) {
-                tauri::async_runtime::spawn(async move {
+                crate::shell::async_runtime::spawn(async move {
                     region::pick(&app).await;
                 });
             }

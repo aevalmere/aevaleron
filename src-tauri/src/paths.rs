@@ -81,24 +81,6 @@ pub fn user_data_dir_from(get: impl Fn(&str) -> Option<String>) -> PathBuf {
         .join("aevaleron")
 }
 
-/// WebView2's profile. Kept out of the userData root so it never rewrites the
-/// `Local State` file that holds Electron's key for the saved API key
-/// (PARITY FILE-07, FILE-13).
-pub fn webview_data_dir() -> PathBuf {
-    webview_data_dir_from(|k| std::env::var(k).ok())
-}
-
-pub fn webview_data_dir_from(get: impl Fn(&str) -> Option<String>) -> PathBuf {
-    if let Some(dir) = get("AEVAL_USERDATA").filter(|d| !d.trim().is_empty()) {
-        return PathBuf::from(dir).join("WebView2");
-    }
-    get("LOCALAPPDATA")
-        .map(PathBuf::from)
-        .unwrap_or_else(std::env::temp_dir)
-        .join("aevaleron")
-        .join("WebView2")
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -172,26 +154,11 @@ mod tests {
     fn aeval_userdata_overrides() {
         let get = env(&[("APPDATA", r"C:\x"), ("AEVAL_USERDATA", r"D:\scratch")]);
         assert_eq!(user_data_dir_from(&get), PathBuf::from(r"D:\scratch"));
-        assert_eq!(
-            webview_data_dir_from(&get),
-            PathBuf::from(r"D:\scratch").join("WebView2")
-        );
     }
 
     #[test]
     fn blank_override_is_ignored() {
         let dir = user_data_dir_from(env(&[("APPDATA", r"C:\r"), ("AEVAL_USERDATA", " ")]));
         assert_eq!(dir, PathBuf::from(r"C:\r").join("aevaleron"));
-    }
-
-    #[test]
-    fn webview_profile_is_not_in_the_userdata_root() {
-        let get = env(&[("APPDATA", r"C:\r"), ("LOCALAPPDATA", r"C:\l")]);
-        let web = webview_data_dir_from(&get);
-        assert_eq!(
-            web,
-            PathBuf::from(r"C:\l").join("aevaleron").join("WebView2")
-        );
-        assert_ne!(web.parent(), Some(user_data_dir_from(&get).as_path()));
     }
 }

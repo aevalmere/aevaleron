@@ -1,11 +1,11 @@
 //! Free-floating output windows (REQUESTS.md 8-11, PARITY NEW-01..07).
 //!
 //! Each answer lives in its own `output-<n>` window with its own
-//! conversation. Rust places a new one 12 px off the bar's glass and shows
-//! it; the page globs itself out of the bar (it asks `output:bar` where the
-//! bar is) and plays the close glob before `output:close` destroys it. One
-//! hidden, loaded window is always kept warm so the next answer opens with
-//! no page load.
+//! conversation. Rust places a new one 12 px off the bar and shows it. The
+//! window is opaque and native (ui/output.rs): it is the sheet, so a window
+//! that follows its transcript takes the height the page reports
+//! (`output:glass`), and one the person sized keeps theirs (B-027). One
+//! hidden, built window is always kept warm so the next answer opens at once.
 //!
 //! The bar's follow-ups go to the target (the focused output); the bar's
 //! `chat:new` detaches it so the next question opens a new window. Task
@@ -21,7 +21,7 @@ use std::time::Duration;
 
 use parking_lot::Mutex;
 use serde_json::{json, Value};
-use tauri::AppHandle;
+use crate::shell::{async_runtime, AppHandle};
 
 use super::layout::{self, Anchor};
 use super::{
@@ -87,7 +87,7 @@ pub(super) fn meta() -> Meta {
 
 /// Creates a hidden output window with a fresh conversation; returns its
 /// label. It sits on the bar until it is shown, so the glob starts there.
-pub fn create(app: &AppHandle) -> tauri::Result<String> {
+pub fn create(app: &AppHandle) -> crate::shell::Result<String> {
     let label = {
         let st = shared(app);
         let mut s = st.lock();
@@ -125,7 +125,7 @@ fn is_idle(o: &Output) -> bool {
 }
 
 /// Keeps one hidden, unused output window around.
-pub fn create_spare(app: &AppHandle) -> tauri::Result<()> {
+pub fn create_spare(app: &AppHandle) -> crate::shell::Result<()> {
     let have = shared(app).lock().outputs.values().any(is_idle);
     if !have {
         create(app)?;
@@ -164,7 +164,7 @@ fn open_spare(app: &AppHandle, except: Option<&str>) -> Option<String> {
     // itself in on `chat:user` / `query:start` / `agent:begin`.
     show(app, &label);
     let a = app.clone();
-    tauri::async_runtime::spawn(async move {
+    async_runtime::spawn(async move {
         let _ = create_spare(&a);
     });
     Some(label)
@@ -212,16 +212,14 @@ fn own_area(h: isize) -> Rect {
     screen::matching_px(flags::rect_px(h)).work_area
 }
 
-/// The window's glass size. B-027: the transcript does not enter into it;
-/// the window has room for the tallest sheet and the sheet grows in the
-/// page. A dragged height is exact, because the page's sheet then fills
-/// the window (overlay.css, `data-fixed-height`).
+/// The window's size. The window is the sheet: it follows the transcript
+/// the page last reported, up to the ceiling; a dragged height is exact and
+/// the transcript scrolls inside it (B-027).
 fn size_for(o: &Output, wa: Rect) -> (f64, f64) {
     let w = o
         .rect
         .map_or_else(|| store::get().get_output_width() as f64, |r| r.width);
-    let room = layout::output_max_height(wa);
-    (w, layout::output_height(wa, room, o.user_height))
+    (w, layout::output_height(wa, o.content_height, o.user_height))
 }
 
 /// The part of `glass` the sheet covers.
@@ -335,23 +333,52 @@ pub fn show(app: &AppHandle, label: &str) {
     send_meta(app);
 }
 
-/// `output:glass {top, height}`: the visible sheet as the page measures it,
-/// `top` from the window's edge. Kept in glass DIPs. The page sends it at
-/// most once a frame. Its height is also the transcript's (IPC-06, which
-/// `output:resize` carried until B-164), kept for the size a new window is
-/// placed at; the sheet grows in the page and the window does not move for
-/// it (B-027, D-04).
+/// `output:glass {top, height}`: what the native page needs to show its
+/// whole transcript (title bar included), in DIPs; `top` is 0, the window
+/// being the sheet. The page sends it only when it changed. A window that
+/// follows its transcript grows or shrinks to it at once (IPC-06); one the
+/// person sized keeps their height (B-027). Hit-testing needs no sheet:
+/// the whole window is the sheet, so the resize bands sit inside its edge.
 pub fn set_sheet(app: &AppHandle, label: &str, top: f64, height: f64) {
-    let sheet = ((top - stage::MARGIN).max(0.0), height.max(0.0));
-    with(app, label, |o| {
-        o.sheet = Some(sheet);
-        if sheet.1 > 0.0 {
-            o.content_height = sheet.1;
-        }
-    });
-    if let Some(h) = hwnd(app, label) {
-        flags::set_meta(h, |m| m.sheet = Some(sheet));
+    if height <= 0.0 {
+        return;
     }
+    let sheet = (top.max(0.0), height);
+    let Some((active, user)) = with(app, label, |o| {
+        o.sheet = Some(sheet);
+        o.content_height = height;
+        (o.active, o.user_height)
+    }) else {
+        return;
+    };
+    if active && user <= 0.0 && !shared(app).lock().hidden {
+        follow_content(app, label, height);
+    }
+}
+
+/// Sizes a transcript-following window to its content; `room_around`
+/// keeps the edge nearest the bar and grows away from it.
+fn follow_content(app: &AppHandle, label: &str, content: f64) {
+    let Some(h) = hwnd(app, label) else {
+        return;
+    };
+    if flags::is_maximized(h) || !flags::is_visible(h) {
+        return;
+    }
+    let glass = motion::glass(h);
+    let wa = own_area(h);
+    let height = layout::output_height(wa, content, 0.0);
+    if (height - glass.height).abs() < 1.0 {
+        return;
+    }
+    let to = room_around(wa, bar_rect(app), glass, height);
+    if to == glass {
+        return;
+    }
+    mark_app(label);
+    motion::stop(h);
+    motion::set_glass(h, to);
+    with(app, label, |o| o.rect = Some(to));
 }
 
 /// B-027: the person took hold of a sheet's edge and the window has just
@@ -360,7 +387,7 @@ pub fn set_sheet(app: &AppHandle, label: &str, top: f64, height: f64) {
 pub fn on_resize_start(app: &AppHandle, label: &str, height: f64) {
     with(app, label, |o| o.user_height = height);
     let (a, l) = (app.clone(), label.to_string());
-    tauri::async_runtime::spawn(async move {
+    async_runtime::spawn(async move {
         emit(&a, &l, "overlay:state", overlay_state(&a, Some(&l)));
     });
 }
@@ -373,7 +400,8 @@ fn refit(app: &AppHandle, label: &str, h: isize) -> Rect {
         return glass;
     };
     let wa = own_area(h);
-    let room = layout::output_max_height(wa);
+    let content = with(app, label, |o| o.content_height).unwrap_or(0.0);
+    let room = layout::output_height(wa, content, 0.0);
     let to = room_around(wa, bar_rect(app), visible(glass, sheet), room);
     if to != glass {
         mark_app(label);
@@ -430,7 +458,7 @@ fn hide_window(app: &AppHandle, label: &str) {
     leaving().lock().insert(label.to_string(), ticket);
     emit(app, label, "output:away", json!({ "away": true }));
     let (a, l) = (app.clone(), label.to_string());
-    tauri::async_runtime::spawn(async move {
+    async_runtime::spawn(async move {
         tokio::time::sleep(Duration::from_millis(LEAVE_WAIT_MS)).await;
         finish_leave(&a, &l, Some(ticket));
     });
@@ -709,7 +737,7 @@ pub fn open_conversation(app: &AppHandle, entry: &Value) -> bool {
     }
     show(app, &label);
     let a = app.clone();
-    tauri::async_runtime::spawn(async move {
+    async_runtime::spawn(async move {
         let _ = create_spare(&a);
     });
     true
@@ -1140,7 +1168,7 @@ pub fn on_destroyed(app: &AppHandle, label: &str) {
     leaving().lock().remove(label);
     going().lock().remove(label);
     let a = app.clone();
-    tauri::async_runtime::spawn(async move {
+    async_runtime::spawn(async move {
         let _ = create_spare(&a);
         send_overlay_state(&a);
     });
@@ -1159,24 +1187,21 @@ mod tests {
         }
     }
 
-    /// B-027: the window's size does not depend on the transcript, and
-    /// `output:glass` stores the number without moving a window.
+    /// The opaque window is the sheet: it follows its transcript between
+    /// the floor and the ceiling, and a dragged height wins (B-027).
     #[test]
-    fn content_growth_never_sets_bounds() {
+    fn size_follows_content_until_dragged() {
         let wa = Rect::new(0.0, 0.0, 1920.0, 1040.0);
         let mut o = out("output-1", true, 1);
         o.rect = Some(Rect::new(100.0, 100.0, 420.0, 300.0));
         o.content_height = 120.0;
-        let short = size_for(&o, wa);
+        assert_eq!(size_for(&o, wa), (420.0, layout::OUTPUT_MIN_HEIGHT));
+        o.content_height = 300.0;
+        assert_eq!(size_for(&o, wa).1, 300.0);
         o.content_height = 900.0;
-        assert_eq!(size_for(&o, wa), short);
-        assert_eq!(short.1, layout::output_max_height(wa));
-        let src = include_str!("outputs.rs");
-        let from = src.find("pub fn set_sheet(").unwrap();
-        let end = from + src[from..].find("\n}").unwrap();
-        let body = &src[from..end];
-        assert!(body.contains("content_height"));
-        assert!(!body.contains("motion::") && !body.contains("set_glass"));
+        assert_eq!(size_for(&o, wa).1, layout::output_max_height(wa));
+        o.user_height = 500.0;
+        assert_eq!(size_for(&o, wa).1, 500.0);
     }
 
     fn with_chat(mut o: Output, question: &str) -> Output {

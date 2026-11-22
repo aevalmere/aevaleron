@@ -125,7 +125,7 @@ pub struct Desktop {
     queue: tokio::sync::Mutex<()>,
     starting: tokio::sync::Mutex<()>,
     deps: RwLock<Deps>,
-    app: RwLock<Option<tauri::AppHandle>>,
+    app: RwLock<Option<crate::shell::AppHandle>>,
     events: broadcast::Sender<Value>,
 }
 
@@ -328,7 +328,7 @@ impl Desktop {
     }
 
     /// Lets the default own-window list read the app's windows.
-    pub fn set_app(&self, app: tauri::AppHandle) {
+    pub fn set_app(&self, app: crate::shell::AppHandle) {
         if let Ok(mut a) = self.app.write() {
             *a = Some(app);
         }
@@ -622,7 +622,7 @@ impl Desktop {
 
     /// Every app window; the lens and the pointer as non-blocking layers.
     fn default_own_windows(&self) -> Vec<OwnWindow> {
-        use tauri::Manager;
+        use crate::shell::Manager;
         let Some(app) = self.app.read().ok().and_then(|a| a.clone()) else {
             return Vec::new();
         };

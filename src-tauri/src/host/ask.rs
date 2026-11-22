@@ -10,7 +10,6 @@ use std::time::{Duration, Instant};
 
 use parking_lot::Mutex;
 use serde_json::{json, Value};
-use tauri::AppHandle;
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 use tokio_util::sync::CancellationToken;
 
@@ -31,6 +30,7 @@ use crate::llm::settings::{
     self as llm_settings, active, candidates_for, model_for, Active, LlmSettings,
 };
 use crate::llm::sse::Meter;
+use crate::shell::AppHandle;
 use crate::state::{shared, Mode};
 use crate::windows::{self, outputs};
 use crate::{buddy, store};
@@ -613,13 +613,13 @@ pub fn prefetch_bar_context(app: &AppHandle) {
     };
     *super::bar_context().lock() = Some(ctx.clone());
     let app = app.clone();
-    tauri::async_runtime::spawn(async move {
+    crate::shell::async_runtime::spawn(async move {
         let d2 = d.clone();
-        tauri::async_runtime::spawn(async move {
+        crate::shell::async_runtime::spawn(async move {
             let _ = d2.start().await;
         });
         if store::get().has_api_key() {
-            tauri::async_runtime::spawn(async move {
+            crate::shell::async_runtime::spawn(async move {
                 llm.fetch_catalogue().await;
             });
         }
@@ -805,7 +805,7 @@ async fn models_now() -> (Option<Active>, String, String) {
             // cached the stored pick goes out as it is.
             if let Some(a) = act.clone() {
                 let l = llm.clone();
-                tauri::async_runtime::spawn(async move {
+                crate::shell::async_runtime::spawn(async move {
                     l.native_catalogue(p, &a.key).await;
                 });
             }

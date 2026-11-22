@@ -203,7 +203,8 @@ for (;;) {
 }
 say(
   `timed out after ${timeoutMin} min with no ${workflow} results for ${short(sha)}: the run is still queued or ` +
-    'running, was cancelled before it could publish, or never started (ui-shots runs only when its paths change).',
+    'running, was cancelled before it could publish, or never started (ui-shots runs after the rust build, on ' +
+    'rust/native-ui only, or on demand).',
 );
 hint(newerRun());
 process.exit(2);

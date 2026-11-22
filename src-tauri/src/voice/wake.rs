@@ -35,7 +35,8 @@ use std::time::{Duration, Instant};
 
 use parking_lot::Mutex;
 use serde_json::{json, Value};
-use tauri::AppHandle;
+
+use crate::shell::{async_runtime, AppHandle};
 
 use super::capture::{self, Listen};
 use super::keyword::{self, Verdict};
@@ -892,7 +893,7 @@ fn act(
             let audio = wav::resample(&samples, rate, wav::RATE);
             let (a, k, t, g) = (app.clone(), key.clone(), tx.clone(), *pill_gen);
             WORKING.store(true, Ordering::SeqCst);
-            tauri::async_runtime::spawn(async move {
+            async_runtime::spawn(async move {
                 line(&a, &k, audio, spoke_end, g).await;
                 WORKING.store(false, Ordering::SeqCst);
                 let _ = t.send(Msg::Done);
@@ -950,7 +951,7 @@ async fn write_down(s: &VoiceSettings, audio: Vec<f32>, word: &str) -> Result<St
         return Err("The voice model is not on this PC yet.".into());
     };
     let (language, prompt) = (s.language.clone(), word.to_string());
-    let run = tauri::async_runtime::spawn_blocking(move || match engine::piece(&path, &audio) {
+    let run = async_runtime::spawn_blocking(move || match engine::piece(&path, &audio) {
         Some(p) => whisper::transcribe_after(&path, p, &language, &prompt),
         None => Ok(String::new()),
     });

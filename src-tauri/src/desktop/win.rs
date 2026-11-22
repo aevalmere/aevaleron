@@ -127,9 +127,9 @@ pub fn raise(raw: isize) {
 
 /// Places a window on exact physical pixels (logical positions would be
 /// converted with whichever monitor's scale the window started on).
-pub fn place<R: tauri::Runtime>(win: &tauri::WebviewWindow<R>, r: PxRect) {
-    let _ = win.set_position(tauri::PhysicalPosition::new(r.x, r.y));
-    let _ = win.set_size(tauri::PhysicalSize::new(
+pub fn place(win: &crate::shell::WebviewWindow, r: PxRect) {
+    let _ = win.set_position(crate::shell::PhysicalPosition::new(r.x, r.y));
+    let _ = win.set_size(crate::shell::PhysicalSize::new(
         r.width.max(1) as u32,
         r.height.max(1) as u32,
     ));

@@ -1,0 +1,174 @@
+// The buddy (renderer/buddy.html, cursor-buddy.css): a soft rounded pointer
+// in the accent whose tip sits on the target pixel, and the card beside it,
+// or a tour card on its own. The window spans the display and is
+// see-through; Rust makes it click-through except while the pointer is over
+// the card. Positions are Rust's (overlays.rs): the tip and the card's
+// top-left, in this window's logical px.
+
+import { Theme, Glyph, IconButton, Button } from "theme.slint";
+
+export struct BuddyAction {
+    label: string,
+    primary: bool,
+}
+
+export component BuddyWindow inherits Window {
+    background: transparent;
+    default-font-family: Theme.font;
+
+    // The arrow, drawn by Rust (overlays.rs `arrow_image`): 32 x 36 px with
+    // the path's apex at (5.38, 2.29).
+    in property <image> arrow;
+    // Put away between sessions: nothing is drawn, at once.
+    in property <bool> away: true;
+    in property <bool> arrow-shown: false;
+    in property <bool> card-shown: false;
+    // The session finished: both fade out.
+    in property <bool> done: false;
+    in property <length> tip-x;
+    in property <length> tip-y;
+    in property <length> card-x;
+    in property <length> card-y;
+    // "point", "step", "card" or "agent".
+    in property <string> kind: "step";
+    in property <string> message;
+    in property <string> hint;
+    in property <int> pip-index: -1;
+    in property <int> pip-count: 0;
+    in property <[BuddyAction]> actions;
+    // The action the keyboard is on (a focused card), or -1.
+    in property <int> focus-index: -1;
+    in property <bool> dragging: false;
+
+    out property <length> card-w: card.width;
+    out property <length> card-h: card.height;
+
+    callback dismiss();
+    callback action(int);
+    callback card-down(length, length);
+    callback card-move(length, length);
+    callback card-up(length, length);
+
+    property <duration> fade: Theme.reduced-motion ? 0ms : root.done ? 360ms : 180ms;
+
+    Image {
+        x: root.tip-x - 5.38px;
+        y: root.tip-y - 2.29px;
+        width: 32px;
+        height: 36px;
+        source: root.arrow;
+        visible: !root.away;
+        opacity: root.arrow-shown && !root.done ? 1 : 0;
+        animate opacity { duration: root.fade; }
+    }
+
+    card := Rectangle {
+        x: root.card-x;
+        y: root.card-y;
+        width: min(300px * Theme.text-scale, max(200px, body.preferred-width));
+        height: body.preferred-height;
+        visible: !root.away;
+        opacity: root.card-shown && !root.done ? 1 : 0;
+        animate opacity { duration: root.fade; }
+        border-radius: Theme.r-sheet;
+        background: Theme.raised;
+
+        // Drag anywhere on the card but its buttons; a press that never
+        // moved is a click (overlays.rs).
+        TouchArea {
+            width: parent.width;
+            height: parent.height;
+            mouse-cursor: root.dragging ? MouseCursor.grabbing : MouseCursor.grab;
+            pointer-event(e) => {
+                if (e.button == PointerEventButton.left) {
+                    if (e.kind == PointerEventKind.down) {
+                        root.card-down(self.absolute-position.x + self.mouse-x, self.absolute-position.y + self.mouse-y);
+                    } else if (e.kind == PointerEventKind.up) {
+                        root.card-up(self.absolute-position.x + self.mouse-x, self.absolute-position.y + self.mouse-y);
+                    }
+                }
+            }
+            moved => {
+                root.card-move(self.absolute-position.x + self.mouse-x, self.absolute-position.y + self.mouse-y);
+            }
+        }
+
+        body := VerticalLayout {
+            padding: Theme.sp-4;
+            padding-bottom: root.actions.length > 0 ? Theme.sp-3 : Theme.sp-4;
+
+            // Progress as pips, in a row of its own only when there are steps.
+            if root.pip-index >= 0 && root.pip-count >= 2: HorizontalLayout {
+                alignment: start;
+                spacing: Theme.sp-1;
+                padding-bottom: Theme.sp-2;
+                for pip[i] in root.pip-count: Rectangle {
+                    width: i == root.pip-index ? 16px : 6px;
+                    height: 6px;
+                    border-radius: 3px;
+                    background: i == root.pip-index ? Theme.label : Theme.fill-3;
+                    animate width { duration: Theme.morph; }
+                }
+            }
+
+            HorizontalLayout {
+                spacing: Theme.sp-2;
+
+                Text {
+                    text: root.message;
+                    font-size: Theme.row;
+                    color: Theme.label;
+                    wrap: word-wrap;
+                    vertical-alignment: top;
+                    horizontal-stretch: 1;
+                }
+
+                // The agent's card narrates and has no close: Esc and the
+                // trail's Stop end a run.
+                if root.kind != "agent": VerticalLayout {
+                    alignment: start;
+                    IconButton {
+                        glyph: Glyph.close;
+                        tip: "Dismiss the pointer";
+                        size: 28px * Theme.text-scale;
+                        glyph-size: 10px;
+                        clicked => {
+                            root.dismiss();
+                        }
+                    }
+                }
+            }
+
+            if root.hint != "": Text {
+                text: root.hint;
+                font-size: Theme.meta;
+                color: Theme.label-2;
+                wrap: word-wrap;
+            }
+
+            if root.actions.length > 0: HorizontalLayout {
+                alignment: end;
+                spacing: Theme.sp-2;
+                padding-top: Theme.sp-3;
+                for act[i] in root.actions: Rectangle {
+                    min-width: btn.min-width + 4px;
+                    height: btn.height + 4px;
+                    border-radius: self.height / 2;
+                    border-width: root.focus-index == i ? 2px : 0px;
+                    border-color: Theme.focus-ring;
+
+                    btn := Button {
+                        x: 2px;
+                        y: 2px;
+                        width: parent.width - 4px;
+                        text: act.label;
+                        prominent: act.primary;
+                        clicked => {
+                            root.action(i);
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

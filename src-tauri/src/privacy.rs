@@ -26,10 +26,10 @@
 
 use parking_lot::Mutex;
 use serde_json::{json, Value};
-use tauri::AppHandle;
 
 use crate::agent::seams::DeskError;
 use crate::desktop::DesktopError;
+use crate::shell::AppHandle;
 use crate::state::{shared, Mode};
 use crate::windows;
 

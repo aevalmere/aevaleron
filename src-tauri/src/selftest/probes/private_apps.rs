@@ -28,16 +28,6 @@ use crate::windows::{self, OVERLAY};
 const LINE: &str = "Notepad is on your private apps list, so the screen was not read.";
 const WAIT: Duration = Duration::from_secs(5);
 
-const MODE_JS: &str = "document.body.dataset.mode || ''";
-
-// The bar's notice as shown, or empty while it is hidden.
-const NOTICE_JS: &str = r#"
-(() => {
-  const n = document.getElementById('notice');
-  return n.hidden ? '' : document.getElementById('notice-text').textContent;
-})()
-"#;
-
 /// Puts the stored list back however the probe ends, a panic included: the
 /// smoke's Notepad cannot be found and closed while it is listed.
 struct Restore(Option<Value>);
@@ -99,7 +89,7 @@ pub fn run(cx: &mut Cx) {
 }
 
 fn mode(cx: &Cx) -> String {
-    let v = cx.eval(OVERLAY, MODE_JS).unwrap_or(Value::Null);
+    let v = cx.probe(OVERLAY, "mode").unwrap_or(Value::Null);
     v.as_str().unwrap_or_default().to_string()
 }
 
@@ -134,10 +124,11 @@ fn ask_refused(cx: &Cx, handle: &Value) {
 }
 
 /// The open bar's notice names the app, in the same line as everywhere
-/// else (the page draws its notice only while the bar is open).
+/// else (the page shows its notice only while the bar is open; `notice` is
+/// empty while it is hidden).
 fn bar_says(cx: &Cx) {
     cx.on_main(windows::send_overlay_state);
-    let notice = || cx.eval(OVERLAY, NOTICE_JS).unwrap_or(Value::Null);
+    let notice = || cx.probe(OVERLAY, "notice").unwrap_or(Value::Null);
     let said = cx.wait_for(WAIT, || notice() == json!(LINE));
     cx.must("privateAppsBar", said, format!("notice={}", notice()));
 }

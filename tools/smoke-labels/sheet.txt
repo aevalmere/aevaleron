@@ -5,10 +5,10 @@
 noOutputInput
 markdown
 markdownStructure
-readingMeasure
+# native-ui: readingMeasure removed; the measure was a CSS width, the native page lays text out itself
 transcriptScroll
 transcriptWheel
 chatCeiling
-scrollThumb
+# native-ui: scrollThumb removed; the --scroll-thumb CSS variable has no native counterpart
 moreIndicator
-globMorphMs
+# native-ui: globMorphMs removed; AevalGlob was the page's JS morph

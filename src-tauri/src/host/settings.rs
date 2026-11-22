@@ -8,7 +8,6 @@ use std::sync::OnceLock;
 
 use parking_lot::Mutex;
 use serde_json::{json, Map, Value};
-use tauri::AppHandle;
 use tokio_util::sync::CancellationToken;
 
 use crate::llm::auth;
@@ -21,6 +20,7 @@ use crate::llm::payloads::{
 use crate::llm::provider::Provider;
 use crate::llm::settings::{self as llm_settings, model_for, LlmSettings};
 use crate::llm::status::{self, Checked, Status, Table};
+use crate::shell::AppHandle;
 use crate::store;
 use crate::windows;
 
@@ -118,9 +118,8 @@ fn provider_of(p: &Value) -> String {
     }
 }
 
-fn clipboard_text(app: &AppHandle) -> String {
-    use tauri_plugin_clipboard_manager::ClipboardExt;
-    app.clipboard().read_text().unwrap_or_default()
+fn clipboard_text() -> String {
+    crate::shell::sys::clipboard_read().unwrap_or_default()
 }
 
 /// The status the row shows now, and `provider:status` for Settings and the
@@ -474,9 +473,9 @@ fn clip_key_of(text: &str) -> Option<(Provider, String)> {
 
 /// `settings:clip-key`: a key on the clipboard for a provider that has
 /// none, masked. The key stays in Rust.
-fn clip_key(app: &AppHandle) -> Value {
+fn clip_key() -> Value {
     let found =
-        clip_key_of(&clipboard_text(app)).filter(|(p, _)| !store::get().has_provider_key(p.id()));
+        clip_key_of(&clipboard_text()).filter(|(p, _)| !store::get().has_provider_key(p.id()));
     let reply = match found {
         Some((p, k)) => ClipKeyReply {
             found: true,
@@ -491,7 +490,7 @@ fn clip_key(app: &AppHandle) -> Value {
 /// `settings:use-clip-key`: saves the clipboard's key under the provider it
 /// belongs to, tested first like any other (Decision D-10).
 async fn use_clip_key(app: &AppHandle) -> Value {
-    let Some((provider, key)) = clip_key_of(&clipboard_text(app)) else {
+    let Some((provider, key)) = clip_key_of(&clipboard_text()) else {
         return json!({ "ok": false, "error": "The clipboard no longer holds a key." });
     };
     save_tested(app, provider, &key).await
@@ -621,7 +620,7 @@ pub async fn route(
         "settings:save-model" | "settings:save-brain" | "settings:save-agent-model" => {
             save_model(app, channel, p)
         }
-        "settings:clip-key" => clip_key(app),
+        "settings:clip-key" => clip_key(),
         "settings:use-clip-key" => use_clip_key(app).await,
         "settings:test-key" => test_key(app, p).await,
         "settings:set-provider-order" => set_provider_order(app, p),

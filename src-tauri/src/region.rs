@@ -13,12 +13,12 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Mutex;
 use std::time::Duration;
 
-use serde_json::Value;
-use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder, WindowEvent};
+use serde_json::{json, Value};
 use tokio::sync::oneshot;
 
 use crate::capture::{self, screen, Rect};
 use crate::desktop::win;
+use crate::shell::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder, WindowEvent};
 use crate::state::{shared, Mode};
 
 /// A drag shorter than this on either axis is a click that missed.
@@ -191,7 +191,7 @@ async fn gone(app: &AppHandle) {
 /// resolves `None`.
 fn give_up_unless_loaded(app: &AppHandle, gen: u64) {
     let app = app.clone();
-    tauri::async_runtime::spawn(async move {
+    crate::shell::async_runtime::spawn(async move {
         tokio::time::sleep(LOAD_LIMIT).await;
         if LOADED.load(Ordering::Relaxed) < gen && current() == Some(gen) {
             let s = LOAD_LIMIT.as_secs();
@@ -201,10 +201,15 @@ fn give_up_unless_loaded(app: &AppHandle, gen: u64) {
     });
 }
 
-fn open_window(app: &AppHandle, phys: screen::PxRect, gen: u64) -> tauri::Result<()> {
+fn open_window(app: &AppHandle, phys: screen::PxRect, gen: u64) -> crate::shell::Result<()> {
     // Unlike every other surface this one wants the keyboard and the mouse:
     // it is a modal gesture, not an overlay.
-    let win = WebviewWindowBuilder::new(app, LABEL, WebviewUrl::App("renderer/region.html".into()))
+    let purpose = if FOR_TEXT.load(Ordering::Relaxed) {
+        "text"
+    } else {
+        "area"
+    };
+    let win =WebviewWindowBuilder::new(app, LABEL, WebviewUrl::App("renderer/region.html".into()))
         .title("Aevaleron")
         .decorations(false)
         .transparent(true)
@@ -214,10 +219,11 @@ fn open_window(app: &AppHandle, phys: screen::PxRect, gen: u64) -> tauri::Result
         .skip_taskbar(true)
         .content_protected(true)
         .visible(false)
-        .data_directory(crate::paths::webview_data_dir())
-        .initialization_script(page_script())
         .on_page_load(move |w, p| {
-            if matches!(p.event(), tauri::webview::PageLoadEvent::Finished) {
+            if matches!(p.event(), crate::shell::webview::PageLoadEvent::Finished) {
+                // What the page's line says the pick is for (region.js read
+                // `window.aevalRegionFor`).
+                let _ = w.emit_to(LABEL, "region:purpose", json!({ "purpose": purpose }));
                 LOADED.fetch_max(gen, Ordering::Relaxed);
                 let raw = capture::hwnd_of(&w);
                 capture::exclude_window(raw);
@@ -230,7 +236,6 @@ fn open_window(app: &AppHandle, phys: screen::PxRect, gen: u64) -> tauri::Result
     win::tool_window(capture::hwnd_of(&win), false);
     win::place(&win, phys);
     capture::exclude_window(capture::hwnd_of(&win));
-    crate::crash::guard_webview(&win, move |app, _| cancel_gen(app, gen));
     // Losing focus means the user clicked into something else; a full-screen
     // scrim they did not ask to keep must not survive that.
     let a = app.clone();
@@ -257,16 +262,6 @@ pub async fn select_text(app: &AppHandle, display: Option<screen::Display>) -> O
     let got = select(app, display).await;
     FOR_TEXT.store(false, Ordering::Relaxed);
     got
-}
-
-/// The bridge, and for a text pick the word the page reads to say so
-/// (`window.aevalRegionFor`, region.js).
-fn page_script() -> String {
-    let mut script = crate::ipc::bridge_script();
-    if FOR_TEXT.load(Ordering::Relaxed) {
-        script.push_str("window.aevalRegionFor = 'text';\n");
-    }
-    script
 }
 
 // ------------------------------------------------- the conversation's area

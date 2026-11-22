@@ -8,10 +8,10 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use serde_json::{json, Map, Value};
-use tauri::AppHandle;
 
 use crate::agent::seams::{DeskError, DesktopOps};
 use crate::desktop::{Deps, Desktop, DesktopError};
+use crate::shell::AppHandle;
 
 pub struct DesktopAdapter {
     d: Arc<Desktop>,

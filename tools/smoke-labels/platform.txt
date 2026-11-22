@@ -33,7 +33,7 @@ crashMainThread
 contextMenus
 contextMenuEditable
 launchAtLogin
-navigationBlocked
+# native-ui: navigationBlocked removed; native pages have no location to navigate
 updateConfig
 updateClassify
 updateNotes

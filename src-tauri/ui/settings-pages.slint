@@ -1,0 +1,626 @@
+// Settings' Answers, Tasks, Privacy, Shortcuts and General pages
+// (settings.html #pg-answers, #pg-agent, #pg-privacy, #pg-shortcuts,
+// #pg-general; the private apps section was private-apps-settings.js).
+
+import { Theme, Button } from "theme.slint";
+import { SettingsState } from "settings-state.slint";
+import { PageTitle, Group, Note, SwitchRow, ChoiceOption, ChoiceList, Slider, Progress, TextField, TextButton, Key, Disclosure, StaticRow, ActionRow } from "settings-widgets.slint";
+
+export component AnswersPage inherits VerticalLayout {
+    spacing: Theme.sp-3;
+    PageTitle {
+        text: "Answers";
+    }
+    Group {
+        Disclosure {
+            rid: "sec-skill";
+            title: "Answer style";
+            summary: SettingsState.skill-summary;
+            ChoiceList {
+                group: "skill";
+                choices: SettingsState.skills;
+            }
+            HorizontalLayout {
+                spacing: Theme.sp-3;
+                Button {
+                    text: "Open styles folder";
+                    clicked => {
+                        SettingsState.act("open-skills", "");
+                    }
+                }
+                Note {
+                    text: "Add a .md file to make your own style.";
+                    vertical-alignment: center;
+                    horizontal-stretch: 1;
+                }
+            }
+            if SettingsState.skills-status != "": Note {
+                text: SettingsState.skills-status;
+            }
+        }
+    }
+}
+
+export component TasksPage inherits VerticalLayout {
+    spacing: Theme.sp-3;
+    PageTitle {
+        text: "Tasks";
+    }
+    Group {
+        Disclosure {
+            rid: "sec-agent";
+            title: "Permissions";
+            summary: SettingsState.agent-summary;
+            ChoiceOption {
+                name: "Automatic";
+                checked: SettingsState.permission == "auto";
+                clicked => {
+                    SettingsState.act("permission", "auto");
+                }
+            }
+            ChoiceOption {
+                name: "Ask for risky steps";
+                checked: SettingsState.permission == "risky";
+                clicked => {
+                    SettingsState.act("permission", "risky");
+                }
+            }
+            ChoiceOption {
+                name: "Ask before every action";
+                checked: SettingsState.permission == "every";
+                clicked => {
+                    SettingsState.act("permission", "every");
+                }
+            }
+            Note {
+                text: SettingsState.permission-note;
+            }
+            HorizontalLayout {
+                spacing: Theme.sp-3;
+                padding-left: Theme.sp-3;
+                Text {
+                    text: "Most steps for one task";
+                    font-size: Theme.row;
+                    color: Theme.label;
+                    vertical-alignment: center;
+                }
+                Slider {
+                    horizontal-stretch: 1;
+                    minimum: 10;
+                    maximum: 50;
+                    step: 5;
+                    value: SettingsState.steps;
+                    moved(v) => {
+                        SettingsState.slide("steps", v, false);
+                    }
+                    released(v) => {
+                        SettingsState.slide("steps", v, true);
+                    }
+                }
+                Text {
+                    text: round(SettingsState.steps);
+                    font-size: Theme.row;
+                    color: Theme.label-2;
+                    vertical-alignment: center;
+                    min-width: 24px;
+                    horizontal-alignment: right;
+                }
+            }
+            SwitchRow {
+                text: "Let it look at screenshots when the app shares too little";
+                checked: SettingsState.shots;
+                toggled(v) => {
+                    SettingsState.toggle("screenshots", v);
+                }
+            }
+            SwitchRow {
+                text: "Put the mouse back after it clicks";
+                checked: SettingsState.cursor;
+                toggled(v) => {
+                    SettingsState.toggle("returnCursor", v);
+                }
+            }
+            Note {
+                text: "Esc, the Stop button or the tray stops it; moving the mouse pauses it. Screenshots are never saved.";
+            }
+            if SettingsState.revoke-shown: HorizontalLayout {
+                alignment: start;
+                Button {
+                    text: "Revoke permission";
+                    clicked => {
+                        SettingsState.act("agent-revoke", "");
+                    }
+                }
+            }
+            if SettingsState.agent-status != "": Note {
+                text: SettingsState.agent-status;
+            }
+        }
+    }
+}
+
+// The private apps list: a field that takes the typed name, cleared when
+// Rust says the name went on the list (private-epoch).
+component PrivateAdd inherits HorizontalLayout {
+    property <int> epoch: SettingsState.private-epoch;
+    changed epoch => {
+        name.set-text("");
+    }
+    spacing: Theme.sp-2;
+    name := TextField {
+        placeholder: "notepad.exe";
+        accepted(t) => {
+            SettingsState.text-accept("private-name", t);
+        }
+    }
+    Button {
+        text: "Add";
+        clicked => {
+            SettingsState.text-accept("private-name", name.text);
+        }
+    }
+}
+
+export component PrivacyPage inherits VerticalLayout {
+    spacing: Theme.sp-3;
+    PageTitle {
+        text: "Privacy";
+    }
+    Group {
+        StaticRow {
+            title: "Who sees your screen";
+            note: SettingsState.recipients;
+        }
+        Disclosure {
+            rid: "sec-history";
+            title: "History";
+            summary: SettingsState.history-summary;
+            SwitchRow {
+                text: "Keep past conversations so you can find an answer again";
+                checked: SettingsState.save-history;
+                toggled(v) => {
+                    SettingsState.toggle("save-history", v);
+                }
+            }
+            Note {
+                text: "Text only, on this machine. Screenshots are never written to disk.";
+            }
+            if SettingsState.history-confirm == "": HorizontalLayout {
+                spacing: Theme.sp-2;
+                alignment: start;
+                Button {
+                    text: "Open history";
+                    clicked => {
+                        SettingsState.act("open-history", "");
+                    }
+                }
+                if SettingsState.clear-shown: Button {
+                    text: "Delete all";
+                    danger: true;
+                    clicked => {
+                        SettingsState.act("clear-history", "");
+                    }
+                }
+            }
+            if SettingsState.history-confirm != "": HorizontalLayout {
+                spacing: Theme.sp-2;
+                Text {
+                    text: SettingsState.history-confirm;
+                    font-size: Theme.row;
+                    color: Theme.label;
+                    vertical-alignment: center;
+                    horizontal-stretch: 1;
+                    wrap: word-wrap;
+                }
+                Button {
+                    text: "Delete";
+                    danger: true;
+                    clicked => {
+                        SettingsState.act("history-confirm", "yes");
+                    }
+                }
+                Button {
+                    text: "Keep";
+                    clicked => {
+                        SettingsState.act("history-confirm", "no");
+                    }
+                }
+            }
+            if SettingsState.history-status != "": Note {
+                text: SettingsState.history-status;
+            }
+        }
+        Disclosure {
+            rid: "sec-private";
+            title: "Private apps";
+            summary: SettingsState.private-summary;
+            Note {
+                text: "While one of these apps is in front, Aevaleron takes no screenshot, reads no text from the screen and runs no task step on it. A question you type is still answered, without the screen.";
+            }
+            for a in SettingsState.private-apps: HorizontalLayout {
+                spacing: Theme.sp-3;
+                padding-left: Theme.sp-3;
+                VerticalLayout {
+                    alignment: center;
+                    horizontal-stretch: 1;
+                    Text {
+                        text: a.name;
+                        font-size: Theme.row;
+                        color: Theme.label;
+                        overflow: elide;
+                    }
+                    Text {
+                        text: a.exe;
+                        font-size: Theme.meta;
+                        font-family: Theme.mono;
+                        color: Theme.label-3;
+                        overflow: elide;
+                    }
+                }
+                TextButton {
+                    text: "Remove";
+                    danger: true;
+                    clicked => {
+                        SettingsState.act("private-remove", a.exe);
+                    }
+                }
+            }
+            if SettingsState.private-apps.length == 0: Note {
+                text: "No apps are on the list, so Aevaleron reads whichever app is in front.";
+            }
+            Text {
+                text: "Add an app by the name of its program";
+                font-size: Theme.caption;
+                color: Theme.label-2;
+            }
+            PrivateAdd { }
+            HorizontalLayout {
+                spacing: Theme.sp-3;
+                Button {
+                    text: "Add the app that was in front";
+                    enabled: SettingsState.front-enabled;
+                    clicked => {
+                        SettingsState.act("private-front", "");
+                    }
+                }
+                Note {
+                    text: SettingsState.front-note;
+                    vertical-alignment: center;
+                    horizontal-stretch: 1;
+                }
+            }
+            if SettingsState.private-status != "": Note {
+                text: SettingsState.private-status;
+                tone: SettingsState.private-error ? "danger" : "";
+            }
+        }
+        StaticRow {
+            title: "Screen share";
+            summary: SettingsState.share-summary;
+            note: SettingsState.share-line;
+        }
+    }
+}
+
+component LocalKey inherits HorizontalLayout {
+    in property <string> text;
+    in property <[string]> keys;
+    padding-left: Theme.sp-3;
+    padding-right: Theme.sp-3;
+    spacing: Theme.sp-3;
+    min-height: 40px * Theme.text-scale;
+    Text {
+        text: root.text;
+        font-size: Theme.row;
+        color: Theme.label;
+        vertical-alignment: center;
+        horizontal-stretch: 1;
+        wrap: word-wrap;
+    }
+    for k in root.keys: VerticalLayout {
+        alignment: center;
+        Key {
+            text: k;
+        }
+    }
+}
+
+export component ShortcutsPage inherits VerticalLayout {
+    spacing: Theme.sp-3;
+    PageTitle {
+        text: "Shortcuts";
+    }
+    Group {
+        Disclosure {
+            rid: "sec-shortcuts";
+            title: "Keyboard";
+            summary: SettingsState.shortcut-summary;
+            for s in SettingsState.shortcuts: VerticalLayout {
+                spacing: 2px;
+                HorizontalLayout {
+                    spacing: Theme.sp-3;
+                    padding-left: Theme.sp-3;
+                    min-height: 44px * Theme.text-scale;
+                    Text {
+                        text: s.label;
+                        font-size: Theme.row;
+                        color: Theme.label;
+                        vertical-alignment: center;
+                        horizontal-stretch: 1;
+                    }
+                    VerticalLayout {
+                        alignment: center;
+                        Key {
+                            text: s.current;
+                            empty: s.empty;
+                            live: s.capturing;
+                        }
+                    }
+                    VerticalLayout {
+                        alignment: center;
+                        Button {
+                            text: s.capturing ? "Cancel" : "Change";
+                            clicked => {
+                                SettingsState.act("shortcut", s.action);
+                            }
+                        }
+                    }
+                }
+                if s.warn != "": Note {
+                    text: s.warn;
+                    tone: "warn";
+                }
+            }
+            HorizontalLayout {
+                spacing: Theme.sp-3;
+                padding-left: Theme.sp-3;
+                min-height: 44px * Theme.text-scale;
+                Text {
+                    text: "Clear the bar, close it, stop a task";
+                    font-size: Theme.row;
+                    color: Theme.label;
+                    vertical-alignment: center;
+                    horizontal-stretch: 1;
+                }
+                VerticalLayout {
+                    alignment: center;
+                    Key {
+                        text: "Esc";
+                    }
+                }
+                Text {
+                    text: "Fixed";
+                    font-size: Theme.caption;
+                    color: Theme.label-3;
+                    vertical-alignment: center;
+                }
+            }
+            if SettingsState.shortcut-error != "": Note {
+                text: SettingsState.shortcut-error;
+                tone: "danger";
+            }
+            if SettingsState.free.length > 0: HorizontalLayout {
+                spacing: Theme.sp-2;
+                alignment: start;
+                Text {
+                    text: "Free now:";
+                    font-size: Theme.caption;
+                    color: Theme.label-2;
+                    vertical-alignment: center;
+                }
+                for f in SettingsState.free: Button {
+                    text: f;
+                    clicked => {
+                        SettingsState.act("free", f);
+                    }
+                }
+            }
+            HorizontalLayout {
+                alignment: start;
+                Button {
+                    text: "Reset shortcuts";
+                    clicked => {
+                        SettingsState.act("reset-shortcuts", "");
+                    }
+                }
+            }
+        }
+    }
+    Text {
+        text: "In Aevaleron windows";
+        font-size: Theme.title;
+        font-weight: 600;
+        color: Theme.label;
+    }
+    Group {
+        LocalKey { text: "New conversation"; keys: ["Ctrl+N"]; }
+        LocalKey { text: "Next or previous answer window"; keys: ["Ctrl+Tab", "Ctrl+Shift+Tab"]; }
+        LocalKey { text: "Move between the bar and the answer"; keys: ["F6"]; }
+        LocalKey { text: "Earlier questions, in the bar"; keys: ["Up", "Down"]; }
+        LocalKey { text: "Undo the bar's choice, in an empty bar"; keys: ["Backspace"]; }
+        LocalKey { text: "Ask about an area"; keys: ["Ctrl+R"]; }
+        LocalKey { text: "Stop the answer or task"; keys: ["Ctrl+."]; }
+        LocalKey { text: "Ask the last question again"; keys: ["Ctrl+Shift+R"]; }
+        LocalKey { text: "Copy the conversation"; keys: ["Ctrl+Shift+C"]; }
+        LocalKey { text: "Close the window"; keys: ["Ctrl+W"]; }
+        LocalKey { text: "Close every answer window"; keys: ["Ctrl+Shift+W"]; }
+        LocalKey { text: "Settings, History"; keys: ["Ctrl+,", "Ctrl+H"]; }
+        LocalKey { text: "Bigger, smaller, usual text"; keys: ["Ctrl+=", "Ctrl+-", "Ctrl+0"]; }
+        LocalKey { text: "Move, size or maximize the window"; keys: ["Alt+Space"]; }
+        LocalKey { text: "This list, from any Settings page"; keys: ["F1"]; }
+    }
+}
+
+export component GeneralPage inherits VerticalLayout {
+    spacing: Theme.sp-3;
+    PageTitle {
+        text: "General";
+    }
+    Group {
+        Disclosure {
+            rid: "sec-text-size";
+            title: "Text size";
+            summary: round(SettingsState.text-pct) + "%";
+            HorizontalLayout {
+                spacing: Theme.sp-3;
+                padding-left: Theme.sp-3;
+                Text {
+                    text: "Size";
+                    font-size: Theme.row;
+                    color: Theme.label;
+                    vertical-alignment: center;
+                }
+                Slider {
+                    horizontal-stretch: 1;
+                    minimum: 100;
+                    maximum: 200;
+                    step: 10;
+                    value: SettingsState.text-pct;
+                    moved(v) => {
+                        SettingsState.slide("text-scale", v, false);
+                    }
+                    released(v) => {
+                        SettingsState.slide("text-scale", v, true);
+                    }
+                }
+                Text {
+                    text: round(SettingsState.text-pct) + "%";
+                    font-size: Theme.row;
+                    color: Theme.label-2;
+                    vertical-alignment: center;
+                    min-width: 40px;
+                    horizontal-alignment: right;
+                }
+            }
+            Note {
+                text: SettingsState.text-note;
+            }
+        }
+        Disclosure {
+            rid: "sec-startup";
+            title: "Launch at login";
+            summary: SettingsState.startup-summary;
+            SwitchRow {
+                text: "Start Aevaleron when I sign in to Windows";
+                checked: SettingsState.launch;
+                toggled(v) => {
+                    SettingsState.toggle("launch-at-login", v);
+                }
+            }
+            if SettingsState.startup-note != "": Note {
+                text: SettingsState.startup-note;
+            }
+        }
+        Disclosure {
+            rid: "sec-button";
+            title: "Button on screen";
+            summary: SettingsState.button-summary;
+            SwitchRow {
+                text: "Keep a small round button on screen that opens the bar";
+                checked: SettingsState.show-button;
+                toggled(v) => {
+                    SettingsState.toggle("show-button", v);
+                }
+            }
+            Note {
+                text: SettingsState.button-note;
+            }
+        }
+        Disclosure {
+            rid: "sec-about";
+            title: "Updates";
+            summary: SettingsState.about-summary;
+            Note {
+                text: SettingsState.update-line;
+                font-size: Theme.row;
+                color: Theme.label-2;
+            }
+            if SettingsState.update-progress-shown: Progress {
+                value: SettingsState.update-progress;
+            }
+            if SettingsState.update-notes != "": Note {
+                text: SettingsState.update-notes;
+            }
+            HorizontalLayout {
+                spacing: Theme.sp-2;
+                alignment: start;
+                if SettingsState.restart-shown: Button {
+                    text: "Restart now";
+                    prominent: true;
+                    clicked => {
+                        SettingsState.act("update-restart", "");
+                    }
+                }
+                if SettingsState.check-shown: Button {
+                    text: "Check for updates";
+                    enabled: SettingsState.check-enabled;
+                    clicked => {
+                        SettingsState.act("update-check", "");
+                    }
+                }
+                if SettingsState.release-url != "": TextButton {
+                    text: SettingsState.release-label;
+                    clicked => {
+                        SettingsState.act("open-url", SettingsState.release-url);
+                    }
+                }
+            }
+        }
+        ActionRow {
+            title: "Bar position";
+            summary: SettingsState.layout-summary;
+            button: "Move…";
+            clicked => {
+                SettingsState.act("edit-position", "");
+            }
+        }
+        ActionRow {
+            title: "Tour";
+            summary: "4 steps";
+            button: "Replay";
+            clicked => {
+                SettingsState.act("replay-tour", "");
+            }
+        }
+        // Slint's royalty-free licence asks for this attribution in About.
+        VerticalLayout {
+            padding-left: Theme.sp-3;
+            padding-right: Theme.sp-3;
+            padding-top: Theme.sp-3;
+            padding-bottom: Theme.sp-3;
+            spacing: Theme.sp-1;
+            HorizontalLayout {
+                spacing: Theme.sp-3;
+                Text {
+                    text: "About";
+                    font-size: Theme.row;
+                    font-weight: 600;
+                    color: Theme.label;
+                    vertical-alignment: center;
+                }
+                Text {
+                    text: "Aevaleron " + SettingsState.version;
+                    horizontal-stretch: 1;
+                    horizontal-alignment: right;
+                    font-size: Theme.row;
+                    color: Theme.label-2;
+                    vertical-alignment: center;
+                }
+            }
+            HorizontalLayout {
+                spacing: Theme.sp-2;
+                alignment: start;
+                TextButton {
+                    text: "Made with Slint";
+                    clicked => {
+                        SettingsState.act("open-url", "https://slint.dev");
+                    }
+                }
+                Note {
+                    text: "Slint Royalty-free License 2.0";
+                    vertical-alignment: center;
+                }
+            }
+        }
+    }
+}
