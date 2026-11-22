@@ -1,5 +1,6 @@
-//! Talking to models: the curated free-model table, the four providers
-//! (OpenRouter, Anthropic, OpenAI, Gemini) behind one request shape,
+//! Talking to models: the curated free-model table, the four HTTP providers
+//! (OpenRouter, Anthropic, OpenAI, Gemini) and the three local CLIs (Claude
+//! Code, Codex, Gemini CLI, in `cli`) behind one request shape,
 //! failover, streaming, prompts and error text. Port of lib/openrouter.js
 //! and lib/fake-llm.js plus the model half of main.js (PARITY MODEL-*,
 //! FAIL-*, PROMPT-*, POINT-*, ERR-*). ARCHITECTURE.md section 10 documents
@@ -7,6 +8,7 @@
 
 pub mod auth;
 pub mod catalogue;
+pub mod cli;
 pub mod client;
 pub mod elements;
 pub mod errors;

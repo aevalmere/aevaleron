@@ -1,7 +1,9 @@
 //! Which company answers (REQUESTS.md 2): OpenRouter, as in Electron, or a
 //! native client for Anthropic, OpenAI or Google Gemini with the user's own
 //! key. The provider is read from the key's prefix and can be overridden in
-//! Settings.
+//! Settings. The three local command-line tools (Claude Code, Codex, Gemini
+//! CLI) answer on the person's own subscription with no key (llm::cli);
+//! they are used only once turned on in Settings.
 
 use super::catalogue::{Curated, Kind, Tier};
 
@@ -11,6 +13,12 @@ pub enum Provider {
     Anthropic,
     OpenAi,
     Gemini,
+    /// Claude Code (`claude`), on the person's Claude subscription.
+    ClaudeCli,
+    /// OpenAI Codex (`codex`), on the person's ChatGPT subscription.
+    CodexCli,
+    /// Gemini CLI (`gemini`), on the person's Google account.
+    GeminiCli,
 }
 
 impl Provider {
@@ -29,11 +37,27 @@ impl Provider {
             Provider::Anthropic => "anthropic",
             Provider::OpenAi => "openai",
             Provider::Gemini => "gemini",
+            Provider::ClaudeCli => "claude-cli",
+            Provider::CodexCli => "codex-cli",
+            Provider::GeminiCli => "gemini-cli",
         }
     }
 
+    /// The local CLIs, in Settings order. Not in [`Provider::ALL`]: they
+    /// join the try order only when turned on.
+    pub const CLI: [Provider; 3] = [Provider::ClaudeCli, Provider::CodexCli, Provider::GeminiCli];
+
     pub fn from_id(id: &str) -> Option<Provider> {
-        Provider::ALL.into_iter().find(|p| p.id() == id.trim())
+        let id = id.trim();
+        Provider::ALL
+            .into_iter()
+            .chain(Provider::CLI)
+            .find(|p| p.id() == id)
+    }
+
+    /// A local command-line tool rather than an HTTP API.
+    pub fn is_cli(self) -> bool {
+        Provider::CLI.contains(&self)
     }
 
     /// The name used in sentences the user reads.
@@ -43,6 +67,9 @@ impl Provider {
             Provider::Anthropic => "Anthropic",
             Provider::OpenAi => "OpenAI",
             Provider::Gemini => "Google Gemini",
+            Provider::ClaudeCli => "Claude Code",
+            Provider::CodexCli => "Codex",
+            Provider::GeminiCli => "Gemini CLI",
         }
     }
 
@@ -72,6 +99,9 @@ impl Provider {
             Provider::Anthropic => ANTHROPIC.iter().collect(),
             Provider::OpenAi => OPENAI.iter().collect(),
             Provider::Gemini => GEMINI.iter().collect(),
+            Provider::ClaudeCli => CLAUDE_CLI.iter().collect(),
+            Provider::CodexCli => CODEX_CLI.iter().collect(),
+            Provider::GeminiCli => GEMINI_CLI.iter().collect(),
         }
     }
 
@@ -86,11 +116,17 @@ impl Provider {
             (Provider::Gemini, Kind::Vision) => "gemini-3.8-flash",
             (Provider::Gemini, Kind::Agent) => "gemini-3.8-flash",
             (Provider::Gemini, Kind::Text) => "gemini-4-argon",
+            (Provider::ClaudeCli, Kind::Vision) => "sonnet",
+            (Provider::ClaudeCli, _) => "opus",
+            // The model the tool itself is set to: no `--model` goes out.
+            (Provider::CodexCli, _) => super::cli::DEFAULT_MODEL,
+            (Provider::GeminiCli, _) => super::cli::DEFAULT_MODEL,
         }
     }
 
     /// Native providers bill every call; only OpenRouter has free models,
-    /// failover and a public catalogue.
+    /// failover and a public catalogue. The CLIs count as native: one model
+    /// list of their own, no free-model failover.
     pub fn is_native(self) -> bool {
         self != Provider::OpenRouter
     }
@@ -155,6 +191,54 @@ const GEMINI: [Curated; 3] = [
     },
 ];
 
+// The CLIs take their own aliases; `default` sends no `--model`.
+#[rustfmt::skip]
+const CLAUDE_CLI: [Curated; 3] = [
+    Curated {
+        id: "opus",
+        tier: Tier::Paid,
+        note: "The newest Opus on your Claude plan. The most careful, and the slowest.",
+    },
+    Curated {
+        id: "sonnet",
+        tier: Tier::Paid,
+        note: "The newest Sonnet on your Claude plan. Quick at reading a screen.",
+    },
+    Curated {
+        id: "haiku",
+        tier: Tier::Paid,
+        note: "The newest Haiku on your Claude plan. The fastest.",
+    },
+];
+
+#[rustfmt::skip]
+const CODEX_CLI: [Curated; 1] = [
+    Curated {
+        id: super::cli::DEFAULT_MODEL,
+        tier: Tier::Paid,
+        note: "The model Codex is set to use on your ChatGPT plan.",
+    },
+];
+
+#[rustfmt::skip]
+const GEMINI_CLI: [Curated; 3] = [
+    Curated {
+        id: super::cli::DEFAULT_MODEL,
+        tier: Tier::Paid,
+        note: "The model Gemini CLI picks for your Google account.",
+    },
+    Curated {
+        id: "gemini-4-argon",
+        tier: Tier::Paid,
+        note: "Google's flagship reasoning model.",
+    },
+    Curated {
+        id: "gemini-3.8-flash",
+        tier: Tier::Paid,
+        note: "The strongest Flash. Quick, and reads screens well.",
+    },
+];
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -200,5 +284,14 @@ mod tests {
             }
             assert_eq!(Provider::from_id(p.id()), Some(p));
         }
+        for p in Provider::CLI {
+            assert!(p.is_cli() && p.is_native());
+            assert_eq!(Provider::from_id(p.id()), Some(p));
+            for k in [Kind::Vision, Kind::Text, Kind::Agent] {
+                let d = p.default_model(k);
+                assert!(p.models(k).iter().any(|c| c.id == d), "{p:?} {k:?} {d}");
+            }
+        }
+        assert!(Provider::ALL.iter().all(|p| !p.is_cli()));
     }
 }

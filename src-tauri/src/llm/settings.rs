@@ -42,6 +42,21 @@ pub trait LlmSettings: Send + Sync {
     fn failover(&self) -> FailoverPrefs {
         FailoverPrefs::default()
     }
+    /// `cliProviders.enabled` in aevaleron.json: a local CLI is only ever
+    /// used once the person turns it on.
+    fn cli_enabled(&self, _provider: Provider) -> bool {
+        false
+    }
+    /// `cliProviders.paths.<id>`: where the person said the CLI is, when
+    /// it is not found on its own.
+    fn cli_path(&self, _provider: Provider) -> Option<String> {
+        None
+    }
+    /// `roleProviders.<role>`: the provider the person picked for one job
+    /// (`vision`, `text`, `agent` or `voice`), tried before the rest.
+    fn role_provider(&self, _role: &str) -> Option<Provider> {
+        None
+    }
 }
 
 /// The provider and key a request goes out with.
@@ -116,12 +131,31 @@ fn key_of(s: &dyn LlmSettings, p: Provider) -> Option<String> {
 /// The key saved for `p`, when `p` can use it: a blank key, or one whose
 /// prefix names another provider (an `sk-or-` key saved under Anthropic),
 /// is never sent (review-llm-agent P2-12).
+///
+/// A local CLI has no key: its "key" is the program's path, there only when
+/// the CLI is turned on and found (llm::cli).
 pub fn usable_key(s: &dyn LlmSettings, p: Provider) -> Option<String> {
+    if p.is_cli() {
+        return cli_program(s, p);
+    }
     let key = key_of(s, p)?;
     match Provider::detect(&key) {
         Some(owner) if owner != p => None,
         _ => Some(key),
     }
+}
+
+/// The program a turned-on CLI runs: the stored path when it exists, else
+/// the one found on PATH and in the usual install folders.
+pub fn cli_program(s: &dyn LlmSettings, p: Provider) -> Option<String> {
+    if !p.is_cli() || !s.cli_enabled(p) {
+        return None;
+    }
+    let stored = s.cli_path(p).map(|v| v.trim().to_string());
+    if let Some(path) = stored.filter(|v| !v.is_empty()) {
+        return std::path::Path::new(&path).is_file().then_some(path);
+    }
+    super::cli::find(p).map(|f| f.to_string_lossy().into_owned())
 }
 
 /// The order providers are tried in: the stored `providerOrder` (unknown
@@ -137,7 +171,10 @@ pub fn order(s: &dyn LlmSettings) -> Vec<Provider> {
     } else {
         stored
     };
-    for p in lead.into_iter().chain(Provider::ALL) {
+    // A turned-on CLI the person never placed comes after the HTTP
+    // providers, so turning one on changes nothing until it is moved up.
+    let clis = Provider::CLI.into_iter().filter(|p| s.cli_enabled(*p));
+    for p in lead.into_iter().chain(Provider::ALL).chain(clis) {
         if !out.contains(&p) {
             out.push(p);
         }
@@ -145,14 +182,29 @@ pub fn order(s: &dyn LlmSettings) -> Vec<Provider> {
     out
 }
 
+/// [`order`] for one job: the provider picked for it (`roleProviders`)
+/// first.
+pub fn order_for(s: &dyn LlmSettings, role: &str) -> Vec<Provider> {
+    let mut out = order(s);
+    if let Some(pick) = s.role_provider(role) {
+        out.retain(|p| *p != pick);
+        out.insert(0, pick);
+    }
+    out
+}
+
+fn keyed_in(s: &dyn LlmSettings, order: Vec<Provider>) -> Vec<Candidate> {
+    order
+        .into_iter()
+        .filter_map(|p| usable_key(s, p).map(|k| Candidate::new(s, p, k)))
+        .collect()
+}
+
 /// Providers in order with a key each can use, cooldowns ignored. The last
 /// resort when every candidate is cooling down: a question still goes
 /// somewhere and comes back with that provider's own error.
 pub fn keyed(s: &dyn LlmSettings) -> Vec<Candidate> {
-    order(s)
-        .into_iter()
-        .filter_map(|p| usable_key(s, p).map(|k| Candidate::new(s, p, k)))
-        .collect()
+    keyed_in(s, order(s))
 }
 
 /// The providers a screen question can go to now, in the person's order
@@ -172,7 +224,7 @@ pub fn candidates_for(s: &dyn LlmSettings, kind: Kind) -> Vec<Candidate> {
 
 /// [`candidates_for`] against a given status table and time.
 pub fn candidates_with(s: &dyn LlmSettings, kind: Kind, table: &Table, now: u64) -> Vec<Candidate> {
-    keyed(s)
+    keyed_in(s, order_for(s, kind.as_str()))
         .into_iter()
         .filter(|c| {
             let paid = c.provider == Provider::OpenRouter && !c.model(kind).ends_with(":free");
@@ -217,6 +269,9 @@ pub struct MemorySettings {
     pub healed: Mutex<Vec<(Kind, String)>>,
     pub paid: Mutex<bool>,
     pub prefs: Mutex<FailoverPrefs>,
+    /// Turned-on CLIs and the program each runs.
+    pub cli: Mutex<HashMap<Provider, String>>,
+    pub roles: Mutex<HashMap<String, Provider>>,
 }
 
 impl MemorySettings {
@@ -264,6 +319,18 @@ impl LlmSettings for MemorySettings {
 
     fn failover(&self) -> FailoverPrefs {
         *self.prefs.lock()
+    }
+
+    fn cli_enabled(&self, provider: Provider) -> bool {
+        self.cli.lock().contains_key(&provider)
+    }
+
+    fn cli_path(&self, provider: Provider) -> Option<String> {
+        self.cli.lock().get(&provider).cloned()
+    }
+
+    fn role_provider(&self, role: &str) -> Option<Provider> {
+        self.roles.lock().get(role).copied()
     }
 }
 
@@ -382,6 +449,36 @@ mod tests {
         // A key with no known prefix is trusted to the slot it was saved in.
         s.keys.lock().insert(Provider::Gemini, "custom-key".into());
         assert_eq!(active(&s).unwrap().provider, Provider::Gemini);
+    }
+
+    #[test]
+    fn clis_join_only_when_turned_on() {
+        let s = MemorySettings::with_key("sk-or-v1-x");
+        let t = Table::default();
+        // Installed or not, a CLI that is off is never a candidate.
+        assert_eq!(ids(&candidates_with(&s, Kind::Vision, &t, 0)), [Provider::OpenRouter]);
+        assert!(!order(&s).contains(&Provider::ClaudeCli));
+        // On, with a program that exists: after the HTTP providers.
+        let exe = std::env::current_exe().unwrap();
+        let exe = exe.to_string_lossy().into_owned();
+        s.cli.lock().insert(Provider::ClaudeCli, exe.clone());
+        let got = candidates_with(&s, Kind::Vision, &t, 0);
+        assert_eq!(ids(&got), [Provider::OpenRouter, Provider::ClaudeCli]);
+        assert_eq!(got[1].key, exe, "the program is the CLI's key");
+        assert_eq!(got[1].model(Kind::Vision), "sonnet");
+        // Picked for one job: first for that job only.
+        s.roles.lock().insert("text".into(), Provider::ClaudeCli);
+        let text = ids(&candidates_with(&s, Kind::Text, &t, 0));
+        assert_eq!(text, [Provider::ClaudeCli, Provider::OpenRouter]);
+        let vision = ids(&candidates_with(&s, Kind::Vision, &t, 0));
+        assert_eq!(vision, [Provider::OpenRouter, Provider::ClaudeCli]);
+        // As the default provider: first in the stored order.
+        *s.order.lock() = vec![Provider::ClaudeCli];
+        assert_eq!(active(&s).unwrap().provider, Provider::ClaudeCli);
+        // A stored path that is gone is not used.
+        s.cli.lock().insert(Provider::ClaudeCli, r"C:\nope\claude.exe".into());
+        assert_eq!(usable_key(&s, Provider::ClaudeCli), None);
+        assert_eq!(active(&s).unwrap().provider, Provider::OpenRouter);
     }
 
     #[test]

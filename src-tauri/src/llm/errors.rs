@@ -39,6 +39,9 @@ pub mod codes {
     pub const SERVER: &str = "server";
     pub const UNKNOWN: &str = "unknown";
     pub const PAID_HOP: &str = "paid-hop";
+    /// A local CLI provider is turned on but its program is not there, or
+    /// would not start (llm::cli).
+    pub const CLI_MISSING: &str = "cli-missing";
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -294,6 +297,10 @@ pub fn credit_url(provider: Provider) -> &'static str {
         Provider::Anthropic => "https://console.anthropic.com/settings/billing",
         Provider::OpenAi => "https://platform.openai.com/settings/organization/billing",
         Provider::Gemini => "https://aistudio.google.com/apikey",
+        // The CLIs run on a plan: where its usage and limits are shown.
+        Provider::ClaudeCli => "https://claude.ai/settings/usage",
+        Provider::CodexCli => "https://chatgpt.com/codex/settings/usage",
+        Provider::GeminiCli => "https://aistudio.google.com/",
     }
 }
 
@@ -370,6 +377,11 @@ const OFFLINE_TEXT: &str = "No connection. Answers and tasks need the internet."
 pub fn explain(err: &ApiError, a: &About<'_>) -> Option<Explained> {
     if err.is_abort() {
         return None;
+    }
+    if a.provider.is_cli() {
+        if let Some(out) = explain_cli(err, a) {
+            return Some(out);
+        }
     }
     let p = a.provider.name();
     let or = a.provider == Provider::OpenRouter;
@@ -499,6 +511,48 @@ or add credit to keep asking now."
                 }
             }
         }
+    };
+    Some(Explained {
+        code,
+        text,
+        tone,
+        actions,
+    })
+}
+
+/// The failures that read differently on a local CLI: it has no key and no
+/// credit, but a sign-in, a plan limit and a program that must be there.
+/// `None` leaves the rest to [`explain`].
+fn explain_cli(err: &ApiError, a: &About<'_>) -> Option<Explained> {
+    let p = a.provider.name();
+    let command = super::cli::command_of(a.provider);
+    let code = code_of(a.provider, err, a.model);
+    let mut actions: Vec<Action> = Vec::new();
+    let mut tone = Tone::Error;
+    let text = match code {
+        codes::CLI_MISSING => {
+            let at = format!("prov-{}", a.provider.id());
+            actions.push(section("fix-cli", "Open Settings", at));
+            actions.extend(ask_next(a));
+            format!(
+                "Aevaleron can't start {p}. Install it so `{command}` works in a terminal, or \
+turn it off in Settings."
+            )
+        }
+        codes::BAD_KEY => {
+            actions.push(retry());
+            actions.extend(ask_next(a));
+            format!(
+                "{p} isn't signed in. Open a terminal, run `{command}` and sign in, then ask again."
+            )
+        }
+        codes::NO_CREDIT | codes::DAILY_CAP | codes::RATE_LIMITED | codes::FREE_BUSY => {
+            tone = Tone::Note;
+            actions.push(link("add-credit", "See usage", credit_url(a.provider)));
+            actions.extend(ask_next(a));
+            format!("{p} says your plan's usage limit is reached. Try again later.")
+        }
+        _ => return None,
     };
     Some(Explained {
         code,
