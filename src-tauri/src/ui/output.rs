@@ -1837,6 +1837,10 @@ impl OutputPage {
         self.ui
             .set_copy_all_done(st.flashes.iter().any(|(k, _)| k == "copy-all"));
         self.ui.set_target(st.target && st.mode == "panel");
+        drop(guard);
+        // Reading the height lays the page out now, so the window follows
+        // the rows just set without waiting on a `changed` handler.
+        self.report_height(self.ui.get_content_height());
     }
 
     /// The wait count and the busy countdown tick once a second.
@@ -2006,6 +2010,9 @@ impl OutputPage {
             let mut st = self.st.borrow_mut();
             st.away = away;
             st.away_seq += 1;
+            // The core sizes a returning window from its own copy; send ours
+            // again rather than trust that it kept it.
+            st.last_height = 0.0;
             st.away_seq
         };
         self.ui.set_away(away);
@@ -2259,6 +2266,8 @@ impl OutputPage {
             let mut st = self.st.borrow_mut();
             st.wait = None;
             st.items.clear();
+            // The core put its copy back to the default height on reset.
+            st.last_height = 0.0;
             st.live = None;
             st.trail = None;
             st.titled = false;
