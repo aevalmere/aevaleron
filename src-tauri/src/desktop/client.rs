@@ -1,33 +1,28 @@
-//! The desktop helper process and every call into it: a port of
-//! lib/desktop/index.js (PARITY DESK-01..12). host.cs and host.ps1 are
-//! compiled into the exe from lib/desktop (the source of truth) and sent over
-//! stdin exactly as index.js sent them; the prebuilt DLL ships beside the exe
-//! and loads only on a SHA-256 match.
+//! The desktop engine and every call into it: a port of
+//! lib/desktop/index.js (PARITY DESK-01..12). The engine itself is
+//! `host`, in process (it used to be host.cs inside a powershell.exe child);
+//! it runs on a worker thread of its own that takes one request at a time.
 //!
-//! Lazy: nothing spawns until the first call. One op at a time, in order.
-//! A helper exit rejects in-flight calls with HELPER_DOWN and the next call
-//! respawns; three deaths inside 60 s stop respawning until `start()`.
-//! Every rect and point is physical virtual-screen pixels.
+//! Lazy: nothing starts until the first call. One op at a time, in order.
+//! A worker that panics rejects in-flight calls with HELPER_DOWN and the next
+//! call starts a fresh one; three deaths inside 60 s stop restarting until
+//! `start()`. Every rect and point is physical virtual-screen pixels.
 
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex, OnceLock, RwLock};
+use std::sync::{Arc, Mutex, RwLock};
 use std::time::{Duration, Instant};
 
 use serde_json::{json, Value};
-use tokio::io::{AsyncBufRead, AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
-use tokio::sync::{broadcast, mpsc, oneshot};
+use tokio::sync::{broadcast, oneshot};
 
-use super::protocol::{self as p, DResult, DesktopError, Incoming};
+use super::host;
+use super::protocol::{self as p, DResult, DesktopError};
 use super::scoring;
 use super::win;
 use crate::capture::screen;
 
-const HOST_CS: &str = include_str!("../../../lib/desktop/host.cs");
-const HOST_PS1: &str = include_str!("../../../lib/desktop/host.ps1");
-const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-
-/// One of our windows, as the helper's own-window registry wants it. A
+/// One of our windows, as the engine's own-window registry wants it. A
 /// `block: false` layer (lens, pointer) is ours but never in the way of a
 /// click that lands under it.
 #[derive(Clone, Debug, PartialEq)]
@@ -54,10 +49,10 @@ pub struct Deps {
     pub after_synthetic_key: Hook<()>,
 }
 
+/// The running worker: requests go to it over `tx`.
 struct Proc {
     gen: u64,
-    pid: u32,
-    tx: mpsc::UnboundedSender<String>,
+    tx: std::sync::mpsc::Sender<host::Job>,
 }
 
 #[derive(Default)]
@@ -73,7 +68,6 @@ struct State {
     watching: bool,
     watch_override: Option<bool>,
     uia_warm: bool,
-    start_tx: Option<oneshot::Sender<DResult<()>>>,
     next_id: u64,
     gen: u64,
     stopping: HashSet<u64>,
@@ -90,8 +84,8 @@ impl State {
         }
     }
 
-    /// A helper that stopped answering: nothing more is sent to it, and the
-    /// kill that follows is not counted as a second death.
+    /// A worker that stopped answering: nothing more is sent to it, and its
+    /// end, if it ever comes, is not counted as a second death.
     fn abandon(&mut self, gen: u64) {
         if self.proc.as_ref().map(|p| p.gen) == Some(gen) {
             self.proc = None;
@@ -147,142 +141,27 @@ pub fn powershell() -> PathBuf {
         .join("powershell.exe")
 }
 
-/// Release builds are the shipped app: the user-writable compile cache is
-/// never read there, so an installed copy only loads the prebuilt assembly
-/// whose hash it carries, or compiles in memory.
-fn cache_dir() -> String {
-    if !cfg!(debug_assertions) {
-        return String::new();
-    }
-    if let Ok(v) = std::env::var("AEVAL_DESKTOP_CACHE") {
-        return v;
-    }
-    std::env::var("LOCALAPPDATA")
-        .map(PathBuf::from)
-        .unwrap_or_else(|_| std::env::temp_dir())
-        .join("aevaleron")
-        .display()
-        .to_string()
+/// Closes the worker's books when its thread ends, by return or by panic.
+struct WorkerExit {
+    me: Arc<Desktop>,
+    gen: u64,
+    why: Option<String>,
 }
 
-/// Where a build-time copy of the compiled helper may be: the bundled
-/// `desktop/` resource folder beside the exe, the exe folder, and in a dev
-/// build the repo's `build/` (tools/build-desktop.js).
-fn prebuilt_dirs() -> Vec<String> {
-    let mut dirs = Vec::new();
-    if let Some(exe_dir) = std::env::current_exe()
-        .ok()
-        .and_then(|e| e.parent().map(PathBuf::from))
-    {
-        dirs.push(exe_dir.join("desktop"));
-        dirs.push(exe_dir);
-    }
-    if cfg!(debug_assertions) {
-        dirs.push(
-            PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-                .join("..")
-                .join("build"),
-        );
-    }
-    dirs.into_iter()
-        .filter(|d| d.is_dir())
-        .map(|d| d.display().to_string())
-        .collect()
-}
-
-/// SHA-256 of the prebuilt DLL, fixed at compile time by CI (from
-/// lib/desktop/prebuilt.json), so swapping the file beside the exe is not
-/// enough to get code loaded.
-pub fn prebuilt_sha() -> &'static str {
-    p::valid_sha(option_env!("AEVAL_DESKTOP_DLL_SHA").unwrap_or(""))
-}
-
-pub fn bootstrap_line(compile_only: bool) -> String {
-    let dirs = prebuilt_dirs();
-    let cache = cache_dir();
-    p::bootstrap_line(&p::Bootstrap {
-        host_cs: HOST_CS,
-        host_ps1: HOST_PS1,
-        cache: &cache,
-        prebuilt_dirs: &dirs,
-        dll_sha: prebuilt_sha(),
-        compile_only,
-        version: env!("CARGO_PKG_VERSION"),
-    })
-}
-
-fn kill_tree(pid: u32) {
-    if pid == 0 {
-        return;
-    }
-    // The helper has a conhost child; /T takes it too, so nothing under the
-    // install folder outlives the app and blocks an update.
-    std::thread::spawn(move || {
-        use std::os::windows::process::CommandExt;
-        let _ = std::process::Command::new(system_tool("taskkill.exe"))
-            .args(["/T", "/F", "/PID", &pid.to_string()])
-            .creation_flags(CREATE_NO_WINDOW)
-            .status();
-    });
-}
-
-/// Puts the helper in a job that closes with this process, however it
-/// ends, so no helper outlives the app and blocks an update (B-138).
-fn kill_with_app(child: &tokio::process::Child) {
-    use windows::core::PCWSTR;
-    use windows::Win32::Foundation::HANDLE;
-    use windows::Win32::System::JobObjects::{
-        AssignProcessToJobObject, CreateJobObjectW, JobObjectExtendedLimitInformation,
-        SetInformationJobObject, JOBOBJECT_EXTENDED_LIMIT_INFORMATION,
-        JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
-    };
-    // Held until the process ends, when the system closes it.
-    static JOB: OnceLock<isize> = OnceLock::new();
-    let job = *JOB.get_or_init(|| unsafe {
-        let Ok(job) = CreateJobObjectW(None, PCWSTR::null()) else {
-            return 0;
-        };
-        let mut info = JOBOBJECT_EXTENDED_LIMIT_INFORMATION::default();
-        info.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
-        let size = std::mem::size_of_val(&info) as u32;
-        let ptr: *const JOBOBJECT_EXTENDED_LIMIT_INFORMATION = &info;
-        let class = JobObjectExtendedLimitInformation;
-        if SetInformationJobObject(job, class, ptr.cast(), size).is_err() {
-            return 0;
-        }
-        job.0 as isize
-    });
-    let Some(raw) = child.raw_handle() else {
-        return;
-    };
-    if job != 0 {
-        let job = HANDLE(job as *mut std::ffi::c_void);
-        // `stop()` and the three-deaths rule still work if this fails.
-        let _ = unsafe { AssignProcessToJobObject(job, HANDLE(raw)) };
+impl Drop for WorkerExit {
+    fn drop(&mut self) {
+        let why = self.why.take().unwrap_or_else(|| {
+            if std::thread::panicking() {
+                "the desktop worker panicked".into()
+            } else {
+                "the desktop worker ended".into()
+            }
+        });
+        self.me.on_exit(self.gen, &why);
     }
 }
 
-/// One stdout line as text, its line ending gone. Bytes that are not UTF-8
-/// are replaced, so odd output from the helper cannot stop the reader.
-fn line_text(raw: &[u8]) -> String {
-    let raw = raw.strip_suffix(b"\n").unwrap_or(raw);
-    let raw = raw.strip_suffix(b"\r").unwrap_or(raw);
-    String::from_utf8_lossy(raw).into_owned()
-}
-
-/// Reads lines until the pipe closes, handing each to `on_line`.
-async fn read_lines<R: AsyncBufRead + Unpin>(mut reader: R, mut on_line: impl FnMut(&str)) {
-    let mut buf = Vec::new();
-    loop {
-        buf.clear();
-        match reader.read_until(b'\n', &mut buf).await {
-            Ok(n) if n > 0 => on_line(&line_text(&buf)),
-            _ => break,
-        }
-    }
-}
-
-/// One of our windows for the helper's registry. The handle comes from the
+/// One of our windows for the engine's registry. The handle comes from the
 /// cache when the window is registered, because `read` hops to the main
 /// thread (B-140).
 fn own_window(label: &str, cached: Option<isize>, read: impl FnOnce() -> u64) -> OwnWindow {
@@ -357,64 +236,47 @@ impl Desktop {
             "ready": s.ready && s.proc.is_some(),
             "disabled": s.disabled,
             "deaths": s.deaths.len(),
-            "pid": s.proc.as_ref().map(|p| p.pid),
+            // The engine runs in this process.
+            "pid": s.proc.as_ref().map(|_| std::process::id()),
+            "inProcess": true,
             "dpi": s.ready_info.as_ref().and_then(|r| r.get("dpi").cloned()),
             "watching": s.watching,
             "stderr": tail,
         })
     }
 
-    // ------------------------------------------------------------ process
+    // ------------------------------------------------------------ worker
 
-    fn on_line(self: &Arc<Self>, line: &str) {
-        match p::parse_line(line) {
-            Incoming::Ignored => {}
-            Incoming::Noise(l) => self.st().stderr_note(&format!("\n[stdout] {l}")),
-            Incoming::Ready(msg) => {
-                let tx = {
-                    let mut s = self.st();
-                    s.ready = true;
-                    s.ready_info = Some(msg.clone());
-                    s.start_tx.take()
-                };
-                if let Some(tx) = tx {
-                    let _ = tx.send(Ok(()));
-                }
-                let _ = self.events.send(msg);
-            }
-            Incoming::Fatal(e) => {
-                let tx = {
-                    let mut s = self.st();
-                    s.stderr_note(&format!("\n[fatal] {e}"));
-                    s.start_tx.take()
-                };
-                if let Some(tx) = tx {
-                    let _ = tx.send(Err(DesktopError::new(
-                        "HELPER_DOWN",
-                        format!("desktop helper failed to start: {e}"),
-                    )));
-                }
-                let _ = self.events.send(json!({ "event": "fatal", "error": e }));
-            }
-            Incoming::UserInput(msg) => {
-                let _ = self.events.send(msg.clone());
-                let hook = self.deps.read().ok().and_then(|d| d.on_user_input.clone());
-                if let Some(h) = hook {
-                    // A listener error must not take the reader down.
-                    let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| h(&msg)));
-                }
-            }
-            Incoming::Reply(id, result) => {
-                let tx = self.st().pending.remove(&id);
-                if let Some(tx) = tx {
-                    let _ = tx.send(result);
-                }
-            }
+    /// A `user-input` event from the engine's input watch.
+    fn on_event(&self, msg: Value) {
+        let _ = self.events.send(msg.clone());
+        let hook = self.deps.read().ok().and_then(|d| d.on_user_input.clone());
+        if let Some(h) = hook {
+            // A listener error must not take the watch down.
+            let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| h(&msg)));
         }
     }
 
-    fn on_exit(&self, gen: u64, code: Option<i32>) {
-        let code = code.map(|c| c.to_string()).unwrap_or_else(|| "null".into());
+    fn on_reply(&self, id: u64, out: host::Outcome) {
+        let mut s = self.st();
+        let tx = s.pending.remove(&id);
+        let r = match out {
+            host::Outcome::Reply(r) => r,
+            host::Outcome::Crashed(why) => {
+                s.stderr_note(&format!("\n[crash] {why}"));
+                Err(DesktopError::new(
+                    "HELPER_DOWN",
+                    format!("desktop helper crashed: {why}"),
+                ))
+            }
+        };
+        drop(s);
+        if let Some(tx) = tx {
+            let _ = tx.send(r);
+        }
+    }
+
+    fn on_exit(&self, gen: u64, why: &str) {
         let mut s = self.st();
         let ours = s.proc.as_ref().map(|p| p.gen) == Some(gen);
         let deliberate = s.stopping.remove(&gen);
@@ -424,133 +286,68 @@ impl Desktop {
             if !deliberate {
                 s.record_death();
             }
-            s.fail_all(
-                "HELPER_DOWN",
-                &format!("desktop helper exited (code {code})"),
-            );
-        }
-        if ours || s.proc.is_none() {
-            if let Some(tx) = s.start_tx.take() {
-                let tail: String = {
-                    let t = s.last_stderr.trim();
-                    let chars: Vec<char> = t.chars().collect();
-                    chars[chars.len().saturating_sub(400)..].iter().collect()
-                };
-                let _ = tx.send(Err(DesktopError::new(
-                    "HELPER_DOWN",
-                    format!("desktop helper exited during start (code {code}): {tail}"),
-                )));
-            }
+            s.fail_all("HELPER_DOWN", &format!("desktop helper exited ({why})"));
         }
     }
 
     async fn spawn_helper(self: &Arc<Self>) -> DResult<()> {
-        use tokio::process::Command;
-        let mut cmd = Command::new(powershell());
-        cmd.args([
-            "-NoLogo",
-            "-NoProfile",
-            "-NonInteractive",
-            "-ExecutionPolicy",
-            "Bypass",
-            "-Command",
-            "-",
-        ])
-        .stdin(std::process::Stdio::piped())
-        .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::piped())
-        .creation_flags(CREATE_NO_WINDOW)
-        .kill_on_drop(false);
-        let mut child = cmd.spawn().map_err(|e| {
-            DesktopError::new("HELPER_DOWN", format!("could not run powershell.exe: {e}"))
-        })?;
-        kill_with_app(&child);
-        let pid = child.id().unwrap_or(0);
-        let mut stdin = child
-            .stdin
-            .take()
-            .ok_or_else(|| DesktopError::new("HELPER_DOWN", "no stdin"))?;
-        let stdout = child
-            .stdout
-            .take()
-            .ok_or_else(|| DesktopError::new("HELPER_DOWN", "no stdout"))?;
-        let mut stderr = child
-            .stderr
-            .take()
-            .ok_or_else(|| DesktopError::new("HELPER_DOWN", "no stderr"))?;
-        let (tx, mut rx) = mpsc::unbounded_channel::<String>();
-        let (start_tx, start_rx) = oneshot::channel();
+        let (tx, rx) = std::sync::mpsc::channel::<host::Job>();
         let gen = {
             let mut s = self.st();
             s.gen += 1;
             let gen = s.gen;
-            s.proc = Some(Proc {
-                gen,
-                pid,
-                tx: tx.clone(),
-            });
+            s.proc = Some(Proc { gen, tx });
             s.ready = false;
             s.uia_warm = false;
             s.sent_own.clear();
             s.watching = false;
-            s.start_tx = Some(start_tx);
             gen
         };
-
-        tokio::spawn(async move {
-            while let Some(line) = rx.recv().await {
-                if stdin.write_all(line.as_bytes()).await.is_err() {
-                    break;
-                }
-                let _ = stdin.flush().await;
-            }
-        });
+        // What a fresh helper process started with: no refs, no watched
+        // windows, no saved cursor, no input watch.
+        host::reset();
         let me = self.clone();
-        tokio::spawn(async move {
-            read_lines(BufReader::new(stdout), |l| me.on_line(l)).await;
-        });
+        host::set_sink(Arc::new(move |v| me.on_event(v)));
         let me = self.clone();
-        tokio::spawn(async move {
-            let mut buf = [0u8; 2048];
-            while let Ok(n) = stderr.read(&mut buf).await {
-                if n == 0 {
-                    break;
-                }
-                me.st().stderr_note(&String::from_utf8_lossy(&buf[..n]));
-            }
-        });
-        let me = self.clone();
-        tokio::spawn(async move {
-            let code = child.wait().await.ok().and_then(|s| s.code());
-            me.on_exit(gen, code);
-        });
-
-        // One line, because `-Command -` runs stdin line by line. Requests
-        // are written only after ready, so powershell's reader has nothing
-        // buffered when host.cs takes over stdin.
-        let _ = tx.send(bootstrap_line(false));
-        match tokio::time::timeout(Duration::from_millis(p::START_TIMEOUT), start_rx).await {
-            Ok(Ok(r)) => r,
-            Ok(Err(_)) => Err(DesktopError::new(
+        let started = std::thread::Builder::new()
+            .name("desktop-worker".into())
+            .spawn(move || {
+                let mut exit = WorkerExit {
+                    me: me.clone(),
+                    gen,
+                    why: None,
+                };
+                let why = std::cell::RefCell::new(None);
+                host::serve(rx, |id, out| {
+                    if let host::Outcome::Crashed(w) = &out {
+                        *why.borrow_mut() = Some(w.clone());
+                    }
+                    me.on_reply(id, out);
+                });
+                exit.why = why.into_inner();
+                drop(exit);
+            });
+        if let Err(e) = started {
+            self.st().abandon(gen);
+            return Err(DesktopError::new(
                 "HELPER_DOWN",
-                "desktop helper exited during start",
-            )),
-            Err(_) => {
-                {
-                    let mut s = self.st();
-                    s.start_tx = None;
-                    s.abandon(gen);
-                }
-                kill_tree(pid);
-                Err(DesktopError::new(
-                    "HELPER_DOWN",
-                    format!(
-                        "desktop helper did not start within {}s",
-                        p::START_TIMEOUT / 1000
-                    ),
-                ))
-            }
+                format!("could not start the desktop worker: {e}"),
+            ));
         }
+        let ready = host::ready_event();
+        {
+            let mut s = self.st();
+            if s.proc.as_ref().map(|p| p.gen) != Some(gen) {
+                return Err(DesktopError::new(
+                    "HELPER_DOWN",
+                    "desktop helper exited during start",
+                ));
+            }
+            s.ready = true;
+            s.ready_info = Some(ready.clone());
+        }
+        let _ = self.events.send(ready);
+        Ok(())
     }
 
     /// Idempotent; also re-enables after three crashes.
@@ -583,11 +380,13 @@ impl Desktop {
         self.spawn_helper().await
     }
 
-    /// Kills the helper tree; call before quitting.
+    /// Ends the worker (its queue closes) and the input watch; call before
+    /// quitting.
     pub fn stop(&self) {
         let proc = {
             let mut s = self.st();
             s.ready = false;
+            s.watching = false;
             s.fail_all("HELPER_DOWN", "desktop helper stopped");
             let proc = s.proc.take();
             if let Some(p) = &proc {
@@ -595,9 +394,9 @@ impl Desktop {
             }
             proc
         };
-        if let Some(proc) = proc {
-            let _ = proc.tx.send("{\"op\":\"quit\"}\n".into());
-            kill_tree(proc.pid);
+        if proc.is_some() {
+            host::cancel_all();
+            host::stop_watch();
         }
     }
 
@@ -647,7 +446,7 @@ impl Desktop {
     }
 
     async fn send(&self, op: &str, args: &Value, timeout_ms: u64) -> DResult<Value> {
-        let (id, rx, gen, pid) = {
+        let (id, rx, gen) = {
             let mut s = self.st();
             if !s.ready || s.proc.is_none() {
                 return Err(DesktopError::new(
@@ -660,25 +459,38 @@ impl Desktop {
             let (tx, rx) = oneshot::channel();
             s.pending.insert(id, tx);
             let proc = s.proc.as_ref().expect("checked above");
-            let (gen, pid) = (proc.gen, proc.pid);
-            let _ = proc.tx.send(p::request_line(id, op, args, timeout_ms));
-            (id, rx, gen, pid)
+            let gen = proc.gen;
+            let args = if args.is_null() {
+                json!({})
+            } else {
+                args.clone()
+            };
+            let job = host::Job::new(id, op, args, timeout_ms);
+            if proc.tx.send(job).is_err() {
+                s.pending.remove(&id);
+                return Err(DesktopError::new(
+                    "HELPER_DOWN",
+                    "desktop helper is not running",
+                ));
+            }
+            (id, rx, gen)
         };
         let wait = Duration::from_millis(timeout_ms + p::REPLY_GRACE);
         match tokio::time::timeout(wait, rx).await {
             Ok(Ok(r)) => r,
             Ok(Err(_)) => Err(DesktopError::new("HELPER_DOWN", "desktop helper stopped")),
             Err(_) => {
-                // A helper that stops answering entirely is killed: the next
-                // call gets a fresh one.
+                // A worker that stops answering entirely is left behind: the
+                // next call gets a fresh one. Whatever it is still running may
+                // no longer act.
                 {
                     let mut s = self.st();
                     s.pending.remove(&id);
                     s.abandon(gen);
-                    // Nothing else waiting on this helper will hear from it.
+                    // Nothing else waiting on this worker will hear from it.
                     s.fail_all("HELPER_DOWN", "desktop helper stopped answering");
                 }
-                kill_tree(pid);
+                host::cancel_all();
                 Err(DesktopError::new(
                     "TIMEOUT",
                     format!(
@@ -737,12 +549,12 @@ impl Desktop {
 
     /// Stops every request the helper is running or has queued from sending
     /// any more input (B-050). It skips the queue, since the request it stops
-    /// is the one holding it; host.cs reads it on its own stdin thread.
+    /// is the one holding it.
     pub async fn cancel(&self) -> DResult<Value> {
         if !self.is_ready() {
             return Ok(json!({ "ok": true, "cancelled": 0 }));
         }
-        self.send("cancel", &json!({}), 1000).await
+        Ok(json!({ "ok": true, "cancelled": host::cancel_all() }))
     }
 
     fn uia_timeout(&self) -> u64 {
@@ -1327,8 +1139,8 @@ mod tests {
     }
 
     fn proc_of(gen: u64) -> Proc {
-        let (tx, _rx) = mpsc::unbounded_channel();
-        Proc { gen, pid: 1, tx }
+        let (tx, _rx) = std::sync::mpsc::channel();
+        Proc { gen, tx }
     }
 
     /// A helper that never says ready is a death like any other, and no
@@ -1359,21 +1171,9 @@ mod tests {
         assert!(s.proc.is_some() && s.ready);
     }
 
-    #[tokio::test]
-    async fn non_utf8_line_does_not_stop_reader() {
-        let input: &[u8] = b"{\"a\":1}\r\n\xff\xfe broken\n{\"b\":2}\nlast";
-        let mut lines = Vec::new();
-        read_lines(input, |l| lines.push(l.to_string())).await;
-        assert_eq!(lines.len(), 4, "{lines:?}");
-        assert_eq!(lines[0], "{\"a\":1}");
-        assert!(lines[1].contains('\u{fffd}'));
-        assert_eq!(lines[2], "{\"b\":2}");
-        assert_eq!(lines[3], "last");
-    }
-
     #[test]
     fn system_tools_use_absolute_paths() {
-        for name in ["taskkill.exe", "cmd.exe"] {
+        for name in ["cmd.exe"] {
             let p = system_tool(name);
             assert!(p.is_absolute(), "{p:?}");
             assert!(p.ends_with(format!("System32\\{name}")), "{p:?}");
@@ -1413,13 +1213,20 @@ mod tests {
         assert!(s.pending.is_empty());
     }
 
-    #[test]
-    fn bootstrap_carries_the_real_host_sources() {
-        let l = bootstrap_line(false);
-        assert!(l.starts_with("$AevalCs="));
-        assert!(HOST_CS.contains("namespace AevalDesktop"));
-        assert!(HOST_PS1.contains("[AevalDesktop.Host]::Run($AevalVersion)"));
-        assert_eq!(l.matches('\n').count(), 1);
+    /// The engine answers in process: no child, our own pid, and a reply
+    /// through the same queue every op takes.
+    #[tokio::test]
+    async fn the_engine_answers_in_process() {
+        let d = Desktop::new();
+        d.spawn_helper().await.unwrap();
+        assert!(d.is_ready());
+        assert_eq!(d.status()["pid"], json!(std::process::id()));
+        let pong = d.send("ping", &json!({}), p::OP_TIMEOUT).await.unwrap();
+        assert_eq!(pong["inProcess"], json!(true));
+        let bad = d.send("nope", &json!({}), p::OP_TIMEOUT).await;
+        assert_eq!(bad.unwrap_err().code, "BAD_ARGS");
+        d.stop();
+        assert!(!d.is_ready());
     }
 
     /// Attack on timing: `key tab` repeated 100 times outlasts the plain

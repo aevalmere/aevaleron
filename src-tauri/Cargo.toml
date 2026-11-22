@@ -122,6 +122,12 @@ windows-sys = { version = "0.59", features = [
   # ---- lane: llm ----
   # ---- end ----
   # ---- lane: agent ----
+  # The in-process desktop engine (src/desktop/host): window frames, the
+  # secure-desktop check, SAFEARRAY release, and the input watch's tick.
+  "Win32_Graphics_Dwm",
+  "Win32_System_Ole",
+  "Win32_System_StationsAndDesktops",
+  "Win32_System_SystemInformation",
   # ---- end ----
   # ---- lane: voice ----
   # The clipboard paste with save and restore, and the push-to-talk hook.
@@ -162,10 +168,18 @@ windows = { version = "0.62", features = [
   "Win32_Networking_WinHttp",
   # ---- end ----
   # ---- lane: agent ----
-  # The helper dies with the app: a kill-on-close job object (B-138).
+  # The in-process desktop engine (src/desktop/host): UI Automation through
+  # COM and VARIANTs, and Windows.Media.Ocr over a SoftwareBitmap.
+  "Foundation_Collections",
+  "Globalization",
+  "Graphics_Imaging",
+  "Media_Ocr",
+  "Storage_Streams",
   "Win32_Security",
-  "Win32_System_JobObjects",
+  "Win32_System_Com",
+  "Win32_System_Ole",
   "Win32_System_Threading",
+  "Win32_System_Variant",
   # ---- end ----
 ] }
 

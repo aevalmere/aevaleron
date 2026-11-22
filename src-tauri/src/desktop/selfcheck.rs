@@ -174,14 +174,18 @@ pub async fn run(desktop: &Arc<Desktop>, rep: &Report, o: &Options) {
     // ---------------------------------------------------------------- B2
     let t = Instant::now();
     let mut started = true;
-    if let Err(e) = async {
+    let mut pong = Value::Null;
+    match async {
         desktop.start().await?;
         desktop.ping().await
     }
     .await
     {
-        started = false;
-        rep.log("desktopError", err_text(&e));
+        Ok(p) => pong = p,
+        Err(e) => {
+            started = false;
+            rep.log("desktopError", err_text(&e));
+        }
     }
     let ready_ms = t.elapsed().as_millis();
     rep.must(
@@ -196,6 +200,12 @@ pub async fn run(desktop: &Arc<Desktop>, rep: &Report, o: &Options) {
     rep.log(
         "desktopDpi",
         desktop.status()["dpi"].to_string().trim_matches('"'),
+    );
+    // The engine runs inside the app: no powershell.exe helper.
+    rep.must(
+        "desktopInProcess",
+        pong["inProcess"] == json!(true) && pong["pid"] == json!(std::process::id()),
+        &format!("ping={pong}"),
     );
 
     let windows = list(&desktop.list_windows(false).await.unwrap_or(Value::Null));
@@ -540,6 +550,11 @@ async fn steps(desktop: &Arc<Desktop>, rep: &Report, win: &Value) {
     step!("restoreCursor", async {
         desktop.restore_cursor().await.map(|_| ())
     });
+    // Each op's last and slowest time inside the engine, and how often it
+    // ran, measured by the engine around the op itself.
+    if let Ok(p) = desktop.ping().await {
+        rep.log("desktopOpMs", p["opMs"].to_string());
+    }
 }
 
 /// Closing uses patterns only (Invoke on buttons, WM_CLOSE on the window),

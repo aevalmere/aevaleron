@@ -90,15 +90,6 @@ jobs:
           else
             gh release create "$TAG" --draft --verify-tag --title "Aevaleron ${TAG#v}" --notes-file notes.md
           fi
-      # The desktop helper ships prebuilt (DESK-12): compile host.cs once,
-      # bundle build/desktop-<hash>.dll, and pin its SHA-256 into the exe so
-      # a swapped file beside it is never loaded.
-      - name: Prebuild the desktop helper
-        run: |
-          node tools/build-desktop.js
-          sha=$(node -p "require('./lib/desktop/prebuilt.json').sha256")
-          if ! [[ "$sha" =~ ^[0-9a-f]{64}$ ]]; then echo "::error::no prebuilt sha: $sha"; exit 1; fi
-          echo "AEVAL_DESKTOP_DLL_SHA=$sha" >> "$GITHUB_ENV"
       # The bundler's own NSIS download (github.com release assets) answers
       # 504 for days at a time; the toolset is seeded from SourceForge and
       # the vendored DLL instead, with the hashes the bundler checks, so the
