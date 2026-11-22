@@ -1,0 +1,10 @@
+children seen:
+notepad.exe [6136] "notepad.exe" C:\Users\RUNNER~1\AppData\Local\Temp\aeval-desktop-check-8544-1a204cd9814.txt
+aevaleron.exe [7144] "D:\a\aevaleron\aevaleron\src-tauri\target\release\aevaleron.exe"
+notepad.exe [768] "notepad.exe" C:\Users\RUNNER~1\AppData\Local\Temp\aeval-agent-check-8544-1a204ce6c1d.txt
+powershell.exe [7304] "C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File C:\Users\RUNNER~1\AppData\Local\Temp\aeval-form-8544-1a204ce84d9.ps1
+notepad.exe [7552] "notepad.exe" C:\Users\RUNNER~1\AppData\Local\Temp\aeval-v2-8544-1a204cea8e0.txt
+powershell.exe [2812] "C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -NonInteractive -STA -ExecutionPolicy Bypass -File C:\Users\RUNNER~1\AppData\Local\Temp\aeval-rt-8544-1a204cec19f.ps1
+powershell.exe [1908] "powershell.exe" -NoProfile -NonInteractive -Command "Add-Type -AssemblyName System.Speech; $s = New-Object System.Speech.Synthesis.SpeechSynthesizer; $f = New-Object System.Speech.AudioFormat.SpeechAudioFormatInfo(16000, [System.Speech.AudioFormat.AudioBitsPerSample]::Sixteen, [System.Speech.AudioFormat.AudioChannel]::Mono); $s.SetOutputToWaveFile($env:AEVAL_WAKE_OUT, $f); $s.Speak($env:AEVAL_WAKE_TEXT); $s.Dispose()"
+powershell.exe [8628] "powershell.exe" -NoProfile -NonInteractive -Command "Add-Type -AssemblyName System.Speech; $s = New-Object System.Speech.Synthesis.SpeechSynthesizer; $f = New-Object System.Speech.AudioFormat.SpeechAudioFormatInfo(16000, [System.Speech.AudioFormat.AudioBitsPerSample]::Sixteen, [System.Speech.AudioFormat.AudioChannel]::Mono); $s.SetOutputToWaveFile($env:AEVAL_WAKE_OUT, $f); $s.Speak($env:AEVAL_WAKE_TEXT); $s.Dispose()"
+unexpected:
