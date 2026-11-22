@@ -1,0 +1,138 @@
+{
+  "workflow": "rust",
+  "workflow_name": "rust",
+  "run_id": 45041909944,
+  "run_attempt": 1,
+  "run_url": "https://github.com/aevalmere/aevaleron/actions/runs/45041909944",
+  "event": "push",
+  "sha": "a795bec794da32ddd59f961922cbdd59832c6495",
+  "ref": "rust/native-ui",
+  "ref_dir": "rust-native-ui",
+  "conclusion": "success",
+  "failed": [],
+  "finished": "2026-11-22T16:33:49Z",
+  "error_lines": 274,
+  "metrics": {
+    "exeKB": "28387",
+    "installerKB": "8525",
+    "upgrade": "ok:from-1.1.1",
+    "processCount": "1",
+    "idlePrivateMB": "38.9",
+    "idleWorkingSetMB": "130.1",
+    "idleCpuPct": "0.23",
+    "idleThreads": "18",
+    "secondLaunchMs": "19"
+  },
+  "steps": [
+    {
+      "name": "Checkout",
+      "outcome": "success",
+      "log": ""
+    },
+    {
+      "name": "Node",
+      "outcome": "success",
+      "log": ""
+    },
+    {
+      "name": "Rust toolchain",
+      "outcome": "success",
+      "log": ""
+    },
+    {
+      "name": "Voice build flags",
+      "outcome": "success",
+      "log": ""
+    },
+    {
+      "name": "Cache cargo",
+      "outcome": "success",
+      "log": ""
+    },
+    {
+      "name": "Gate helper",
+      "outcome": "success",
+      "log": ""
+    },
+    {
+      "name": "Prebuild desktop helper",
+      "outcome": "success",
+      "log": "prebuild.log"
+    },
+    {
+      "name": "Format",
+      "outcome": "success",
+      "log": ""
+    },
+    {
+      "name": "Format patch",
+      "outcome": "skipped",
+      "log": ""
+    },
+    {
+      "name": "Clippy",
+      "outcome": "success",
+      "log": "clippy.log"
+    },
+    {
+      "name": "Unit tests",
+      "outcome": "success",
+      "log": "test.log"
+    },
+    {
+      "name": "Release build",
+      "outcome": "success",
+      "log": "build.log"
+    },
+    {
+      "name": "Restore NSIS toolset",
+      "outcome": "success",
+      "log": ""
+    },
+    {
+      "name": "Seed NSIS toolset",
+      "outcome": "success",
+      "log": "nsis.log"
+    },
+    {
+      "name": "Save NSIS toolset",
+      "outcome": "skipped",
+      "log": ""
+    },
+    {
+      "name": "Build installer",
+      "outcome": "success",
+      "log": "installer.log"
+    },
+    {
+      "name": "Smoke",
+      "outcome": "success",
+      "log": "smoke.log"
+    },
+    {
+      "name": "Capture check",
+      "outcome": "success",
+      "log": "capture.log"
+    },
+    {
+      "name": "Desktop selfcheck",
+      "outcome": "success",
+      "log": "desktop.log"
+    },
+    {
+      "name": "Install check",
+      "outcome": "success",
+      "log": "install.log"
+    },
+    {
+      "name": "Upload installer",
+      "outcome": "success",
+      "log": ""
+    },
+    {
+      "name": "Upload exe",
+      "outcome": "success",
+      "log": ""
+    }
+  ]
+}
