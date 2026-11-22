@@ -1,0 +1,16 @@
+[SHOT] bar overlay-light.png 600x112
+[SHOT] bar overlay-dark.png 600x112
+[SHOT] answer output-1-light.png 420x198
+[SHOT] answer output-1-dark.png 420x198
+[SHOT] settings settings-light.png 660x560
+[SHOT] settings settings-dark.png 660x560
+[SHOT] history history-light.png 460x560
+[SHOT] history history-dark.png 460x560
+[SHOT] done written=4 failed=0 
+--- stderr ---
+whisper: weights memory-mapped: 59.0 MiB in CPU_Mapped
+whisper@637: sched buffer CPU -> 21.5 MB
+whisper@637: sched buffer CPU -> 21.5 MB
+whisper@637: sched buffer CPU -> 21.5 MB
+whisper@637: sched buffer CPU -> 21.5 MB
+--- exit code: 0

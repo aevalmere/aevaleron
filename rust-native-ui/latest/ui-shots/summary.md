@@ -1,12 +1,12 @@
 # ui-shots: success
 
 - Workflow: rust
-- Run: [45050024359](https://github.com/aevalmere/aevaleron/actions/runs/45050024359), attempt 1, on push
-- Commit: d07b3b940cf0405014a7bae5c2fb337b7423c9dd
+- Run: [45052287103](https://github.com/aevalmere/aevaleron/actions/runs/45052287103), attempt 1, on push
+- Commit: bdecdcd7c8d3b2dab344f1ad9f00505452143b43
 - Ref: rust/native-ui
 - Conclusion: **success**
-- Finished: 2026-11-22T17:49:34Z
-- Screenshots: artifact native-ui-shots, and https://github.com/aevalmere/aevaleron/tree/shots/native-ui/rust/native-ui/d07b3b940cf0405014a7bae5c2fb337b7423c9dd (/ in the ref becomes -)
+- Finished: 2026-11-22T18:17:59Z
+- Screenshots: artifact native-ui-shots, and https://github.com/aevalmere/aevaleron/tree/shots/native-ui/rust/native-ui/bdecdcd7c8d3b2dab344f1ad9f00505452143b43 (/ in the ref becomes -)
 
 | Step | Outcome | Log |
 |---|---|---|
