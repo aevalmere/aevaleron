@@ -1,12 +1,12 @@
 # rust: failure
 
 - Workflow: rust
-- Run: [44979611594](https://github.com/aevalmere/aevaleron/actions/runs/44979611594), attempt 1, on push
-- Commit: 091937f15080aeeba585e51874332d88725eb005
+- Run: [44980855227](https://github.com/aevalmere/aevaleron/actions/runs/44980855227), attempt 1, on push
+- Commit: ffd37248b5059080ca2295534b3368a5293f8bd2
 - Ref: rust/cli-providers
 - Conclusion: **failure**
-- Failed: Format, Capture check, Desktop selfcheck
-- Finished: 2026-11-22T03:27:46Z
+- Failed: Smoke
+- Finished: 2026-11-22T03:57:13Z
 
 | Step | Outcome | Log |
 |---|---|---|
@@ -17,17 +17,17 @@
 | Cache cargo | success |  |
 | Gate helper | success |  |
 | Prebuild desktop helper | success | [prebuild.log](prebuild.log) |
-| Format | failure | [fmt.log](fmt.log) |
-| Format patch | success | [fmt.patch](fmt.patch) |
+| Format | success |  |
+| Format patch | skipped |  |
 | Clippy | success | [clippy.log](clippy.log) |
 | Unit tests | success | [test.log](test.log) |
-| Restore NSIS toolset | skipped |  |
-| Seed NSIS toolset | skipped |  |
-| Save NSIS toolset | skipped |  |
-| Build installer | skipped |  |
-| Smoke | skipped |  |
-| Capture check | failure | [capture.log](capture.log) |
-| Desktop selfcheck | failure | [desktop.log](desktop.log) |
+| Restore NSIS toolset | success |  |
+| Seed NSIS toolset | success | [nsis.log](nsis.log) |
+| Save NSIS toolset | success |  |
+| Build installer | success | [build.log](build.log) |
+| Smoke | failure | [smoke.log](smoke.log) |
+| Capture check | success | [capture.log](capture.log) |
+| Desktop selfcheck | success | [desktop.log](desktop.log) |
 | Upload installer | skipped |  |
 
-errors.txt: 150 error and warning lines from the logs.
+errors.txt: 1 error and warning lines from the logs.
