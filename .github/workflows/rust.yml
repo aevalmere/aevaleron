@@ -96,18 +96,32 @@ jobs:
             exit $code
           }
           '@ | Set-Content (Join-Path $env:RUNNER_TEMP 'gate.ps1')
-
-      # The desktop helper ships prebuilt (DESK-12): compile host.cs once,
-      # ship build/desktop-<hash>.dll in desktop\ beside the exe, and pin its
-      # SHA-256 into the exe.
-      - name: Prebuild desktop helper
-        id: prebuild
-        run: |
-          & "$env:RUNNER_TEMP\gate.ps1" prebuild "node ../tools/build-desktop.js"
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          $sha = (Get-Content ../lib/desktop/prebuilt.json -Raw | ConvertFrom-Json).sha256
-          if ($sha -notmatch '^[0-9a-f]{64}$') { throw "no prebuilt sha: $sha" }
-          "AEVAL_DESKTOP_DLL_SHA=$sha" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          # Waits for the app like WaitForExit, polling its child processes
+          # every second. The desktop engine runs in process, so the old
+          # helper (powershell.exe -Command -) or any child not listed here
+          # fails the step. Answers whether the app exited in time.
+          @'
+          param($Proc, [int]$Ms, [string]$Report)
+          $allowed = @('notepad.exe', 'powershell.exe', 'conhost.exe', 'aevaleron.exe', 'cmd.exe', 'werfault.exe', 'explorer.exe')
+          $seen = [ordered]@{}
+          $bad = New-Object System.Collections.Generic.List[string]
+          $end = (Get-Date).AddMilliseconds($Ms)
+          while (-not $Proc.HasExited -and (Get-Date) -lt $end) {
+            foreach ($c in @(Get-CimInstance Win32_Process -Filter "ParentProcessId=$($Proc.Id)" -ErrorAction SilentlyContinue)) {
+              $key = "$($c.ProcessId)"
+              if ($seen.Contains($key)) { continue }
+              $line = "$($c.Name) [$($c.ProcessId)] $($c.CommandLine)"
+              $seen[$key] = $line
+              $name = "$($c.Name)".ToLower()
+              $helper = $name -eq 'powershell.exe' -and "$($c.CommandLine)" -match '-Command\s+-(\s|$)'
+              if ($helper -or $allowed -notcontains $name) { $bad.Add($line) }
+            }
+            Start-Sleep -Milliseconds 1000
+          }
+          @('children seen:') + @($seen.Values) + @('unexpected:') + @($bad) | Set-Content $Report
+          foreach ($b in $bad) { Write-Host "::error title=unexpected child process::$($b.Replace('%', '%25'))" }
+          $Proc.HasExited
+          '@ | Set-Content (Join-Path $env:RUNNER_TEMP 'children.ps1')
 
       - name: Format
         id: fmt
@@ -148,19 +162,14 @@ jobs:
         run: '& "$env:RUNNER_TEMP\gate.ps1" test "cargo test --color never"'
 
       # cargo's bin is target\release\aevaleron.exe (the package name); the
-      # installer names it Aevaleron.exe. The helper DLL goes into desktop\
-      # beside it, where an installed copy has it (desktop/client.rs), so the
-      # checks below run the exe as installed.
+      # installer names it Aevaleron.exe. Nothing ships beside it: the
+      # desktop helper runs in process.
       - name: Release build
         id: build
         if: success() || failure()
         run: |
           & "$env:RUNNER_TEMP\gate.ps1" build "cargo build --release --color never"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          $desk = 'target\release\desktop'
-          if (Test-Path $desk) { Remove-Item -Recurse -Force $desk }
-          New-Item -ItemType Directory -Force $desk | Out-Null
-          Copy-Item ..\build\desktop-*.dll $desk
           $exe = Get-Item target\release\aevaleron.exe
           "[METRIC] exeKB=$([Math]::Round($exe.Length / 1KB))" | Tee-Object -Append -FilePath "$env:RUNNER_TEMP\ci-logs\build.log"
 
@@ -234,8 +243,10 @@ jobs:
           $err = Join-Path $env:RUNNER_TEMP 'smoke.err'
           $p = Start-Process $exe -PassThru -RedirectStandardOutput $out -RedirectStandardError $err
           $null = $p.Handle # keeps ExitCode readable once the process is gone
-          $timedOut = -not $p.WaitForExit(360000)
+          $kids = Join-Path $env:RUNNER_TEMP 'ci-logs\smoke-children.log'
+          $timedOut = -not (& "$env:RUNNER_TEMP\children.ps1" $p 360000 $kids)
           if ($timedOut) { $p.Kill(); Write-Output '::error::smoke timed out after 360 s' }
+          $p.WaitForExit()
           $code = if ($timedOut) { 'timeout' } else { $p.ExitCode }
           @(Get-Content $out -ErrorAction SilentlyContinue) + @('--- stderr ---') + @(Get-Content $err -ErrorAction SilentlyContinue) + @("--- exit code: $code") | Add-Content $log
           $gate = @(node ../tools/smoke-gate.mjs $out 2>&1)
@@ -248,7 +259,11 @@ jobs:
           # Every [SMOKE] line as annotations, readable without a token (a
           # panic in host::setup or a hook shows in the stderr tail).
           $text = (Get-Content $out -Raw -ErrorAction SilentlyContinue) + ''
-          $ok = -not $timedOut -and $code -eq 0 -and $gateCode -eq 0
+          # Select-Object has no -SkipWhile: the lines after 'unexpected:'.
+          $kidLines = @(Get-Content $kids -ErrorAction SilentlyContinue)
+          $cut = [Array]::IndexOf($kidLines, 'unexpected:')
+          $strays = if ($cut -ge 0) { @($kidLines | Select-Object -Skip ($cut + 1)) } else { @('no child report') }
+          $ok = -not $timedOut -and $code -eq 0 -and $gateCode -eq 0 -and $strays.Count -eq 0
           $lines = ($text -split "`n" | Where-Object { $_ -match '^\[SMOKE\]' }) -join "`n"
           if (-not $ok) { $lines += "`n--- stderr ---`n" + ((Get-Content $err -Tail 40 -ErrorAction SilentlyContinue) -join "`n") }
           $lines = $lines.Replace("`r", '')
@@ -258,7 +273,8 @@ jobs:
             $c = $lines.Substring([Math]::Min($lines.Length, $i * 4000), [Math]::Max(0, [Math]::Min(4000, $lines.Length - $i * 4000)))
             Write-Output "::$level title=smoke $($i + 1) of $n::$($c.Replace('%', '%25').Replace("`n", '%0A'))"
           }
-          if (-not $ok) { Add-Content $log "smoke failed: exit code $code, gate exit code $gateCode"; exit 1 }
+          Get-Content $kids -ErrorAction SilentlyContinue | Add-Content $log
+          if (-not $ok) { Add-Content $log "smoke failed: exit code $code, gate exit code $gateCode, unexpected children $($strays.Count)"; exit 1 }
 
       # Split (c): capture fidelity and exclusion on the runner's real screen,
       # then the desktop selfcheck (Notepad included).
@@ -269,7 +285,6 @@ jobs:
           $log = Join-Path $env:RUNNER_TEMP 'ci-logs\capture.log'
           $exe = 'target\release\aevaleron.exe'
           if (-not (Test-Path $exe)) { "missing $exe" | Set-Content $log; throw "missing $exe" }
-          if (-not (Test-Path 'target\release\desktop')) { Write-Output '::warning::no desktop/ folder beside the exe' }
           $scratch = Join-Path $env:RUNNER_TEMP 'aeval-capture'
           New-Item -ItemType Directory -Force $scratch | Out-Null
           $env:AEVAL_CAPTURE_CHECK = '1'
@@ -312,7 +327,8 @@ jobs:
           $out = Join-Path $env:RUNNER_TEMP 'desktop.out'
           $errFile = Join-Path $env:RUNNER_TEMP 'desktop.err'
           $p = Start-Process $exe -PassThru -RedirectStandardOutput $out -RedirectStandardError $errFile
-          $timedOut = -not $p.WaitForExit(240000)
+          $kids = Join-Path $env:RUNNER_TEMP 'ci-logs\desktop-children.log'
+          $timedOut = -not (& "$env:RUNNER_TEMP\children.ps1" $p 240000 $kids)
           if ($timedOut) { $p.Kill(); Write-Output '::error::desktop selfcheck timed out' }
           $text = (Get-Content $out -Raw -ErrorAction SilentlyContinue) + ''
           $errText = (Get-Content $errFile -Tail 40 -ErrorAction SilentlyContinue) -join "`n"
@@ -320,7 +336,11 @@ jobs:
           # stdout and the whole of stderr, for the ci-logs branch.
           @($text, '--- stderr ---') + @(Get-Content $errFile -ErrorAction SilentlyContinue) | Set-Content $log
           if ($timedOut) { Add-Content $log 'desktop selfcheck timed out after 240 s' }
-          $ok = $text -match '\[DESKTOP\] done'
+          # Select-Object has no -SkipWhile: the lines after 'unexpected:'.
+          $kidLines = @(Get-Content $kids -ErrorAction SilentlyContinue)
+          $cut = [Array]::IndexOf($kidLines, 'unexpected:')
+          $strays = if ($cut -ge 0) { @($kidLines | Select-Object -Skip ($cut + 1)) } else { @('no child report') }
+          $ok = $text -match '\[DESKTOP\] done' -and $strays.Count -eq 0
           $lines = ($text -split "`n" | Where-Object { $_ -match '^\[DESKTOP\]' -and $_ -notmatch 'typeReadText|editorCandidates' }) -join "`n"
           if (-not $ok) { $lines += "`n--- stderr ---`n" + $errText }
           # 4096 characters per annotation, 10 per level per step.
@@ -331,7 +351,8 @@ jobs:
             $c = $lines.Substring([Math]::Min($lines.Length, $i * 4000), [Math]::Max(0, [Math]::Min(4000, $lines.Length - $i * 4000)))
             Write-Output "::$level title=desktop selfcheck $($i + 1) of $n::$($c.Replace('%', '%25').Replace("`n", '%0A'))"
           }
-          if (-not $ok) { Add-Content $log 'desktop selfcheck failed: no "[DESKTOP] done" line'; exit 1 }
+          Get-Content $kids -ErrorAction SilentlyContinue | Add-Content $log
+          if (-not $ok) { Add-Content $log "desktop selfcheck failed: [DESKTOP] done seen=$($text -match '\[DESKTOP\] done'), unexpected children $($strays.Count)"; exit 1 }
 
       # The installer on this runner: files, shortcuts, the uninstall entry,
       # one process and no WebView2, idle memory and CPU, single instance, an
@@ -390,7 +411,6 @@ jobs:
             Voice build flags|${{ steps.voiceflags.outcome }}
             Cache cargo|${{ steps.cache.outcome }}
             Gate helper|${{ steps.helper.outcome }}
-            Prebuild desktop helper|${{ steps.prebuild.outcome }}|prebuild.log
             Format|${{ steps.fmt.outcome }}|fmt.log
             Format patch|${{ steps.fmtpatch.outcome }}|fmt.patch
             Clippy|${{ steps.clippy.outcome }}|clippy.log

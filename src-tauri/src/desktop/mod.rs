@@ -1,5 +1,6 @@
-//! Desktop perception and action through the C# helper sidecar (PARITY
-//! DESK-*), plus the wiring for the rest of split (c): the IPC rows for
+//! Desktop perception and action (PARITY DESK-*), through the in-process
+//! engine in `host` (a port of the C# helper that ran in powershell.exe),
+//! plus the wiring for the rest of split (c): the IPC rows for
 //! region, buddy and glass, and the CI checks.
 //!
 //! Callers use the one shared client: `desktop::client().list_windows(..)`.
@@ -9,6 +10,7 @@
 pub mod channels;
 pub mod checks;
 pub mod client;
+mod host;
 pub mod protocol;
 pub mod scoring;
 pub mod selfcheck;
@@ -79,8 +81,7 @@ pub fn helper_at_boot() -> Option<bool> {
     HELPER_AT_BOOT.get().copied()
 }
 
-/// Called on quit: the helper tree must not outlive the app (it would hold
-/// files under the install folder and block an update).
+/// Called on quit: the worker and the input hooks end with the app.
 pub fn shutdown() {
     client().stop();
 }

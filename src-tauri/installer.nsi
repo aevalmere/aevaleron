@@ -5,9 +5,9 @@
 ;
 ; - per user, in %LOCALAPPDATA%\Aevaleron (or where the last install went,
 ;   HKCU\Software\darkelights\Aevaleron), no admin prompt;
-; - Aevaleron.exe (cargo builds aevaleron.exe; it is renamed here) and the
-;   prebuilt desktop helper in desktop\ beside it (desktop/client.rs looks
-;   there);
+; - Aevaleron.exe (cargo builds aevaleron.exe; it is renamed here) and
+;   nothing else: the desktop helper runs in process now, and the desktop\
+;   folder an older install kept is removed;
 ; - the uninstall entry HKCU\...\Uninstall\Aevaleron;
 ; - Start menu and desktop shortcuts carrying the AUMID the toasts use
 ;   (notify.rs AUMID);
@@ -22,7 +22,7 @@
 ;   touched.
 ;
 ;   makensis /DVERSION=1.1.1 [/DVERSIONWITHBUILD=1.1.1.0] [/DSRCEXE=...]
-;            [/DDESKTOPDIR=...] [/DOUTFILE=...] src-tauri\installer.nsi
+;            [/DOUTFILE=...] src-tauri\installer.nsi
 ;
 ; Relative paths are relative to this file's folder (makensis changes into
 ; it). The output folder has to exist.
@@ -50,9 +50,6 @@ SetCompressor /SOLID lzma
 !endif
 !ifndef SRCEXE
   !define SRCEXE "target\release\aevaleron.exe"
-!endif
-!ifndef DESKTOPDIR
-  !define DESKTOPDIR "..\build"
 !endif
 !ifndef OUTFILE
   !define OUTFILE "target\release\bundle\nsis\Aevaleron_${VERSION}_x64-setup.exe"
@@ -323,15 +320,9 @@ Section Install
 
   File "/oname=${MAINBINARY}" "${SRCEXE}"
 
-  ; The helper's file name carries its source hash: older ones go, and one
-  ; still loaded by a lingering helper process is left as it is.
-  CreateDirectory "$INSTDIR\desktop"
+  ; The prebuilt helper DLL older installs kept; the helper is in process now.
   Delete "$INSTDIR\desktop\desktop-*.dll"
-  SetOutPath "$INSTDIR\desktop"
-  SetOverwrite try
-  File "${DESKTOPDIR}\desktop-*.dll"
-  SetOverwrite on
-  SetOutPath $INSTDIR
+  RMDir "$INSTDIR\desktop"
 
   !insertmacro RemoveWebViewData
 

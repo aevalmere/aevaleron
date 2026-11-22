@@ -127,8 +127,8 @@ function Check-Installed([string]$phase) {
   $fileVersion = if (Test-Path $AppExe) { (Get-Item $AppExe).VersionInfo.ProductVersion } else { '' }
   # Windows keeps four parts, so 1.1.1 can read as 1.1.1.0.
   Check "$phase.exeVersion" ($fileVersion -in $Version, "$Version.0") "exe=$fileVersion want=$Version"
-  $dlls = @(Get-ChildItem $DesktopDir -Filter 'desktop-*.dll' -ErrorAction SilentlyContinue)
-  Check "$phase.desktopHelper" ($dlls.Count -eq 1) "desktop\ holds $($dlls.Count) helper dll: $($dlls.Name -join ', ')"
+  # The helper runs in process: no desktop\ folder, even after an upgrade.
+  Check "$phase.noHelperDll" (-not (Test-Path $DesktopDir)) "desktop\ present: $(Test-Path $DesktopDir)"
   Check "$phase.uninstaller" (Test-Path $Uninstaller) $Uninstaller
   Check "$phase.startMenuShortcut" (Test-Path $StartMenuLnk) $StartMenuLnk
   Check "$phase.desktopShortcut" (Test-Path $DesktopLnk) $DesktopLnk
