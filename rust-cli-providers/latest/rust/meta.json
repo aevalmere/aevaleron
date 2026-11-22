@@ -1,19 +1,19 @@
 {
   "workflow": "rust",
   "workflow_name": "rust",
-  "run_id": 44979419298,
+  "run_id": 44979550594,
   "run_attempt": 1,
-  "run_url": "https://github.com/aevalmere/aevaleron/actions/runs/44979419298",
+  "run_url": "https://github.com/aevalmere/aevaleron/actions/runs/44979550594",
   "event": "push",
-  "sha": "6dddc4a9ae233e0a88003d826c081314085f07eb",
+  "sha": "2f6be157bdae8100c5af86ff05e66c2cc3b6a44b",
   "ref": "rust/cli-providers",
   "ref_dir": "rust-cli-providers",
   "conclusion": "cancelled",
   "failed": [
     "Format"
   ],
-  "finished": "2026-11-22T03:12:20Z",
-  "error_lines": 143,
+  "finished": "2026-11-22T03:13:09Z",
+  "error_lines": 150,
   "steps": [
     {
       "name": "Checkout",

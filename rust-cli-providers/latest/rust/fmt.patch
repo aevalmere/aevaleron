@@ -106,10 +106,23 @@ index 31f3573..534fd1a 100644
          let max = [r#"{"type":"result","subtype":"error_max_turns","is_error":true}"#];
          let ev = run(Provider::ClaudeCli, &max);
 diff --git a/src-tauri/src/llm/cli/run.rs b/src-tauri/src/llm/cli/run.rs
-index 612eced..85ebb61 100644
+index 4940b64..459acd8 100644
 --- a/src-tauri/src/llm/cli/run.rs
 +++ b/src-tauri/src/llm/cli/run.rs
-@@ -533,7 +533,13 @@ pub fn classify(p: Provider, exit: Option<i32>, parts: &[&str]) -> ApiError {
+@@ -442,7 +442,11 @@ async fn pump(provider: Provider, run: &mut Running, tx: &UnboundedSender<Msg>)
+     }
+     let notes = decoder.notes.join("\n");
+     let msg = match state.failed {
+-        Some(f) => Msg::Fail(classify(provider, exit, &[f.as_str(), notes.as_str(), said.as_str()])),
++        Some(f) => Msg::Fail(classify(
++            provider,
++            exit,
++            &[f.as_str(), notes.as_str(), said.as_str()],
++        )),
+         None if exit == Some(0) => Msg::End,
+         None => Msg::Fail(classify(provider, exit, &[notes.as_str(), said.as_str()])),
+     };
+@@ -536,7 +540,13 @@ pub fn classify(p: Provider, exit: Option<i32>, parts: &[&str]) -> ApiError {
      let model_gone = all.contains("model")
          && has(
              &all,
@@ -124,7 +137,7 @@ index 612eced..85ebb61 100644
          );
      if model_gone {
          return ApiError::http(404, said);
-@@ -621,9 +627,9 @@ fn said_signed_in(text: &str) -> Option<bool> {
+@@ -624,9 +634,9 @@ fn said_signed_in(text: &str) -> Option<bool> {
  #[cfg(test)]
  mod tests {
      use super::*;
@@ -135,7 +148,7 @@ index 612eced..85ebb61 100644
      use crate::llm::sse::Meter;
      use crate::llm::wire::HttpRequest;
      use async_trait::async_trait;
-@@ -749,7 +755,10 @@ mod tests {
+@@ -752,7 +762,10 @@ mod tests {
          assert_eq!(image["source"]["data"], "QUJD");
          let last = content.last().unwrap()["text"].as_str().unwrap();
          assert!(last.ends_with("what is this?"));
@@ -147,7 +160,7 @@ index 612eced..85ebb61 100644
          assert!(has_arg(&r, "--tools") && has_arg(&r, "--no-session-persistence"));
          assert!(r["argv"].as_array().unwrap().iter().any(|a| a
              .as_str()
-@@ -819,7 +828,10 @@ mod tests {
+@@ -822,7 +835,10 @@ mod tests {
          assert_eq!(e.message, "Error: model claude-x not found");
          assert!(classify(c, Some(1), &["getaddrinfo ENOTFOUND api.anthropic.com"]).is_network());
          let e = classify(c, Some(3), &["", ""]);
@@ -159,7 +172,7 @@ index 612eced..85ebb61 100644
          assert_eq!(said_signed_in("Logged in using ChatGPT"), Some(true));
          assert_eq!(said_signed_in("Not logged in"), Some(false));
          assert_eq!(said_signed_in("?"), None);
-@@ -900,7 +912,10 @@ mod tests {
+@@ -903,7 +919,10 @@ mod tests {
              return;
          };
          let path = PathBuf::from(&script);

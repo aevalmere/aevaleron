@@ -1,0 +1,156 @@
+== fmt.log ==
+Diff in \\?\D:\a\aevaleron\aevaleron\src-tauri\src\llm\cli\args.rs:295:
+         let tools = a.iter().position(|x| x == "--tools").unwrap();
+         assert_eq!(a[tools + 1], "");
+         assert!(a.get(tools + 2).is_some_and(|x| x.starts_with("--")));
+-        for want in ["-p", "--no-session-persistence", "--model=sonnet", "--safe-mode"] {
++        for want in [
++            "-p",
++            "--no-session-persistence",
++            "--model=sonnet",
++            "--safe-mode",
++        ] {
+             assert!(a.iter().any(|x| x == want), "{want}");
+         }
+         assert!(a.iter().any(|x| x == "--system-prompt=Be brief."));
+Diff in \\?\D:\a\aevaleron\aevaleron\src-tauri\src\llm\cli\args.rs:330:
+         assert_eq!(std::fs::read(&p.files[0]).unwrap(), b"ABC");
+         let image = format!("--image={}", d.join("t2-1.jpg").display());
+         assert_eq!(a.last(), Some(&image));
+-        assert!(a.windows(2).any(|w| w[0] == "--sandbox" && w[1] == "read-only"));
+-        assert!(a.windows(2).any(|w| w[0] == "--disable" && w[1] == "shell_tool"));
++        assert!(a
++            .windows(2)
++            .any(|w| w[0] == "--sandbox" && w[1] == "read-only"));
++        assert!(a
++            .windows(2)
++            .any(|w| w[0] == "--disable" && w[1] == "shell_tool"));
+         let text = String::from_utf8(p.stdin).unwrap();
+         assert!(text.starts_with("<instructions>\nBe brief.\n</instructions>"));
+         assert!(text.ends_with("(Image 1 is attached.)\n\nwhat is this?"));
+Diff in \\?\D:\a\aevaleron\aevaleron\src-tauri\src\llm\cli\find.rs:113:
+
+Diff in \\?\D:\a\aevaleron\aevaleron\src-tauri\src\llm\cli\input.rs:202:
+         assert_eq!(r.system, "Be brief.");
+         assert_eq!(r.parts.len(), 3);
+         let img = r.images().next().unwrap();
+-        assert_eq!((img.mime.as_str(), img.base64.as_str()), ("image/png", "QUJD"));
++        assert_eq!(
++            (img.mime.as_str(), img.base64.as_str()),
++            ("image/png", "QUJD")
++        );
+         assert_eq!(img.ext(), "png");
+         let text = text_with(&r, |i| format!("@shot-{i}.png"));
+         assert_eq!(text, "Exact text.\n\n@shot-1.png\n\nwhat is this?");
+Diff in \\?\D:\a\aevaleron\aevaleron\src-tauri\src\llm\cli\mod.rs:150:
+         .find(|w| {
+             w.contains('.')
+                 && w.starts_with(|c: char| c.is_ascii_digit())
+-                && w.chars().all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '-')
++                && w.chars()
++                    .all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '-')
+         })
+         .map(str::to_string)
+ }
+Diff in \\?\D:\a\aevaleron\aevaleron\src-tauri\src\llm\cli\parse.rs:99:
+                 let text = e["delta"]["text"].as_str();
+                 if e["type"] == "content_block_delta" && e["delta"]["type"] == "text_delta" {
+                     self.saw_delta = true;
+-                    return text.map(|t| vec![Event::Text(t.to_string())]).unwrap_or_default();
++                    return text
++                        .map(|t| vec![Event::Text(t.to_string())])
++                        .unwrap_or_default();
+
+Diff in \\?\D:\a\aevaleron\aevaleron\src-tauri\src\llm\cli\parse.rs:308:
+             Event::Failed(s) => Some(s.clone()),
+             _ => None,
+         });
+-        assert_eq!(failed.as_deref(), Some("Invalid API key · Please run /login"));
++        assert_eq!(
++            failed.as_deref(),
++            Some("Invalid API key · Please run /login")
++        );
+         assert_eq!(d.notes, ["authentication_failed"]);
+         let max = [r#"{"type":"result","subtype":"error_max_turns","is_error":true}"#];
+         let ev = run(Provider::ClaudeCli, &max);
+Diff in \\?\D:\a\aevaleron\aevaleron\src-tauri\src\llm\cli\run.rs:442:
+     }
+     let notes = decoder.notes.join("\n");
+     let msg = match state.failed {
+-        Some(f) => Msg::Fail(classify(provider, exit, &[f.as_str(), notes.as_str(), said.as_str()])),
++        Some(f) => Msg::Fail(classify(
++            provider,
++            exit,
++            &[f.as_str(), notes.as_str(), said.as_str()],
++        )),
+         None if exit == Some(0) => Msg::End,
+         None => Msg::Fail(classify(provider, exit, &[notes.as_str(), said.as_str()])),
+     };
+Diff in \\?\D:\a\aevaleron\aevaleron\src-tauri\src\llm\cli\run.rs:536:
+     let model_gone = all.contains("model")
+         && has(
+             &all,
+-            &["not found", "does not exist", "not supported", "unknown model", "invalid model"],
+
+Diff in \\?\D:\a\aevaleron\aevaleron\src-tauri\src\llm\cli\run.rs:624:
+ #[cfg(test)]
+ mod tests {
+     use super::*;
++    use crate::llm::catalogue::Kind;
+     use crate::llm::client::{ChatTurn, Llm, QueryOpts, Transport};
+     use crate::llm::errors::{explain, About};
+-    use crate::llm::catalogue::Kind;
+     use crate::llm::sse::Meter;
+     use crate::llm::wire::HttpRequest;
+     use async_trait::async_trait;
+Diff in \\?\D:\a\aevaleron\aevaleron\src-tauri\src\llm\cli\run.rs:752:
+         assert_eq!(image["source"]["data"], "QUJD");
+         let last = content.last().unwrap()["text"].as_str().unwrap();
+         assert!(last.ends_with("what is this?"));
+-        assert!(content[0]["text"].as_str().unwrap().contains("User: before"));
++        assert!(content[0]["text"]
++            .as_str()
++            .unwrap()
++            .contains("User: before"));
+         assert!(has_arg(&r, "--tools") && has_arg(&r, "--no-session-persistence"));
+         assert!(r["argv"].as_array().unwrap().iter().any(|a| a
+             .as_str()
+Diff in \\?\D:\a\aevaleron\aevaleron\src-tauri\src\llm\cli\run.rs:822:
+         assert_eq!(e.message, "Error: model claude-x not found");
+         assert!(classify(c, Some(1), &["getaddrinfo ENOTFOUND api.anthropic.com"]).is_network());
+         let e = classify(c, Some(3), &["", ""]);
+-        assert_eq!((e.status, e.message.as_str()), (Some(500), "Claude Code stopped with exit code 3"));
++        assert_eq!(
++            (e.status, e.message.as_str()),
+
+Diff in \\?\D:\a\aevaleron\aevaleron\src-tauri\src\llm\cli\run.rs:903:
+             return;
+         };
+         let path = PathBuf::from(&script);
+-        let info = block(super::super::inspect(Provider::ClaudeCli, Some(path.clone())));
++        let info = block(super::super::inspect(
++            Provider::ClaudeCli,
++            Some(path.clone()),
++        ));
+         assert!(info.installed);
+         assert_eq!(info.version.as_deref(), Some("9.8.7"));
+         assert_eq!(info.signed_in, Some(true));
+Diff in \\?\D:\a\aevaleron\aevaleron\src-tauri\src\llm\settings.rs:456:
+         let s = MemorySettings::with_key("sk-or-v1-x");
+         let t = Table::default();
+         // Installed or not, a CLI that is off is never a candidate.
+-        assert_eq!(ids(&candidates_with(&s, Kind::Vision, &t, 0)), [Provider::OpenRouter]);
++        assert_eq!(
++            ids(&candidates_with(&s, Kind::Vision, &t, 0)),
++            [Provider::OpenRouter]
++        );
+         assert!(!order(&s).contains(&Provider::ClaudeCli));
+         // On, with a program that exists: after the HTTP providers.
+         let exe = std::env::current_exe().unwrap();
+Diff in \\?\D:\a\aevaleron\aevaleron\src-tauri\src\llm\settings.rs:476:
+         *s.order.lock() = vec![Provider::ClaudeCli];
+         assert_eq!(active(&s).unwrap().provider, Provider::ClaudeCli);
+         // A stored path that is gone is not used.
+-        s.cli.lock().insert(Provider::ClaudeCli, r"C:\nope\claude.exe".into());
++        s.cli
+

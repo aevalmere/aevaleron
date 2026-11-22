@@ -73,26 +73,37 @@ Diff in \\?\D:\a\aevaleron\aevaleron\src-tauri\src\llm\cli\parse.rs:308:
          assert_eq!(d.notes, ["authentication_failed"]);
          let max = [r#"{"type":"result","subtype":"error_max_turns","is_error":true}"#];
          let ev = run(Provider::ClaudeCli, &max);
-Diff in \\?\D:\a\aevaleron\aevaleron\src-tauri\src\llm\cli\run.rs:533:
+Diff in \\?\D:\a\aevaleron\aevaleron\src-tauri\src\llm\cli\run.rs:442:
+     }
+     let notes = decoder.notes.join("\n");
+     let msg = match state.failed {
+-        Some(f) => Msg::Fail(classify(provider, exit, &[f.as_str(), notes.as_str(), said.as_str()])),
++        Some(f) => Msg::Fail(classify(
++            provider,
++            exit,
++            &[f.as_str(), notes.as_str(), said.as_str()],
++        )),
+         None if exit == Some(0) => Msg::End,
+         None => Msg::Fail(classify(provider, exit, &[notes.as_str(), said.as_str()])),
+     };
+Diff in \\?\D:\a\aevaleron\aevaleron\src-tauri\src\llm\cli\run.rs:536:
      let model_gone = all.contains("model")
          && has(
              &all,
 -            &["not found", "does not exist", "not supported", "unknown model", "invalid model"],
-+            &[
-+                "not found",
-+                "does not exist",
-+                "not supported",
-+                "unknown model",
-+                "invalid model",
-+            ],
-         );
-     if model_gone {
-         return ApiError::http(404, said);
-Diff in \\?\D:\a\aevaleron\aevaleron\src-tauri\src\llm\cli\run.rs:621:
+
+Diff in \\?\D:\a\aevaleron\aevaleron\src-tauri\src\llm\cli\run.rs:624:
  #[cfg(test)]
  mod tests {
-
-Diff in \\?\D:\a\aevaleron\aevaleron\src-tauri\src\llm\cli\run.rs:749:
+     use super::*;
++    use crate::llm::catalogue::Kind;
+     use crate::llm::client::{ChatTurn, Llm, QueryOpts, Transport};
+     use crate::llm::errors::{explain, About};
+-    use crate::llm::catalogue::Kind;
+     use crate::llm::sse::Meter;
+     use crate::llm::wire::HttpRequest;
+     use async_trait::async_trait;
+Diff in \\?\D:\a\aevaleron\aevaleron\src-tauri\src\llm\cli\run.rs:752:
          assert_eq!(image["source"]["data"], "QUJD");
          let last = content.last().unwrap()["text"].as_str().unwrap();
          assert!(last.ends_with("what is this?"));
@@ -104,25 +115,26 @@ Diff in \\?\D:\a\aevaleron\aevaleron\src-tauri\src\llm\cli\run.rs:749:
          assert!(has_arg(&r, "--tools") && has_arg(&r, "--no-session-persistence"));
          assert!(r["argv"].as_array().unwrap().iter().any(|a| a
              .as_str()
-Diff in \\?\D:\a\aevaleron\aevaleron\src-tauri\src\llm\cli\run.rs:819:
+Diff in \\?\D:\a\aevaleron\aevaleron\src-tauri\src\llm\cli\run.rs:822:
          assert_eq!(e.message, "Error: model claude-x not found");
          assert!(classify(c, Some(1), &["getaddrinfo ENOTFOUND api.anthropic.com"]).is_network());
          let e = classify(c, Some(3), &["", ""]);
 -        assert_eq!((e.status, e.message.as_str()), (Some(500), "Claude Code stopped with exit code 3"));
 +        assert_eq!(
 +            (e.status, e.message.as_str()),
-+            (Some(500), "Claude Code stopped with exit code 3")
-+        );
-         assert_eq!(said_signed_in("Logged in using ChatGPT"), Some(true));
-         assert_eq!(said_signed_in("Not logged in"), Some(false));
-         assert_eq!(said_signed_in("?"), None);
-Diff in \\?\D:\a\aevaleron\aevaleron\src-tauri\src\llm\cli\run.rs:900:
+
+Diff in \\?\D:\a\aevaleron\aevaleron\src-tauri\src\llm\cli\run.rs:903:
              return;
          };
          let path = PathBuf::from(&script);
 -        let info = block(super::super::inspect(Provider::ClaudeCli, Some(path.clone())));
 +        let info = block(super::super::inspect(
-
++            Provider::ClaudeCli,
++            Some(path.clone()),
++        ));
+         assert!(info.installed);
+         assert_eq!(info.version.as_deref(), Some("9.8.7"));
+         assert_eq!(info.signed_in, Some(true));
 Diff in \\?\D:\a\aevaleron\aevaleron\src-tauri\src\llm\settings.rs:456:
          let s = MemorySettings::with_key("sk-or-v1-x");
          let t = Table::default();
@@ -141,9 +153,4 @@ Diff in \\?\D:\a\aevaleron\aevaleron\src-tauri\src\llm\settings.rs:476:
          // A stored path that is gone is not used.
 -        s.cli.lock().insert(Provider::ClaudeCli, r"C:\nope\claude.exe".into());
 +        s.cli
-+            .lock()
-+            .insert(Provider::ClaudeCli, r"C:\nope\claude.exe".into());
-         assert_eq!(usable_key(&s, Provider::ClaudeCli), None);
-         assert_eq!(active(&s).unwrap().provider, Provider::OpenRouter);
-     }
 
