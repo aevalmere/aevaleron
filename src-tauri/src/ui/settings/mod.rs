@@ -82,9 +82,10 @@ pub(super) async fn ask(label: String, channel: &'static str, payload: Value, ms
             Err(_) => Reply::Failed,
         };
     }
-    let job = async_runtime::spawn(async move {
-        tokio::time::timeout(Duration::from_millis(ms), fut).await
-    });
+    let job =
+        async_runtime::spawn(
+            async move { tokio::time::timeout(Duration::from_millis(ms), fut).await },
+        );
     match job.await {
         Ok(Ok(Ok(v))) => Reply::Got(v),
         Ok(Err(_)) => Reply::TimedOut,
@@ -684,9 +685,14 @@ impl SettingsPage {
             "sec-model" | "sec-brain" | "sec-agent-model" => "pg-models",
             "sec-skill" => "pg-answers",
             "sec-agent" => "pg-agent",
-            "sec-voice-dictation" | "sec-voice-wake" | "sec-voice-engine"
-            | "sec-voice-language" | "sec-voice-mic" | "sec-voice-cleanup"
-            | "sec-voice-privacy" | "sec-voice-credits" => "pg-voice",
+            "sec-voice-dictation"
+            | "sec-voice-wake"
+            | "sec-voice-engine"
+            | "sec-voice-language"
+            | "sec-voice-mic"
+            | "sec-voice-cleanup"
+            | "sec-voice-privacy"
+            | "sec-voice-credits" => "pg-voice",
             "sec-watch-agents" | "sec-watch-awake" | "sec-watch-cards" => "pg-watch",
             "sec-recipients" | "sec-history" | "sec-private" | "sec-share" => "pg-privacy",
             "sec-shortcuts" => "pg-shortcuts",
@@ -696,7 +702,11 @@ impl SettingsPage {
         };
         let opens = !matches!(
             id,
-            "sec-voice-privacy" | "sec-voice-credits" | "sec-recipients" | "sec-share" | "sec-layout"
+            "sec-voice-privacy"
+                | "sec-voice-credits"
+                | "sec-recipients"
+                | "sec-share"
+                | "sec-layout"
                 | "sec-tour"
         );
         if opens {
@@ -831,7 +841,12 @@ impl super::Page for SettingsPage {
             "visible" => json!(super::history::is_visible(self.hwnd)),
             "providers" => {
                 let st = self.st.borrow();
-                json!(st.prov.list.iter().map(|p| p.id.clone()).collect::<Vec<_>>())
+                json!(st
+                    .prov
+                    .list
+                    .iter()
+                    .map(|p| p.id.clone())
+                    .collect::<Vec<_>>())
             }
             "shortcuts" => {
                 let s = self.s().get_shortcuts();

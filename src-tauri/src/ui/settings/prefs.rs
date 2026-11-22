@@ -172,22 +172,17 @@ impl SettingsPage {
     }
 
     pub(super) fn save_skill(&self, id: &str) {
-        self.call(
-            "settings:save-skill",
-            json!({ "skill": id }),
-            0,
-            |p, r| {
-                if r.failed() {
-                    p.unsaved(Some("skills"));
-                    return;
-                }
-                let Some(v) = r.value() else {
-                    return;
-                };
-                p.st.borrow_mut().data["skill"] = v["skill"].clone();
-                p.render_skills();
-            },
-        );
+        self.call("settings:save-skill", json!({ "skill": id }), 0, |p, r| {
+            if r.failed() {
+                p.unsaved(Some("skills"));
+                return;
+            }
+            let Some(v) = r.value() else {
+                return;
+            };
+            p.st.borrow_mut().data["skill"] = v["skill"].clone();
+            p.render_skills();
+        });
     }
 
     pub(super) fn open_skills(&self) {
@@ -229,7 +224,11 @@ impl SettingsPage {
                 p.unsaved(Some("agent"));
                 return;
             }
-            if let Some(a) = r.value().map(|v| v["agent"].clone()).filter(Value::is_object) {
+            if let Some(a) = r
+                .value()
+                .map(|v| v["agent"].clone())
+                .filter(Value::is_object)
+            {
                 p.render_agent(&a);
             }
             if let Some(t) = done {
@@ -538,18 +537,23 @@ impl SettingsPage {
         let d = self.st.borrow().data.clone();
         let k = d["textScale"].as_f64().filter(|k| *k > 0.0).unwrap_or(1.0);
         let pct = (k * 100.0).round();
-        let os = d["osTextScale"].as_f64().filter(|k| *k > 0.0).unwrap_or(1.0);
+        let os = d["osTextScale"]
+            .as_f64()
+            .filter(|k| *k > 0.0)
+            .unwrap_or(1.0);
         let s = self.s();
         s.set_text_pct(pct as f32);
-        s.set_text_note(if (os - 1.0).abs() > 0.001 {
-            format!(
-                "Starts from your Windows text size. Windows is set to {}%.",
-                (os * 100.0).round() as i64
-            )
-        } else {
-            "Starts from your Windows text size.".to_string()
-        }
-        .into());
+        s.set_text_note(
+            if (os - 1.0).abs() > 0.001 {
+                format!(
+                    "Starts from your Windows text size. Windows is set to {}%.",
+                    (os * 100.0).round() as i64
+                )
+            } else {
+                "Starts from your Windows text size.".to_string()
+            }
+            .into(),
+        );
     }
 
     /// The slider moved: shown at once, saved once it rests for 150 ms.
@@ -562,10 +566,13 @@ impl SettingsPage {
         self.st.borrow_mut().data["textScale"] = json!(k);
         self.render_text_scale();
         let label = self.label.clone();
-        self.text_timer
-            .start(TimerMode::SingleShot, Duration::from_millis(150), move || {
+        self.text_timer.start(
+            TimerMode::SingleShot,
+            Duration::from_millis(150),
+            move || {
                 super::bridge::send(&label, "settings:set-text-scale", json!({ "scale": k }));
-            });
+            },
+        );
     }
 
     pub(super) fn on_text_scale(&self, s: &Value) {
@@ -596,7 +603,14 @@ impl SettingsPage {
     fn render_startup(&self) {
         let d = self.st.borrow().data.clone();
         let s = self.s();
-        s.set_startup_summary(if flag(&d, "launchAtLogin") { "On" } else { "Off" }.into());
+        s.set_startup_summary(
+            if flag(&d, "launchAtLogin") {
+                "On"
+            } else {
+                "Off"
+            }
+            .into(),
+        );
         // Unpackaged, the Run key would point at a development binary
         // rather than at Aevaleron, so the preference is remembered and not
         // applied. Saying so beats a switch that silently does nothing.
@@ -792,12 +806,14 @@ impl SettingsPage {
             SharedString::new()
         });
         s.set_release_url(release.into());
-        s.set_release_label(if !from.is_empty() && status != "ready" {
-            "What's new"
-        } else {
-            "Release notes"
-        }
-        .into());
+        s.set_release_label(
+            if !from.is_empty() && status != "ready" {
+                "What's new"
+            } else {
+                "Release notes"
+            }
+            .into(),
+        );
         s.set_restart_shown(restart);
         s.set_check_shown(!matches!(status.as_str(), "dev" | "ready" | "downloading"));
         s.set_check_enabled(status != "checking");

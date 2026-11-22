@@ -19,9 +19,9 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::OnceLock;
 use std::time::{Duration, Instant};
 
+use crate::shell::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 use parking_lot::Mutex;
 use serde_json::{json, Value};
-use crate::shell::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 
 use crate::state::{shared, BusEvent, Mode, Rect};
 use crate::{hotkeys, store};

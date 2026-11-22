@@ -22,7 +22,11 @@ pub fn invoke(
         let Some(w) = AppHandle::get().get_webview_window(&label) else {
             return Err(format!("no window {label}"));
         };
-        let payload = if payload.is_null() { None } else { Some(payload) };
+        let payload = if payload.is_null() {
+            None
+        } else {
+            Some(payload)
+        };
         crate::ipc::invoke(w, channel, payload).await
     });
     async move {

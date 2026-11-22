@@ -921,7 +921,7 @@ impl Llm {
             let listed = live
                 .as_ref()
                 .and_then(|l| l.iter().find(|m| m.id == id).cloned());
-            return listed.map_or(true, |m| m.images);
+            return listed.is_none_or(|m| m.images);
         }
         let all = self.known_catalogue();
         catalogue::sees_images(all.as_deref().map(Vec::as_slice), id)

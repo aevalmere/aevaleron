@@ -8,20 +8,20 @@ import { SettingsState, SetProvRow } from "settings-state.slint";
 import { PageTitle, Group, Note, SwitchRow, ChoiceOption, Segments, TextField, TextButton, Disclosure, Combo } from "settings-widgets.slint";
 
 component ProvRowView inherits Rectangle {
-    in property <SetProvRow> row;
+    in property <SetProvRow> it;
     in property <int> index;
     in property <int> count;
-    property <bool> open: SettingsState.open-row == "prov-" + root.row.id;
-    property <int> epoch: root.row.epoch;
-    property <int> focus-at: root.row.focus;
+    property <bool> open: SettingsState.open-row == "prov-" + root.it.id;
+    property <int> epoch: root.it.epoch;
+    property <int> focus-at: root.it.focus;
     property <bool> shown: false;
     property <length> pressed-y;
     property <length> head-h: 56px * Theme.text-scale;
-    property <bool> dragged: SettingsState.drag-id == root.row.id;
+    property <bool> dragged: SettingsState.drag-id == root.it.id;
     property <bool> lands-here: SettingsState.drag-id != "" && !root.dragged && SettingsState.drag-to == root.index;
 
     changed epoch => {
-        field.set-text(root.row.field-text);
+        field.set-text(root.it.field-text);
         root.shown = false;
     }
     changed focus-at => {
@@ -53,18 +53,18 @@ component ProvRowView inherits Rectangle {
                         root.pressed-y = self.mouse-y;
                     }
                     if (e.button == PointerEventButton.left && e.kind == PointerEventKind.up) {
-                        if (SettingsState.drag-id == root.row.id) {
-                            SettingsState.prov-move(root.row.id, SettingsState.drag-to);
+                        if (SettingsState.drag-id == root.it.id) {
+                            SettingsState.prov-move(root.it.id, SettingsState.drag-to);
                         } else {
                             SettingsState.combo-open = "";
-                            SettingsState.open-row = root.open ? "" : "prov-" + root.row.id;
+                            SettingsState.open-row = root.open ? "" : "prov-" + root.it.id;
                         }
                     }
                 }
                 moved => {
                     if (self.pressed && SettingsState.ordered && root.count > 1) {
-                        if (SettingsState.drag-id == root.row.id || abs(self.mouse-y - root.pressed-y) > 6px) {
-                            SettingsState.drag-id = root.row.id;
+                        if (SettingsState.drag-id == root.it.id || abs(self.mouse-y - root.pressed-y) > 6px) {
+                            SettingsState.drag-id = root.it.id;
                             SettingsState.drag-to = max(0, min(root.count - 1, root.index + round((self.mouse-y - root.pressed-y) / root.head-h)));
                         }
                     }
@@ -82,7 +82,7 @@ component ProvRowView inherits Rectangle {
                     vertical-alignment: center;
                 }
                 Text {
-                    text: root.row.pos;
+                    text: root.it.pos;
                     font-size: Theme.caption;
                     color: Theme.label-3;
                     vertical-alignment: center;
@@ -93,16 +93,16 @@ component ProvRowView inherits Rectangle {
                     horizontal-stretch: 1;
                     spacing: 2px;
                     Text {
-                        text: root.row.name;
+                        text: root.it.name;
                         font-size: Theme.row;
                         font-weight: 600;
                         color: Theme.label;
                         overflow: elide;
                     }
                     Text {
-                        text: root.row.sub;
+                        text: root.it.sub;
                         font-size: Theme.meta;
-                        font-family: root.row.mono ? Theme.mono : Theme.font;
+                        font-family: root.it.mono ? Theme.mono : Theme.font;
                         color: Theme.label-3;
                         overflow: elide;
                     }
@@ -111,20 +111,20 @@ component ProvRowView inherits Rectangle {
                     spacing: Theme.sp-1;
                     alignment: end;
                     Text {
-                        text: root.row.icon;
+                        text: root.it.icon;
                         font-family: Theme.icons;
                         font-size: 12px * Theme.text-scale;
-                        color: root.row.tone == "danger" ? Theme.danger : root.row.tone == "ok" ? Theme.accent-text : Theme.label-2;
+                        color: root.it.tone == "danger" ? Theme.danger : root.it.tone == "ok" ? Theme.accent-text : Theme.label-2;
                         vertical-alignment: center;
                     }
                     Text {
-                        text: root.row.word;
+                        text: root.it.word;
                         font-size: Theme.caption;
-                        color: root.row.tone == "danger" ? Theme.danger : root.row.tone == "ok" ? Theme.accent-text : Theme.label-2;
+                        color: root.it.tone == "danger" ? Theme.danger : root.it.tone == "ok" ? Theme.accent-text : Theme.label-2;
                         vertical-alignment: center;
                     }
                 }
-                if root.row.is-default: Rectangle {
+                if root.it.is-default: Rectangle {
                     height: 22px * Theme.text-scale;
                     min-width: cap.preferred-width + 2 * Theme.sp-2;
                     border-radius: self.height / 2;
@@ -156,17 +156,17 @@ component ProvRowView inherits Rectangle {
                 padding-bottom: Theme.sp-4;
                 spacing: Theme.sp-3;
 
-                if root.row.msg != "": Note {
-                    text: root.row.msg;
-                    tone: root.row.msg-danger ? "danger" : "";
+                if root.it.msg != "": Note {
+                    text: root.it.msg;
+                    tone: root.it.msg-danger ? "danger" : "";
                     font-size: Theme.row;
-                    color: root.row.msg-danger ? Theme.danger : Theme.label-2;
+                    color: root.it.msg-danger ? Theme.danger : Theme.label-2;
                 }
 
-                if root.row.clip != "": HorizontalLayout {
+                if root.it.clip != "": HorizontalLayout {
                     spacing: Theme.sp-3;
                     Text {
-                        text: "Key on the clipboard: " + root.row.clip;
+                        text: "Key on the clipboard: " + root.it.clip;
                         font-size: Theme.caption;
                         font-family: Theme.mono;
                         color: Theme.label-2;
@@ -178,7 +178,7 @@ component ProvRowView inherits Rectangle {
                         text: "Use this key";
                         prominent: true;
                         clicked => {
-                            SettingsState.prov-act(root.row.id, "clip", "");
+                            SettingsState.prov-act(root.it.id, "clip", "");
                         }
                     }
                 }
@@ -186,32 +186,32 @@ component ProvRowView inherits Rectangle {
                 // The field lives as long as the row: a re-render never
                 // moves it, so a half-pasted key survives.
                 Rectangle {
-                    height: root.row.field ? field-col.preferred-height : 0px;
+                    height: root.it.field ? field-col.preferred-height : 0px;
                     clip: true;
                     field-col := VerticalLayout {
                         spacing: Theme.sp-1;
                         Text {
-                            text: root.row.field-label;
+                            text: root.it.field-label;
                             font-size: Theme.caption;
                             color: Theme.label-2;
                         }
                         HorizontalLayout {
                             spacing: Theme.sp-2;
                             field := TextField {
-                                placeholder: root.row.placeholder;
+                                placeholder: root.it.placeholder;
                                 password: !root.shown;
                                 mono: true;
-                                enabled: !root.row.busy;
+                                enabled: !root.it.busy;
                                 edited(t) => {
-                                    SettingsState.prov-edited(root.row.id, t);
+                                    SettingsState.prov-edited(root.it.id, t);
                                 }
                                 accepted(t) => {
-                                    SettingsState.prov-act(root.row.id, "enter", t);
+                                    SettingsState.prov-act(root.it.id, "enter", t);
                                 }
                             }
                             Button {
                                 text: root.shown ? "Hide" : "Show";
-                                enabled: !root.row.busy;
+                                enabled: !root.it.busy;
                                 clicked => {
                                     root.shown = !root.shown;
                                     field.focus-field();
@@ -219,25 +219,25 @@ component ProvRowView inherits Rectangle {
                             }
                             Button {
                                 text: "Save";
-                                prominent: root.row.save-prominent;
-                                enabled: !root.row.busy;
+                                prominent: root.it.save-prominent;
+                                enabled: !root.it.busy;
                                 clicked => {
-                                    SettingsState.prov-act(root.row.id, "save", field.text);
+                                    SettingsState.prov-act(root.it.id, "save", field.text);
                                 }
                             }
                         }
                     }
                 }
 
-                if root.row.actions.length > 0: HorizontalLayout {
+                if root.it.actions.length > 0: HorizontalLayout {
                     spacing: Theme.sp-2;
                     alignment: start;
-                    for a in root.row.actions: HorizontalLayout {
+                    for a in root.it.actions: HorizontalLayout {
                         if a.kind == "text": TextButton {
                             text: a.label;
                             enabled: !a.disabled;
                             clicked => {
-                                SettingsState.prov-act(root.row.id, a.id, field.text);
+                                SettingsState.prov-act(root.it.id, a.id, field.text);
                             }
                         }
                         if a.kind == "link": TextButton {
@@ -258,34 +258,34 @@ component ProvRowView inherits Rectangle {
                             danger: a.kind == "danger";
                             enabled: !a.disabled;
                             clicked => {
-                                SettingsState.prov-act(root.row.id, a.id, field.text);
+                                SettingsState.prov-act(root.it.id, a.id, field.text);
                             }
                         }
                     }
                 }
 
-                if root.row.order: HorizontalLayout {
+                if root.it.order: HorizontalLayout {
                     spacing: Theme.sp-1;
                     alignment: start;
                     TextButton {
                         text: "Move up";
-                        enabled: root.row.can-up;
+                        enabled: root.it.can-up;
                         clicked => {
-                            SettingsState.prov-act(root.row.id, "up", "");
+                            SettingsState.prov-act(root.it.id, "up", "");
                         }
                     }
                     TextButton {
                         text: "Move down";
-                        enabled: root.row.can-down;
+                        enabled: root.it.can-down;
                         clicked => {
-                            SettingsState.prov-act(root.row.id, "down", "");
+                            SettingsState.prov-act(root.it.id, "down", "");
                         }
                     }
-                    if root.row.show-first: TextButton {
+                    if root.it.show-first: TextButton {
                         text: "Use first";
-                        enabled: !root.row.busy;
+                        enabled: !root.it.busy;
                         clicked => {
-                            SettingsState.prov-act(root.row.id, "first", "");
+                            SettingsState.prov-act(root.it.id, "first", "");
                         }
                     }
                 }
@@ -302,7 +302,7 @@ export component ProvidersPage inherits VerticalLayout {
     }
     Group {
         for p[i] in SettingsState.providers: ProvRowView {
-            row: p;
+            it: p;
             index: i;
             count: SettingsState.providers.length;
         }

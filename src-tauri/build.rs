@@ -30,7 +30,11 @@ fn main() {
     println!("cargo:rustc-link-arg=/MANIFEST:EMBED");
     println!("cargo:rustc-link-arg=/MANIFESTINPUT:{}", manifest.display());
 
-    let config = slint_build::CompilerConfiguration::new().with_style("fluent".into());
+    // Images (the style's icons) are decoded here, at build time, into the
+    // software renderer's own format: no image decoder in the exe.
+    let config = slint_build::CompilerConfiguration::new()
+        .with_style("fluent".into())
+        .embed_resources(slint_build::EmbedResourcesKind::EmbedForSoftwareRenderer);
     slint_build::compile_with_config("ui/app.slint", config).expect("compile the .slint UI");
 
     if std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("windows") {

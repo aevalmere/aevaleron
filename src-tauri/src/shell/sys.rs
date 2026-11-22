@@ -73,9 +73,9 @@ pub fn dark_mode() -> bool {
 /// 0x00BBGGRR): DESIGN.md's base surface for the theme.
 pub fn theme_background() -> u32 {
     if dark_mode() {
-        0x001E_1C1C
+        0x0031_231A
     } else {
-        0x00FA_F9F9
+        0x00F0_F7FA
     }
 }
 

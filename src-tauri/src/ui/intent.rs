@@ -188,14 +188,46 @@ pub fn classify(raw: &str) -> Score {
 /// Starting points under an empty bar, picked from the app in front.
 pub fn examples(process: &str, title: &str) -> [&'static str; 3] {
     match app_kind(process, title) {
-        "browser" => ["Summarize this page", "Where is the sign in button?", "Open a new tab and search for the weather"],
-        "excel" => ["What is the total of this column?", "Explain this formula", "Sort this sheet by date"],
-        "mail" => ["Draft a reply to this email", "What does this email want from me?", "Archive this email"],
-        "editor" => ["What does this error mean?", "Explain this function", "Save all open files"],
-        "terminal" => ["Why did this command fail?", "What does this output mean?", "Open a new terminal tab"],
-        "explorer" => ["Which of these files is the newest?", "Rename these files by date", "Make a new folder called old"],
-        "document" => ["Summarize this document", "Fix the grammar in this paragraph", "Save this as a PDF"],
-        _ => ["What's on my screen?", "Where is the settings button?", "Open Notepad and write a haiku"],
+        "browser" => [
+            "Summarize this page",
+            "Where is the sign in button?",
+            "Open a new tab and search for the weather",
+        ],
+        "excel" => [
+            "What is the total of this column?",
+            "Explain this formula",
+            "Sort this sheet by date",
+        ],
+        "mail" => [
+            "Draft a reply to this email",
+            "What does this email want from me?",
+            "Archive this email",
+        ],
+        "editor" => [
+            "What does this error mean?",
+            "Explain this function",
+            "Save all open files",
+        ],
+        "terminal" => [
+            "Why did this command fail?",
+            "What does this output mean?",
+            "Open a new terminal tab",
+        ],
+        "explorer" => [
+            "Which of these files is the newest?",
+            "Rename these files by date",
+            "Make a new folder called old",
+        ],
+        "document" => [
+            "Summarize this document",
+            "Fix the grammar in this paragraph",
+            "Save this as a PDF",
+        ],
+        _ => [
+            "What's on my screen?",
+            "Where is the settings button?",
+            "Open Notepad and write a haiku",
+        ],
     }
 }
 

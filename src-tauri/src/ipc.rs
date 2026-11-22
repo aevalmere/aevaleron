@@ -13,9 +13,9 @@ use std::future::Future;
 use std::panic::AssertUnwindSafe;
 use std::sync::Mutex;
 
+use crate::shell::{AppHandle, Manager, WebviewWindow};
 use futures_util::FutureExt;
 use serde_json::{json, Value};
-use crate::shell::{AppHandle, Manager, WebviewWindow};
 
 use crate::state::{shared, AppState, Mode};
 use crate::windows::{self, outputs};
@@ -195,7 +195,6 @@ pub const LISTEN_CHANNELS: &[&str] = &[
     "bar:open",
     "bar:context",
     "bar:submit",
-    "glass:frame",
     "glass:tier",
     // ---- lane: windows (do not edit outside your lane) ----
     "output:meta",
@@ -318,7 +317,10 @@ const EXCEPTIONS: &[(&str, &[Caller])] = &[
     ("a11y:announce", ANY),
     ("open-external", PAGES),
     ("clipboard:write", PAGES),
-    ("models:list", &[Caller::Bar, Caller::Settings, Caller::Output]),
+    (
+        "models:list",
+        &[Caller::Bar, Caller::Settings, Caller::Output],
+    ),
     ("app:help", PAGES),
     ("window:nudge", PAGES),
     // Every page that loads glass.js, the buddy card included, reads the

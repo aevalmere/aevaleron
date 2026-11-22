@@ -81,6 +81,7 @@ export component BarWindow inherits Window {
     // Where the tour's targets are, in this window (buddy:resolve).
     out property <length> pill-x: orb.absolute-position.x;
     out property <length> pill-y: orb.absolute-position.y;
+    out property <length> pill-w: orb.width;
     out property <length> bar-x: capsule.absolute-position.x;
     out property <length> bar-y: capsule.absolute-position.y;
     out property <length> bar-w: capsule.width;
@@ -112,6 +113,7 @@ export component BarWindow inherits Window {
     callback hud-drag();
     callback edited(string);
     callback clicked-elsewhere();
+    callback field-context();
 
     public function focus-input() {
         input.focus();
@@ -261,6 +263,15 @@ export component BarWindow inherits Window {
                         overflow: elide;
                     }
 
+                    // A right press in the field opens the edit menu.
+                    TouchArea {
+                        pointer-event(e) => {
+                            if (e.button == PointerEventButton.right && e.kind == PointerEventKind.up) {
+                                root.field-context();
+                            }
+                        }
+                    }
+
                     input := TextInput {
                         x: Theme.sp-2;
                             width: parent.width - 2 * Theme.sp-2;
@@ -384,7 +395,7 @@ export component BarWindow inherits Window {
         if root.model-open: Plate {
             height: min(model-col.preferred-height, 280px * Theme.text-scale);
             Flickable {
-                viewport-height: model-col.preferred-height;
+                content-height: model-col.preferred-height;
                 model-col := VerticalLayout {
                     padding: Theme.sp-1;
                     for row[i] in root.model-rows: Rectangle {

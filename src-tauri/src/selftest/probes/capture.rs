@@ -42,7 +42,10 @@ fn glass_tier(cx: &Cx) {
         reasons = "none".into();
     }
     let can_hide = capture::can_hide_from_capture();
-    cx.log("glassTier", format!("{tier} reasons={reasons} canHide={can_hide}"));
+    cx.log(
+        "glassTier",
+        format!("{tier} reasons={reasons} canHide={can_hide}"),
+    );
 }
 
 /// `value` under `label` when `ok`, else `label=FAIL:<value>`.
@@ -421,5 +424,4 @@ fn tour(cx: &Cx) {
     buddy::cancel();
     onboarding(cx);
     reuse(cx);
-
 }

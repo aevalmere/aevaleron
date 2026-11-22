@@ -81,7 +81,9 @@ impl Shots {
         }
         let a = app.clone();
         let _ = on_ui(move || windows::submit_text(&a, QUESTION));
-        let answered = wait_for(ANSWER_WAIT, || on_ui(|| shown_outputs() > 0).unwrap_or(false));
+        let answered = wait_for(ANSWER_WAIT, || {
+            on_ui(|| shown_outputs() > 0).unwrap_or(false)
+        });
         if answered {
             thread::sleep(SETTLE * 2);
             self.scene("answer", |l: &str| l.starts_with("output-"));

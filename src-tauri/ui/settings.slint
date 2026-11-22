@@ -25,8 +25,8 @@ export component SettingsWindow inherits Window {
 
     // The page in view: the last whose top is above the column's top,
     // or the last page once the column is scrolled to its end.
-    property <length> top: -flick.viewport-y + 24px;
-    property <bool> at-end: flick.viewport-height > flick.height && flick.viewport-y <= flick.height - flick.viewport-height + 4px;
+    property <length> top: -flick.content-y + 24px;
+    property <bool> at-end: flick.viewport-height > flick.height && flick.content-y <= flick.height - flick.viewport-height + 4px;
     out property <string> current-page: root.at-end ? "pg-general"
         : root.top >= pg-general.y ? "pg-general"
         : root.top >= pg-shortcuts.y ? "pg-shortcuts"
@@ -39,7 +39,7 @@ export component SettingsWindow inherits Window {
         : "pg-providers";
 
     function scroll-to(y: length) {
-        flick.viewport-y = max(min(0px, flick.height - flick.viewport-height), -y);
+        flick.content-y = max(min(0px, flick.height - flick.viewport-height), -y);
     }
 
     // Scrolls the column to a page by its id (settings:section).
@@ -67,7 +67,7 @@ export component SettingsWindow inherits Window {
 
     // Scrolls by a step (PageUp and PageDown, Home and End from Rust).
     public function scroll-by(dy: length) {
-        root.scroll-to(-flick.viewport-y + dy);
+        root.scroll-to(-flick.content-y + dy);
     }
 
     VerticalLayout {
@@ -167,8 +167,8 @@ export component SettingsWindow inherits Window {
                     y: 0;
                     width: parent.width;
                     height: parent.height;
-                    viewport-width: self.width;
-                    viewport-height: col.preferred-height;
+                    content-width: self.width;
+                    content-height: col.preferred-height;
                     col := VerticalLayout {
                         width: min(flick.width, 760px);
                         x: (flick.width - self.width) / 2;
@@ -191,7 +191,7 @@ export component SettingsWindow inherits Window {
                 // Where the column is: a thin bar at the right edge.
                 if flick.viewport-height > flick.height: Rectangle {
                     x: parent.width - 6px;
-                    y: (parent.height - self.height) * (-flick.viewport-y / max(1px, flick.viewport-height - flick.height));
+                    y: (parent.height - self.height) * (-flick.content-y / max(1px, flick.viewport-height - flick.height));
                     width: 3px;
                     height: max(32px, parent.height * flick.height / flick.viewport-height);
                     border-radius: 1.5px;

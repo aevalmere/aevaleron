@@ -209,7 +209,7 @@ fn open_window(app: &AppHandle, phys: screen::PxRect, gen: u64) -> crate::shell:
     } else {
         "area"
     };
-    let win =WebviewWindowBuilder::new(app, LABEL, WebviewUrl::App("renderer/region.html".into()))
+    let win = WebviewWindowBuilder::new(app, LABEL, WebviewUrl::App("renderer/region.html".into()))
         .title("Aevaleron")
         .decorations(false)
         .transparent(true)

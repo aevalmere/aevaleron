@@ -19,9 +19,9 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::OnceLock;
 use std::time::Duration;
 
+use crate::shell::{async_runtime, AppHandle};
 use parking_lot::Mutex;
 use serde_json::{json, Value};
-use crate::shell::{async_runtime, AppHandle};
 
 use super::layout::{self, Anchor};
 use super::{
@@ -219,7 +219,10 @@ fn size_for(o: &Output, wa: Rect) -> (f64, f64) {
     let w = o
         .rect
         .map_or_else(|| store::get().get_output_width() as f64, |r| r.width);
-    (w, layout::output_height(wa, o.content_height, o.user_height))
+    (
+        w,
+        layout::output_height(wa, o.content_height, o.user_height),
+    )
 }
 
 /// The part of `glass` the sheet covers.

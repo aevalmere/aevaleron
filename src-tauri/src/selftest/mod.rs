@@ -165,9 +165,7 @@ impl Cx {
     pub fn probe(&self, label: &str, key: &str) -> Result<Value, String> {
         let (l, k) = (label.to_string(), key.to_string());
         let got = self.on_main(move |_| {
-            if crate::ui::page(&l).is_none() {
-                return None;
-            }
+            crate::ui::page(&l)?;
             Some(crate::ui::probe(&l, &k))
         });
         match got {

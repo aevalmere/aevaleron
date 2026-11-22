@@ -312,7 +312,7 @@ pub fn apply(
         return Ok((want, changed));
     }
     let name = a.file.rsplit('\\').next().unwrap_or(a.file);
-    let blank = text.map_or(true, |t| t.trim().is_empty());
+    let blank = text.is_none_or(|t| t.trim().is_empty());
     let mut root: Map<String, Value> = if blank {
         Map::new()
     } else {

@@ -23,7 +23,7 @@ use std::time::Duration;
 
 use chrono::TimeZone;
 use serde_json::{json, Value};
-use slint::{ComponentHandle, Model, ModelRc, SharedString, Timer, TimerMode, VecModel};
+use slint::{Model, ModelRc, SharedString, Timer, TimerMode, VecModel};
 
 use super::{bridge, HistRow, HistoryWindow};
 use crate::shell::platform::{self, KeyPress};
@@ -268,7 +268,8 @@ impl HistoryPage {
                 .into()
         };
         self.ui.set_empty_text(empty.into());
-        self.ui.set_empty_turn_on(n == 0 && st.query.is_empty() && !st.enabled);
+        self.ui
+            .set_empty_turn_on(n == 0 && st.query.is_empty() && !st.enabled);
         self.ui.set_off_note(!st.enabled && n > 0);
         drop(st);
         self.render_foot();
@@ -278,7 +279,14 @@ impl HistoryPage {
         let st = self.st.borrow();
         let n = Self::visible_rows(&st).len();
         let count = if n > 0 && st.query.is_empty() {
-            format!("{n} {}", if n == 1 { "conversation" } else { "conversations" })
+            format!(
+                "{n} {}",
+                if n == 1 {
+                    "conversation"
+                } else {
+                    "conversations"
+                }
+            )
         } else {
             String::new()
         };
@@ -450,8 +458,10 @@ impl HistoryPage {
         // The filter runs in Rust over every message body; typing fast
         // should not queue one pass per keystroke.
         let me = self.me.clone();
-        self.search_timer
-            .start(TimerMode::SingleShot, Duration::from_millis(120), move || {
+        self.search_timer.start(
+            TimerMode::SingleShot,
+            Duration::from_millis(120),
+            move || {
                 if let Some(p) = me.upgrade() {
                     let q = p.ui.get_query().trim().to_string();
                     {
@@ -461,7 +471,8 @@ impl HistoryPage {
                     }
                     p.refresh();
                 }
-            });
+            },
+        );
     }
 
     fn reset_search(&self) {
@@ -480,26 +491,21 @@ impl HistoryPage {
     fn open_row(&self, id: &str) {
         self.commit_pending();
         let me = self.me.clone();
-        bridge::call(
-            &self.label,
-            "history:open",
-            json!({ "id": id }),
-            move |r| {
-                let failed = match &r {
-                    Err(_) => true,
-                    Ok(v) => v["ok"] == json!(false),
-                };
-                if failed {
-                    if let Some(p) = me.upgrade() {
-                        p.say(
-                            "Couldn't open that conversation. It may have been deleted.",
-                            false,
-                        );
-                        p.refresh();
-                    }
+        bridge::call(&self.label, "history:open", json!({ "id": id }), move |r| {
+            let failed = match &r {
+                Err(_) => true,
+                Ok(v) => v["ok"] == json!(false),
+            };
+            if failed {
+                if let Some(p) = me.upgrade() {
+                    p.say(
+                        "Couldn't open that conversation. It may have been deleted.",
+                        false,
+                    );
+                    p.refresh();
                 }
-            },
-        );
+            }
+        });
     }
 
     fn open_first(&self) {

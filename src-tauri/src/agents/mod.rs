@@ -1030,7 +1030,7 @@ fn sweep() {
             x.card
                 .session_id
                 .as_deref()
-                .map_or(true, |id| book.get(id).is_some())
+                .is_none_or(|id| book.get(id).is_some())
         });
         (changed, pending.len() != before, !pending.is_empty())
     };

@@ -139,8 +139,12 @@ pub fn deliver(label: &str, channel: &str, payload: &Value) {
 pub fn on_theme_change(now: bool) {
     let _ = platform::post(Box::new(move || {
         DARK.with(|d| d.set(now));
-        let all: Vec<(String, Rc<dyn Page>)> =
-            PAGES.with(|p| p.borrow().iter().map(|(l, p)| (l.clone(), p.clone())).collect());
+        let all: Vec<(String, Rc<dyn Page>)> = PAGES.with(|p| {
+            p.borrow()
+                .iter()
+                .map(|(l, p)| (l.clone(), p.clone()))
+                .collect()
+        });
         for (label, p) in all {
             p.theme(now, text_scale(&label));
         }
@@ -287,7 +291,10 @@ pub fn build(spec: BuildSpec) -> shell::Result<Window> {
 fn build_here(mut b: BuildSpec) -> shell::Result<Window> {
     if let Some(old) = page(&b.label) {
         if is_window(old.hwnd()) {
-            return Err(shell::Error(format!("a window labelled {} exists", b.label)));
+            return Err(shell::Error(format!(
+                "a window labelled {} exists",
+                b.label
+            )));
         }
     }
     let (kind, layered) = kind_of(&b.page);

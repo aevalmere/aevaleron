@@ -370,8 +370,14 @@ fn decode(bytes: &[u8]) -> Option<Image> {
     buf.truncate(info.buffer_size());
     let px = match info.color_type {
         png::ColorType::Rgba => buf,
-        png::ColorType::Rgb => buf.chunks(3).flat_map(|c| [c[0], c[1], c[2], 255]).collect(),
-        png::ColorType::GrayscaleAlpha => buf.chunks(2).flat_map(|c| [c[0], c[0], c[0], c[1]]).collect(),
+        png::ColorType::Rgb => buf
+            .chunks(3)
+            .flat_map(|c| [c[0], c[1], c[2], 255])
+            .collect(),
+        png::ColorType::GrayscaleAlpha => buf
+            .chunks(2)
+            .flat_map(|c| [c[0], c[0], c[0], c[1]])
+            .collect(),
         png::ColorType::Grayscale => buf.iter().flat_map(|&g| [g, g, g, 255]).collect(),
         png::ColorType::Indexed => return None,
     };
@@ -504,7 +510,13 @@ fn make(item: &Item) -> Handle {
         return Handle::Sep(PredefinedMenuItem::separator());
     }
     if let Some(on) = item.checked {
-        return Handle::Check(CheckMenuItem::with_id(item.id, text(item), item.enabled, on, None));
+        return Handle::Check(CheckMenuItem::with_id(
+            item.id,
+            text(item),
+            item.enabled,
+            on,
+            None,
+        ));
     }
     Handle::Row(MenuItem::with_id(item.id, text(item), item.enabled, None))
 }
@@ -1136,7 +1148,10 @@ mod tests {
             let w = u32::from_be_bytes(bytes[16..20].try_into().unwrap());
             assert_eq!(w, size);
             let img = icon(size).unwrap();
-            assert_eq!((img.w, img.h, img.px.len()), (size, size, (size * size * 4) as usize));
+            assert_eq!(
+                (img.w, img.h, img.px.len()),
+                (size, size, (size * size * 4) as usize)
+            );
         }
     }
 }

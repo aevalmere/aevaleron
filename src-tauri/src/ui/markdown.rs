@@ -147,9 +147,7 @@ fn strip_emphasis(s: &str) -> String {
         }
         out = next;
     }
-    re!(r"~~([^~\n]+)~~")
-        .replace_all(&out, "${1}")
-        .into_owned()
+    re!(r"~~([^~\n]+)~~").replace_all(&out, "${1}").into_owned()
 }
 
 fn restore(s: &str, tag: char, parts: &[String]) -> String {
@@ -189,10 +187,7 @@ pub fn inline(text: &str) -> Inline {
             let url = c[2].to_string();
             let host = host_of(&url);
             let plain = bare(&with_code);
-            let h = host
-                .strip_prefix("www.")
-                .unwrap_or(&host)
-                .to_lowercase();
+            let h = host.strip_prefix("www.").unwrap_or(&host).to_lowercase();
             let show = !host.is_empty() && plain != h && plain != bare(&url);
             let host = if show { host } else { String::new() };
             shown.push(if host.is_empty() {
@@ -500,7 +495,9 @@ impl Parser {
             Some(_) => {}
         }
         if let Some(t) = self.top() {
-            self.arena[t].items.push(vec![Part::Text(vec![m[4].to_string()])]);
+            self.arena[t]
+                .items
+                .push(vec![Part::Text(vec![m[4].to_string()])]);
         }
         self.pending_break = false;
     }

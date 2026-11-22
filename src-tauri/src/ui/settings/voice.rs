@@ -15,12 +15,36 @@ use crate::ui::{SetAppRow, SetChoice, SetComboRow, SetComboView, SetToggle};
 
 /// The engines, in the page's order, with what each is.
 const ENGINES: [(&str, &str, &str); 6] = [
-    ("whisper-base", "Whisper base", "On this PC. The default: every language, with fuller punctuation."),
-    ("parakeet-110m", "Parakeet 110M", "On this PC. Fastest. English, with plainer punctuation."),
-    ("whisper-tiny", "Whisper tiny", "On this PC. Small download, gets more words wrong."),
-    ("whisper-small", "Whisper small", "On this PC. More accurate than base, slower on older PCs."),
-    ("parakeet-0.6b", "Parakeet 0.6B", "On this PC. Best text. Large download, slower without a strong processor."),
-    ("gemini", "Gemini", "Uses your Gemini key. The recording is sent to Google."),
+    (
+        "whisper-base",
+        "Whisper base",
+        "On this PC. The default: every language, with fuller punctuation.",
+    ),
+    (
+        "parakeet-110m",
+        "Parakeet 110M",
+        "On this PC. Fastest. English, with plainer punctuation.",
+    ),
+    (
+        "whisper-tiny",
+        "Whisper tiny",
+        "On this PC. Small download, gets more words wrong.",
+    ),
+    (
+        "whisper-small",
+        "Whisper small",
+        "On this PC. More accurate than base, slower on older PCs.",
+    ),
+    (
+        "parakeet-0.6b",
+        "Parakeet 0.6B",
+        "On this PC. Best text. Large download, slower without a strong processor.",
+    ),
+    (
+        "gemini",
+        "Gemini",
+        "Uses your Gemini key. The recording is sent to Google.",
+    ),
 ];
 
 /// A chord's modifiers, in the order it names them, with the keys that
@@ -224,7 +248,12 @@ impl SettingsPage {
         let device = text(set, "device");
         let devices: Vec<String> = snap["devices"]
             .as_array()
-            .map(|d| d.iter().filter_map(Value::as_str).map(str::to_string).collect())
+            .map(|d| {
+                d.iter()
+                    .filter_map(Value::as_str)
+                    .map(str::to_string)
+                    .collect()
+            })
             .unwrap_or_default();
         let default = match devices.first() {
             Some(d) => format!("Windows default ({d})"),
@@ -267,7 +296,10 @@ impl SettingsPage {
         let cleanup = flag(set, "cleanup");
         s.set_cleanup(cleanup);
         s.set_cleanup_summary(if cleanup { "On" } else { "Off" }.into());
-        let budget_ms = snap["cleanupBudgetMs"].as_f64().filter(|b| *b > 0.0).unwrap_or(800.0);
+        let budget_ms = snap["cleanupBudgetMs"]
+            .as_f64()
+            .filter(|b| *b > 0.0)
+            .unwrap_or(800.0);
         let budget = format!("{:.1} s", budget_ms / 1000.0);
         let cost = if cleanup {
             format!("Each dictation waits up to {budget} longer for it.")
@@ -613,8 +645,10 @@ impl SettingsPage {
                 return;
             };
             let before = c.mods.len() + usize::from(c.key.is_some());
-            c.mods
-                .retain(|m| MODS.iter().any(|(n, vks)| n == m && vks.iter().any(|&vk| down(vk))));
+            c.mods.retain(|m| {
+                MODS.iter()
+                    .any(|(n, vks)| n == m && vks.iter().any(|&vk| down(vk)))
+            });
             if c.key.as_ref().is_some_and(|k| !down(k.1)) {
                 c.key = None;
             }

@@ -6,8 +6,8 @@
 
 use std::time::Duration;
 
-use serde_json::json;
 use crate::shell::{AppHandle, Manager};
+use serde_json::json;
 use windows::core::IInspectable;
 use windows::Foundation::TypedEventHandler;
 use windows::UI::ViewManagement::UISettings;

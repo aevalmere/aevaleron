@@ -8,10 +8,10 @@
 
 use std::collections::BTreeMap;
 
+use crate::shell::{AppHandle, Manager};
 use parking_lot::{Mutex, MutexGuard, RwLock};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use crate::shell::{AppHandle, Manager};
 use tokio::sync::broadcast;
 
 /// A rectangle in DIPs (Electron's unit), the glass and never the window.

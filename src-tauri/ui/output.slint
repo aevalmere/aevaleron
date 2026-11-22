@@ -141,31 +141,31 @@ component Buttons inherits Rectangle {
 }
 
 component RowView inherits Rectangle {
-    in property <OutRow> row;
+    in property <OutRow> it;
     callback button(string, string, length, length, length);
     callback context(string);
 
-    property <length> indent: root.row.level * 22px * Theme.text-scale;
-    property <bool> head: root.row.state == "head";
-    property <color> mark-color: root.row.state == "failed" ? Theme.danger
-        : root.row.state == "done" ? Theme.accent-text
-        : root.row.state == "running" || root.row.state == "paused" ? Theme.accent
+    property <length> indent: root.it.level * 22px * Theme.text-scale;
+    property <bool> head: root.it.state == "head";
+    property <color> mark-color: root.it.state == "failed" ? Theme.danger
+        : root.it.state == "done" ? Theme.accent-text
+        : root.it.state == "running" || root.it.state == "paused" ? Theme.accent
         : Theme.label-3;
 
     // A right press anywhere the words do not take it: the row's menu.
     TouchArea {
         pointer-event(e) => {
             if (e.button == PointerEventButton.right && e.kind == PointerEventKind.up) {
-                root.context(root.row.key);
+                root.context(root.it.key);
             }
         }
     }
 
     VerticalLayout {
-        padding-top: root.row.gap;
+        padding-top: root.it.gap;
 
         // A question after the first (the first is the title).
-        if root.row.kind == "user": HorizontalLayout {
+        if root.it.kind == "user": HorizontalLayout {
             alignment: start;
             Rectangle {
                 background: Theme.fill-2;
@@ -176,7 +176,7 @@ component RowView inherits Rectangle {
                     padding-top: Theme.sp-2;
                     padding-bottom: Theme.sp-2;
                     Text {
-                        text: root.row.text;
+                        text: root.it.text;
                         wrap: word-wrap;
                         font-size: Theme.row;
                         color: Theme.label-2;
@@ -185,28 +185,28 @@ component RowView inherits Rectangle {
             }
         }
 
-        if root.row.kind == "h": Words {
-            text: root.row.text;
-            font-size: root.row.level >= 3 ? Theme.body-size : Theme.title;
+        if root.it.kind == "h": Words {
+            text: root.it.text;
+            font-size: root.it.level >= 3 ? Theme.body-size : Theme.title;
             font-weight: 600;
         }
 
-        if root.row.kind == "p": HorizontalLayout {
+        if root.it.kind == "p": HorizontalLayout {
             padding-left: root.indent;
             Words {
-                text: root.row.text;
-                font-weight: root.row.strong ? 600 : 400;
-                font-family: root.row.mono ? Theme.mono : Theme.font;
-                font-size: root.row.mono ? Theme.code : Theme.body-size;
-                color: root.row.accent ? Theme.label-2 : Theme.label;
+                text: root.it.text;
+                font-weight: root.it.strong ? 600 : 400;
+                font-family: root.it.mono ? Theme.mono : Theme.font;
+                font-size: root.it.mono ? Theme.code : Theme.body-size;
+                color: root.it.accent ? Theme.label-2 : Theme.label;
             }
         }
 
-        if root.row.kind == "li": HorizontalLayout {
+        if root.it.kind == "li": HorizontalLayout {
             padding-left: root.indent;
             spacing: Theme.sp-2;
             Text {
-                text: root.row.marker;
+                text: root.it.marker;
                 width: 22px * Theme.text-scale;
                 font-size: Theme.body-size;
                 color: Theme.label-2;
@@ -215,14 +215,14 @@ component RowView inherits Rectangle {
             }
             Words {
                 horizontal-stretch: 1;
-                text: root.row.text;
-                font-weight: root.row.strong ? 600 : 400;
-                font-family: root.row.mono ? Theme.mono : Theme.font;
-                font-size: root.row.mono ? Theme.code : Theme.body-size;
+                text: root.it.text;
+                font-weight: root.it.strong ? 600 : 400;
+                font-family: root.it.mono ? Theme.mono : Theme.font;
+                font-size: root.it.mono ? Theme.code : Theme.body-size;
             }
         }
 
-        if root.row.kind == "quote": HorizontalLayout {
+        if root.it.kind == "quote": HorizontalLayout {
             padding-left: root.indent;
             spacing: Theme.sp-3;
             Rectangle {
@@ -232,18 +232,18 @@ component RowView inherits Rectangle {
             }
             Words {
                 horizontal-stretch: 1;
-                text: root.row.text;
+                text: root.it.text;
                 color: Theme.label-2;
             }
         }
 
-        if root.row.kind == "hr": Rectangle {
+        if root.it.kind == "hr": Rectangle {
             height: 1px;
             background: Theme.hairline;
         }
 
         // A fenced block: Cascadia Mono on a plate, its language and Copy.
-        if root.row.kind == "code": HorizontalLayout {
+        if root.it.kind == "code": HorizontalLayout {
             padding-left: root.indent;
             Rectangle {
                 background: Theme.plate;
@@ -254,22 +254,22 @@ component RowView inherits Rectangle {
                     HorizontalLayout {
                         spacing: Theme.sp-2;
                         Text {
-                            text: root.row.sub;
+                            text: root.it.sub;
                             font-size: Theme.meta;
                             color: Theme.label-3;
                             vertical-alignment: center;
                             horizontal-stretch: 1;
                         }
                         Buttons {
-                            list: root.row.buttons;
-                            key: root.row.key;
+                            list: root.it.buttons;
+                            key: root.it.key;
                             button(k, id, x, t, b) => {
                                 root.button(k, id, x, t, b);
                             }
                         }
                     }
                     Words {
-                        text: root.row.text;
+                        text: root.it.text;
                         font-family: Theme.mono;
                         font-size: Theme.code;
                     }
@@ -278,10 +278,10 @@ component RowView inherits Rectangle {
         }
 
         // One table row; every row has the same columns at the same width.
-        if root.row.kind == "table": HorizontalLayout {
+        if root.it.kind == "table": HorizontalLayout {
             padding-left: root.indent;
             spacing: Theme.sp-3;
-            for c[i] in root.row.cells: Text {
+            for c[i] in root.it.cells: Text {
                 text: c;
                 wrap: word-wrap;
                 min-width: 1px;
@@ -290,37 +290,37 @@ component RowView inherits Rectangle {
                 font-size: Theme.row;
                 font-weight: root.head ? 600 : 400;
                 color: root.head ? Theme.label : Theme.label-2;
-                horizontal-alignment: root.row.aligns[i] == "right" ? TextHorizontalAlignment.right
-                    : root.row.aligns[i] == "center" ? TextHorizontalAlignment.center
+                horizontal-alignment: root.it.aligns[i] == "right" ? TextHorizontalAlignment.right
+                    : root.it.aligns[i] == "center" ? TextHorizontalAlignment.center
                     : TextHorizontalAlignment.left;
             }
         }
 
-        if root.row.kind == "table" && root.head: Rectangle {
+        if root.it.kind == "table" && root.head: Rectangle {
             height: 1px;
             background: Theme.hairline;
         }
 
         // A link of the block above, as a chip that opens it.
-        if root.row.kind == "link": HorizontalLayout {
+        if root.it.kind == "link": HorizontalLayout {
             padding-left: root.indent;
             alignment: start;
             Buttons {
-                list: root.row.buttons;
-                key: root.row.key;
+                list: root.it.buttons;
+                key: root.it.key;
                 button(k, id, x, t, b) => {
                     root.button(k, id, x, t, b);
                 }
             }
         }
 
-        if root.row.kind == "thinking": HorizontalLayout {
+        if root.it.kind == "thinking": HorizontalLayout {
             padding-left: root.indent;
             spacing: Theme.sp-2;
             alignment: start;
             Dots { }
             Text {
-                text: root.row.text;
+                text: root.it.text;
                 font-size: Theme.row;
                 color: Theme.label-2;
                 vertical-alignment: center;
@@ -328,18 +328,18 @@ component RowView inherits Rectangle {
         }
 
         // Under an answer or a run: its buttons, then the quiet usage line.
-        if root.row.kind == "meta": HorizontalLayout {
+        if root.it.kind == "meta": HorizontalLayout {
             padding-left: root.indent;
             spacing: Theme.sp-2;
             Buttons {
-                list: root.row.buttons;
-                key: root.row.key;
+                list: root.it.buttons;
+                key: root.it.key;
                 button(k, id, x, t, b) => {
                     root.button(k, id, x, t, b);
                 }
             }
             Text {
-                text: root.row.sub;
+                text: root.it.sub;
                 font-size: Theme.meta;
                 color: Theme.label-3;
                 vertical-alignment: center;
@@ -349,7 +349,7 @@ component RowView inherits Rectangle {
         }
 
         // An error (or a busy note, or Start over's row) with its fixes.
-        if root.row.kind == "error" || root.row.kind == "note": Rectangle {
+        if root.it.kind == "error" || root.it.kind == "note": Rectangle {
             background: Theme.fill-1;
             border-radius: Theme.r-card;
             VerticalLayout {
@@ -357,25 +357,25 @@ component RowView inherits Rectangle {
                 spacing: Theme.sp-2;
                 HorizontalLayout {
                     spacing: Theme.sp-2;
-                    if root.row.marker != "": Text {
-                        text: root.row.marker;
+                    if root.it.marker != "": Text {
+                        text: root.it.marker;
                         width: 18px * Theme.text-scale;
                         font-family: Theme.icons;
                         font-size: 14px * Theme.text-scale;
-                        color: root.row.state == "error" ? Theme.danger : Theme.label-2;
+                        color: root.it.state == "error" ? Theme.danger : Theme.label-2;
                         vertical-alignment: top;
                     }
                     Words {
                         horizontal-stretch: 1;
-                        text: root.row.text;
+                        text: root.it.text;
                         font-size: Theme.row;
                     }
                 }
-                if root.row.buttons.length > 0: HorizontalLayout {
+                if root.it.buttons.length > 0: HorizontalLayout {
                     alignment: start;
                     Buttons {
-                        list: root.row.buttons;
-                        key: root.row.key;
+                        list: root.it.buttons;
+                        key: root.it.key;
                         button(k, id, x, t, b) => {
                             root.button(k, id, x, t, b);
                         }
@@ -384,62 +384,62 @@ component RowView inherits Rectangle {
             }
         }
 
-        if root.row.kind == "empty": Text {
-            text: root.row.text;
+        if root.it.kind == "empty": Text {
+            text: root.it.text;
             font-size: Theme.row;
             color: Theme.label-3;
             horizontal-alignment: center;
         }
 
         // What was sent with a question.
-        if root.row.kind == "sent": Rectangle {
+        if root.it.kind == "sent": Rectangle {
             background: Theme.plate;
             border-radius: Theme.r-plate;
             VerticalLayout {
                 padding: Theme.sp-3;
                 spacing: Theme.sp-1;
                 Text {
-                    text: root.row.text;
+                    text: root.it.text;
                     wrap: word-wrap;
                     font-size: Theme.caption;
                     font-weight: 600;
                     color: Theme.label-2;
                 }
-                for l in root.row.lines: Text {
+                for l in root.it.lines: Text {
                     text: "\u{2022} " + l;
                     wrap: word-wrap;
                     font-size: Theme.caption;
                     color: Theme.label-2;
                 }
-                if root.row.note != "": Text {
-                    text: root.row.note;
+                if root.it.note != "": Text {
+                    text: root.it.note;
                     wrap: word-wrap;
                     font-size: Theme.meta;
                     color: Theme.label-3;
                 }
-                if root.row.buttons.length > 0: HorizontalLayout {
+                if root.it.buttons.length > 0: HorizontalLayout {
                     alignment: start;
                     Buttons {
-                        list: root.row.buttons;
-                        key: root.row.key;
+                        list: root.it.buttons;
+                        key: root.it.key;
                         button(k, id, x, t, b) => {
                             root.button(k, id, x, t, b);
                         }
                     }
                 }
-                if root.row.picture.width > 0: Image {
-                    source: root.row.picture;
+                if root.it.picture.width > 0: Image {
+                    source: root.it.picture;
                     height: 220px * Theme.text-scale;
                     image-fit: contain;
                 }
             }
         }
 
-        if root.row.kind == "trail-head": HorizontalLayout {
+        if root.it.kind == "trail-head": HorizontalLayout {
             padding-left: root.indent;
             spacing: Theme.sp-2;
             Text {
-                text: root.row.text;
+                text: root.it.text;
                 font-size: Theme.caption;
                 font-weight: 600;
                 color: Theme.label-2;
@@ -447,8 +447,8 @@ component RowView inherits Rectangle {
                 horizontal-stretch: 1;
             }
             Buttons {
-                list: root.row.buttons;
-                key: root.row.key;
+                list: root.it.buttons;
+                key: root.it.key;
                 button(k, id, x, t, b) => {
                     root.button(k, id, x, t, b);
                 }
@@ -456,13 +456,13 @@ component RowView inherits Rectangle {
         }
 
         // A plan item, an act under it, or a row of its own in the trail.
-        if root.row.kind == "step": HorizontalLayout {
+        if root.it.kind == "step": HorizontalLayout {
             padding-left: root.indent;
             spacing: Theme.sp-2;
             Text {
-                text: root.row.marker;
+                text: root.it.marker;
                 width: 18px * Theme.text-scale;
-                font-size: root.row.strong ? Theme.row : Theme.caption;
+                font-size: root.it.strong ? Theme.row : Theme.caption;
                 color: root.mark-color;
                 horizontal-alignment: center;
                 vertical-alignment: top;
@@ -471,57 +471,57 @@ component RowView inherits Rectangle {
                 horizontal-stretch: 1;
                 spacing: 2px;
                 Text {
-                    text: root.row.text;
+                    text: root.it.text;
                     wrap: word-wrap;
-                    font-size: root.row.strong ? Theme.row : Theme.caption;
-                    color: root.row.strong ? Theme.label : Theme.label-2;
+                    font-size: root.it.strong ? Theme.row : Theme.caption;
+                    color: root.it.strong ? Theme.label : Theme.label-2;
                 }
-                if root.row.note != "": Text {
-                    text: root.row.note;
+                if root.it.note != "": Text {
+                    text: root.it.note;
                     wrap: word-wrap;
                     font-size: Theme.meta;
-                    color: root.row.state == "failed" ? Theme.danger : root.row.accent ? Theme.accent-text : Theme.label-3;
+                    color: root.it.state == "failed" ? Theme.danger : root.it.accent ? Theme.accent-text : Theme.label-3;
                 }
             }
-            if root.row.sub != "": Text {
-                text: root.row.sub;
+            if root.it.sub != "": Text {
+                text: root.it.sub;
                 font-size: Theme.meta;
-                color: root.row.state == "failed" ? Theme.danger : Theme.label-3;
+                color: root.it.state == "failed" ? Theme.danger : Theme.label-3;
                 vertical-alignment: top;
             }
         }
 
         // The confirm card, and the consent sheet: what it asks, the exact
         // text it would type, why it asks, and the answers.
-        if root.row.kind == "card": Rectangle {
+        if root.it.kind == "card": Rectangle {
             background: Theme.raised;
             border-radius: Theme.r-card;
             VerticalLayout {
                 padding: Theme.sp-4;
                 spacing: Theme.sp-2;
                 Text {
-                    text: root.row.text;
+                    text: root.it.text;
                     wrap: word-wrap;
                     font-size: Theme.body-size;
                     font-weight: 600;
                     color: Theme.label;
                 }
-                if root.row.sub != "": HorizontalLayout {
+                if root.it.sub != "": HorizontalLayout {
                     Text {
-                        text: root.row.sub;
+                        text: root.it.sub;
                         font-size: Theme.row;
                         font-weight: 700;
                         color: Theme.label;
                     }
                     Text {
                         horizontal-stretch: 1;
-                        text: root.row.extra;
+                        text: root.it.extra;
                         wrap: word-wrap;
                         font-size: Theme.row;
                         color: Theme.label-2;
                     }
                 }
-                for l in root.row.lines: HorizontalLayout {
+                for l in root.it.lines: HorizontalLayout {
                     spacing: Theme.sp-2;
                     Text {
                         text: "\u{2022}";
@@ -536,22 +536,22 @@ component RowView inherits Rectangle {
                         color: Theme.label-2;
                     }
                 }
-                if root.row.value != "": Rectangle {
+                if root.it.value != "": Rectangle {
                     background: Theme.plate;
                     border-radius: Theme.r-row;
                     clip: true;
-                    height: min(typed.preferred-height + 2 * Theme.sp-2, root.row.state == "all" ? 100000px : 8 * 20px * Theme.text-scale + 2 * Theme.sp-2);
+                    height: min(typed.preferred-height + 2 * Theme.sp-2, root.it.state == "all" ? 100000px : 8 * 20px * Theme.text-scale + 2 * Theme.sp-2);
                     typed := Words {
                         x: Theme.sp-2;
                         y: Theme.sp-2;
                         width: parent.width - 2 * Theme.sp-2;
-                        text: root.row.value;
+                        text: root.it.value;
                         font-family: Theme.mono;
                         font-size: Theme.code;
                     }
                 }
-                if root.row.note != "": Text {
-                    text: root.row.note;
+                if root.it.note != "": Text {
+                    text: root.it.note;
                     wrap: word-wrap;
                     font-size: Theme.caption;
                     color: Theme.label-2;
@@ -559,8 +559,8 @@ component RowView inherits Rectangle {
                 HorizontalLayout {
                     alignment: end;
                     Buttons {
-                        list: root.row.buttons;
-                        key: root.row.key;
+                        list: root.it.buttons;
+                        key: root.it.key;
                         button(k, id, x, t, b) => {
                             root.button(k, id, x, t, b);
                         }
@@ -570,7 +570,7 @@ component RowView inherits Rectangle {
         }
 
         // Paused, or a plan waiting for Start.
-        if root.row.kind == "banner": Rectangle {
+        if root.it.kind == "banner": Rectangle {
             background: Theme.fill-1;
             border-radius: Theme.r-card;
             HorizontalLayout {
@@ -578,12 +578,12 @@ component RowView inherits Rectangle {
                 spacing: Theme.sp-3;
                 Words {
                     horizontal-stretch: 1;
-                    text: root.row.text;
+                    text: root.it.text;
                     font-size: Theme.row;
                 }
                 Buttons {
-                    list: root.row.buttons;
-                    key: root.row.key;
+                    list: root.it.buttons;
+                    key: root.it.key;
                     button(k, id, x, t, b) => {
                         root.button(k, id, x, t, b);
                     }
@@ -592,25 +592,25 @@ component RowView inherits Rectangle {
         }
 
         // A run reopened from history: its steps, folded.
-        if root.row.kind == "stored": VerticalLayout {
+        if root.it.kind == "stored": VerticalLayout {
             spacing: Theme.sp-2;
             HorizontalLayout {
                 alignment: start;
                 Buttons {
-                    list: root.row.buttons;
-                    key: root.row.key;
+                    list: root.it.buttons;
+                    key: root.it.key;
                     button(k, id, x, t, b) => {
                         root.button(k, id, x, t, b);
                     }
                 }
             }
-            if root.row.value != "": Rectangle {
+            if root.it.value != "": Rectangle {
                 background: Theme.plate;
                 border-radius: Theme.r-plate;
                 VerticalLayout {
                     padding: Theme.sp-3;
                     Words {
-                        text: root.row.value;
+                        text: root.it.value;
                         font-family: Theme.mono;
                         font-size: Theme.code;
                     }
@@ -677,8 +677,8 @@ export component OutputWindow inherits Window {
     // What the window needs to show everything: Rust sizes a window that
     // follows its transcript from this (output:glass).
     out property <length> content-height: bar.height + col.preferred-height;
-    out property <length> scroll-top: -flick.viewport-y;
-    out property <length> scroll-height: flick.viewport-height;
+    out property <length> scroll-top: -flick.content-y;
+    out property <length> scroll-height: flick.content-height;
     out property <length> view-height: flick.height;
     out property <length> column-width: col.width;
     // Follows new words down unless the person scrolled up.
@@ -695,29 +695,29 @@ export component OutputWindow inherits Window {
     callback height-changed(length);
 
     public function scroll-by(dy: length) {
-        flick.viewport-y = max(min(0px, flick.height - flick.viewport-height), min(0px, flick.viewport-y - dy));
+        flick.content-y = max(min(0px, flick.height - flick.content-height), min(0px, flick.content-y - dy));
     }
 
     public function scroll-home() {
-        flick.viewport-y = 0px;
+        flick.content-y = 0px;
     }
 
     public function scroll-end() {
         root.stick = true;
-        flick.viewport-y = min(0px, flick.height - flick.viewport-height);
+        flick.content-y = min(0px, flick.height - flick.content-height);
     }
 
     changed content-height => {
         root.height-changed(root.content-height);
     }
     changed scroll-height => {
-        flick.viewport-y = root.stick ? min(0px, flick.height - flick.viewport-height) : max(min(0px, flick.height - flick.viewport-height), flick.viewport-y);
+        flick.content-y = root.stick ? min(0px, flick.height - flick.content-height) : max(min(0px, flick.height - flick.content-height), flick.content-y);
     }
     changed view-height => {
-        flick.viewport-y = root.stick ? min(0px, flick.height - flick.viewport-height) : max(min(0px, flick.height - flick.viewport-height), flick.viewport-y);
+        flick.content-y = root.stick ? min(0px, flick.height - flick.content-height) : max(min(0px, flick.height - flick.content-height), flick.content-y);
     }
     changed scroll-top => {
-        root.stick = root.scroll-top >= flick.viewport-height - flick.height - 48px;
+        root.stick = root.scroll-top >= flick.content-height - flick.height - 48px;
     }
 
     sheet := Rectangle {
@@ -852,8 +852,8 @@ export component OutputWindow inherits Window {
                     height: parent.height;
                     // The wheel scrolls; a drag selects text.
                     interactive: false;
-                    viewport-width: self.width;
-                    viewport-height: col.preferred-height;
+                    content-width: self.width;
+                    content-height: col.preferred-height;
 
                     col := VerticalLayout {
                         // The reading measure: 640 px, centred once wider.
@@ -866,7 +866,7 @@ export component OutputWindow inherits Window {
                         padding-bottom: Theme.sp-5;
 
                         for row in root.rows: RowView {
-                            row: row;
+                            it: row;
                             button(k, id, x, t, b) => {
                                 root.row-button(k, id, x, t, b);
                             }
@@ -879,19 +879,19 @@ export component OutputWindow inherits Window {
 
                 // The scroll thumb: visible whenever there is more than fits.
                 thumb := Rectangle {
-                    property <length> over: flick.viewport-height - flick.height;
+                    property <length> over: flick.content-height - flick.height;
                     visible: self.over > 1px;
                     width: thumb-touch.has-hover || thumb-touch.pressed ? 8px : 4px;
                     x: parent.width - self.width - 3px;
-                    height: max(32px, flick.height * (flick.height / max(1px, flick.viewport-height)));
-                    y: self.over > 0px ? (-flick.viewport-y) / self.over * (flick.height - self.height) : 0px;
+                    height: max(32px, flick.height * (flick.height / max(1px, flick.content-height)));
+                    y: self.over > 0px ? (-flick.content-y) / self.over * (flick.height - self.height) : 0px;
                     border-radius: self.width / 2;
                     background: thumb-touch.pressed ? Theme.label-3 : Theme.fill-3;
 
                     thumb-touch := TouchArea {
                         moved => {
                             if (self.pressed) {
-                                flick.viewport-y = max(0px - thumb.over, min(0px, flick.viewport-y - (self.mouse-y - self.pressed-y) * (thumb.over / max(1px, flick.height - thumb.height))));
+                                flick.content-y = max(0px - thumb.over, min(0px, flick.content-y - (self.mouse-y - self.pressed-y) * (thumb.over / max(1px, flick.height - thumb.height))));
                             }
                         }
                     }
@@ -947,8 +947,8 @@ export component OutputWindow inherits Window {
                 width: parent.width;
                 height: parent.height;
                 interactive: false;
-                viewport-width: self.width;
-                viewport-height: menu-col.preferred-height;
+                content-width: self.width;
+                content-height: menu-col.preferred-height;
 
                 menu-col := VerticalLayout {
                     width: panel.width;

@@ -68,10 +68,10 @@ export component HistoryWindow inherits Window {
 
     // Keeps a row (its top `y` and height `h` in the list) in view.
     public function show-row(y: length, h: length) {
-        if (y < -lv.viewport-y) {
-            lv.viewport-y = -y;
-        } else if (y + h > -lv.viewport-y + lv.visible-height) {
-            lv.viewport-y = -(y + h - lv.visible-height);
+        if (y < -lv.content-y) {
+            lv.content-y = -y;
+        } else if (y + h > -lv.content-y + lv.visible-height) {
+            lv.content-y = -(y + h - lv.visible-height);
         }
     }
 

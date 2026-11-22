@@ -29,8 +29,8 @@ use windows_sys::Win32::Foundation::{HWND, RECT};
 use windows_sys::Win32::UI::HiDpi::GetDpiForWindow;
 use windows_sys::Win32::UI::WindowsAndMessaging::{
     GetClientRect, GetForegroundWindow, GetWindowRect, IsWindow, IsWindowVisible, PostMessageW,
-    SetWindowPos, ShowWindow, HWND_NOTOPMOST, HWND_TOPMOST, SWP_NOACTIVATE, SWP_NOMOVE,
-    SWP_NOSIZE, SWP_NOZORDER, SW_HIDE, SW_SHOW, WM_CLOSE,
+    SetWindowPos, ShowWindow, HWND_NOTOPMOST, HWND_TOPMOST, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE,
+    SWP_NOZORDER, SW_HIDE, SW_SHOW, WM_CLOSE,
 };
 
 /// What a shell call can fail with.

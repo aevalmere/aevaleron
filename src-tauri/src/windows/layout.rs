@@ -235,7 +235,7 @@ pub fn find_snap(wa: Rect, r: Rect, size: (f64, f64)) -> Option<(Anchor, Rect)> 
             };
             let target = bounds_for_size(wa, size, &pos);
             let d = center_distance(target, r);
-            let better = best.as_ref().map_or(true, |b| d < b.2);
+            let better = best.as_ref().is_none_or(|b| d < b.2);
             if d <= SNAP_DISTANCE && better {
                 best = Some((pos, target, d));
             }

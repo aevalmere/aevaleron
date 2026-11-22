@@ -27,7 +27,6 @@ export struct AgentRow {
 component Key inherits Rectangle {
     in property <string> text;
 
-    min-width: 24px;
     width: max(24px, key-text.preferred-width + 8px);
     height: key-text.preferred-height + 2px;
     border-radius: Theme.r-key;

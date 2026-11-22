@@ -11,10 +11,10 @@ use std::sync::mpsc;
 use std::sync::OnceLock;
 use std::time::Duration;
 
-use parking_lot::Mutex;
-use serde_json::{json, Value};
 use global_hotkey::hotkey::{Code, HotKey, Modifiers};
 use global_hotkey::{GlobalHotKeyEvent, GlobalHotKeyManager, HotKeyState};
+use parking_lot::Mutex;
+use serde_json::{json, Value};
 
 use crate::shell::AppHandle;
 use crate::state::{shared, Mode};
@@ -72,7 +72,7 @@ fn modifier(t: &str) -> Option<Modifiers> {
         // AltGr is Ctrl+Alt on Windows.
         "altgr" => Modifiers::CONTROL | Modifiers::ALT,
         "shift" => Modifiers::SHIFT,
-        "super" | "meta" | "command" | "cmd" => Modifiers::SUPER,
+        "super" | "meta" | "command" | "cmd" => Modifiers::META,
         _ => return None,
     })
 }
@@ -365,9 +365,10 @@ trait Keys {
     fn unregister_all(&mut self);
 }
 
-struct Plugin<'a>(&'a AppHandle);
+/// The real registrar (global-hotkey on the UI thread).
+struct Live;
 
-impl Keys for Plugin<'_> {
+impl Keys for Live {
     fn register(&mut self, acc: &str, action: &str) -> bool {
         let Ok((mods, code)) = parse(acc) else {
             return false;
@@ -541,7 +542,7 @@ fn apply_now(app: &AppHandle) {
             .collect()
     };
     let mut results = st.lock().hotkeys.clone();
-    let mut keys = Plugin(app);
+    let mut keys = Live;
     let wanted = || want_escape(app);
     let mut reg = registered().lock();
     let changed = reconcile(&mut keys, &mut reg, chords, &mut results, wanted);
@@ -636,7 +637,7 @@ pub fn suspend_escape(app: &AppHandle) {
     on_main_wait(app, |a| {
         let mut reg = registered().lock();
         if reg.escape {
-            Plugin(a).unregister(ESCAPE_CHORD);
+            Live.unregister(ESCAPE_CHORD);
             reg.escape = false;
         }
         drop(reg);
@@ -726,7 +727,7 @@ fn set_now(app: &AppHandle, action: &str, accelerator: &str) -> Value {
     }
     // Probe with everything of ours unregistered, so the probe only fails
     // when another application owns the combo.
-    Plugin(app).unregister_all();
+    Live.unregister_all();
     *registered().lock() = Registered::default();
     shared(app).lock().escape_registered = false;
     if !probe(accelerator) {
@@ -771,7 +772,7 @@ mod tests {
         );
         assert_eq!(p("Control+F5"), (Modifiers::CONTROL, Code::F5));
         assert_eq!(p("Super+F24").1, Code::F24);
-        assert_eq!(p("Meta+Up"), (Modifiers::SUPER, Code::ArrowUp));
+        assert_eq!(p("Meta+Up"), (Modifiers::META, Code::ArrowUp));
         assert_eq!(p("AltGr+E"), (ca, Code::KeyE));
         assert_eq!(p("Option+Return").1, Code::Enter);
         assert_eq!(

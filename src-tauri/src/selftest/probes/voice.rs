@@ -10,10 +10,10 @@ use serde_json::{json, Value};
 
 use crate::desktop;
 use crate::selftest::{notepad, Cx, Input};
-use crate::windows::OVERLAY;
 use crate::voice::{
     self, capture, engine, insert, keyword, model, pill, settings, wake, wav, whisper, Origin,
 };
+use crate::windows::OVERLAY;
 
 const FIXTURE: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),

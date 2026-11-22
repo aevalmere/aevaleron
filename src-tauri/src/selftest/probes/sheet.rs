@@ -47,7 +47,9 @@ pub fn run(cx: &mut Cx) {
         fail_all(cx, "no output window opened");
         return;
     };
-    let ready = cx.wait_for(Duration::from_secs(20), || cx.probe(&label, "visible").is_ok());
+    let ready = cx.wait_for(Duration::from_secs(20), || {
+        cx.probe(&label, "visible").is_ok()
+    });
     if ready {
         check(cx, &label);
     } else {
@@ -109,7 +111,9 @@ fn markdown_labels(cx: &Cx) {
 }
 
 fn has_heading(lines: &[Line], n: usize) -> bool {
-    lines.iter().any(|l| matches!(l, Line::Heading { level, .. } if *level == n))
+    lines
+        .iter()
+        .any(|l| matches!(l, Line::Heading { level, .. } if *level == n))
 }
 
 fn top(cx: &Cx, label: &str) -> f64 {
@@ -156,7 +160,9 @@ fn check(cx: &Cx, label: &str) {
 /// Eight long answers overflow the window: it scrolls, and starts at the
 /// newest.
 fn transcript(cx: &Cx, label: &str) {
-    let settled = cx.wait_for(Duration::from_secs(3), || at_bottom(cx, label) == Some(true));
+    let settled = cx.wait_for(Duration::from_secs(3), || {
+        at_bottom(cx, label) == Some(true)
+    });
     let t = top(cx, label);
     cx.must(
         "transcriptScroll",
@@ -191,7 +197,9 @@ fn wheel(cx: &Cx, label: &str, hwnd: isize) {
 
     let off = at_bottom(cx, label);
     let _ = cx.input(Input::Wheel { at, notches: -40 });
-    let back = cx.wait_for(Duration::from_secs(3), || at_bottom(cx, label) == Some(true));
+    let back = cx.wait_for(Duration::from_secs(3), || {
+        at_bottom(cx, label) == Some(true)
+    });
     cx.must(
         "moreIndicator",
         off == Some(false) && back,

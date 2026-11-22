@@ -565,7 +565,7 @@ component ComboList inherits Rectangle {
     clip: true;
 
     function keep() {
-        fl.viewport-y = max(fl.height - fl.viewport-height, min(0px, fl.height / 2 - root.want));
+        fl.content-y = max(fl.height - fl.viewport-height, min(0px, fl.height / 2 - root.want));
     }
 
     changed want => {
@@ -580,8 +580,8 @@ component ComboList inherits Rectangle {
         y: 0;
         width: parent.width;
         height: parent.height;
-        viewport-width: self.width;
-        viewport-height: list.preferred-height + 2 * Theme.sp-1;
+        content-width: self.width;
+        content-height: list.preferred-height + 2 * Theme.sp-1;
         list := VerticalLayout {
             x: 0;
             y: Theme.sp-1;

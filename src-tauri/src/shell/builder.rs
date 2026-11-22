@@ -167,4 +167,3 @@ impl WebviewWindowBuilder {
         crate::ui::build(self.spec)
     }
 }
-

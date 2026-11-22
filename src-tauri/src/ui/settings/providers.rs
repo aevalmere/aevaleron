@@ -370,7 +370,11 @@ fn view_of(p: &Prov, u: &ProvUi, list: &[Prov]) -> View {
         let dn = name_of(&u.detected);
         v.msg = format!("This is {} {dn} key.", article(&dn));
         v.field = true;
-        v.actions = vec![act("save-under", &format!("Save it under {dn}"), "prominent")];
+        v.actions = vec![act(
+            "save-under",
+            &format!("Save it under {dn}"),
+            "prominent",
+        )];
         return v;
     }
     if !u.error.is_empty() {
@@ -427,7 +431,11 @@ fn view_of(p: &Prov, u: &ProvUi, list: &[Prov]) -> View {
         }
         "ready" => {
             let when = ago(p.checked_at);
-            let when = if when.is_empty() { "just now".into() } else { when };
+            let when = if when.is_empty() {
+                "just now".into()
+            } else {
+                when
+            };
             v.msg = format!("Works. Checked {when}.{}", credit_text(p));
             v.actions = vec![
                 act("test", "Test again", ""),
@@ -454,7 +462,9 @@ fn view_of(p: &Prov, u: &ProvUi, list: &[Prov]) -> View {
             v.msg = if or {
                 "The key works, but the account has no credit, so only free models answer.".into()
             } else {
-                format!("The key works, but the {n} account has no credit. Aevaleron is skipping {n}.")
+                format!(
+                    "The key works, but the {n} account has no credit. Aevaleron is skipping {n}."
+                )
             };
             v.actions = vec![
                 link("Add credit", credit_url, true),
@@ -475,7 +485,10 @@ fn view_of(p: &Prov, u: &ProvUi, list: &[Prov]) -> View {
         }
         _ => {
             v.msg = format!("Can't reach {n} right now. The key is saved; Aevaleron checks again when you're online.");
-            v.actions = vec![act("test", "Test again", ""), act("remove", "Remove", "text")];
+            v.actions = vec![
+                act("test", "Test again", ""),
+                act("remove", "Remove", "text"),
+            ];
         }
     }
     v
@@ -633,11 +646,23 @@ impl SettingsPage {
     }
 
     fn pui(&self, id: &str) -> ProvUi {
-        self.st.borrow().prov.ui.get(id).cloned().unwrap_or_default()
+        self.st
+            .borrow()
+            .prov
+            .ui
+            .get(id)
+            .cloned()
+            .unwrap_or_default()
     }
 
     fn prov(&self, id: &str) -> Option<Prov> {
-        self.st.borrow().prov.list.iter().find(|p| p.id == id).cloned()
+        self.st
+            .borrow()
+            .prov
+            .list
+            .iter()
+            .find(|p| p.id == id)
+            .cloned()
     }
 
     fn with_prov(&self, id: &str, f: impl FnOnce(&mut Prov)) {
@@ -789,7 +814,11 @@ impl SettingsPage {
         let status = status_of_test(r);
         let v = r.value().cloned();
         self.with_prov(id, |p| {
-            p.status = if p.has_key { status } else { "not-added".into() };
+            p.status = if p.has_key {
+                status
+            } else {
+                "not-added".into()
+            };
             if p.status == "ready" {
                 p.checked_at = now_ms();
             }
@@ -956,7 +985,9 @@ impl SettingsPage {
                     .iter()
                     .any(|w| low.contains(w));
             let shown = if rejected {
-                format!("{name} rejected this key, so it wasn't saved. Check it and paste it again.")
+                format!(
+                    "{name} rejected this key, so it wasn't saved. Check it and paste it again."
+                )
             } else if err.is_empty() {
                 "Aevaleron couldn't save the key. Try again.".into()
             } else {
@@ -1488,7 +1519,11 @@ impl SettingsPage {
                 p.say("Couldn't change that setting.");
                 return;
             }
-            if let Some(f) = r.value().map(|v| v["failover"].clone()).filter(Value::is_object) {
+            if let Some(f) = r
+                .value()
+                .map(|v| v["failover"].clone())
+                .filter(Value::is_object)
+            {
                 p.st.borrow_mut().data["failover"] = f;
             }
             p.render_failover();
@@ -1551,9 +1586,9 @@ impl SettingsPage {
         }
         self.st.borrow_mut().prov.mode = m.to_string();
         let keep = m.to_string();
-        let _ = crate::shell::async_runtime::spawn_blocking(move || {
+        drop(crate::shell::async_runtime::spawn_blocking(move || {
             crate::store::get().set_raw(MODE_KEY, json!(keep));
-        });
+        }));
         self.render_models_mode();
         if m == "auto" {
             self.use_recommended_models();
@@ -1680,7 +1715,11 @@ impl SettingsPage {
         };
         if provider == "openrouter" {
             let mut st = self.st.borrow_mut();
-            for (cid, key) in [("model", "model"), ("brain", "brain"), ("agent", "agentModel")] {
+            for (cid, key) in [
+                ("model", "model"),
+                ("brain", "brain"),
+                ("agent", "agentModel"),
+            ] {
                 st.prov.pickers.entry(cid).or_default().current = text(&data, key);
             }
         }

@@ -55,8 +55,7 @@ use base64::Engine as _;
 use regex::Regex;
 use serde_json::{json, Value};
 use slint::{
-    Image, Model, ModelRc, Rgb8Pixel, SharedPixelBuffer, SharedString, Timer, TimerMode,
-    VecModel,
+    Image, Model, ModelRc, Rgb8Pixel, SharedPixelBuffer, SharedString, Timer, TimerMode, VecModel,
 };
 
 use super::markdown::{self, Line};
@@ -95,8 +94,7 @@ const RESET_TEXT: &str = "Started over. The last conversation is in History.";
 const RESET_FAILED: &str = "Couldn't bring it back here. It is in History.";
 const EMPTY_TEXT: &str = "Your next question goes here.";
 const PRIVACY_URL: &str = "https://openrouter.ai/settings/privacy";
-const ALLOWED_AS_SIMILAR: &str =
-    "Not asked again: you allowed this same step earlier in this task";
+const ALLOWED_AS_SIMILAR: &str = "Not asked again: you allowed this same step earlier in this task";
 
 /// A payload field that is not there.
 static NULL: Value = Value::Null;
@@ -500,10 +498,12 @@ fn new_trail(st: &mut St, task: &str) -> u32 {
 }
 
 fn ensure_trail(st: &mut St) -> u32 {
-    match st.trail {
-        Some(id) if trail_mut(st, id).is_some() => id,
-        _ => new_trail(st, ""),
+    if let Some(id) = st.trail {
+        if trail_mut(st, id).is_some() {
+            return id;
+        }
     }
+    new_trail(st, "")
 }
 
 /// What a probe or Copy reads as the whole conversation.
@@ -662,7 +662,10 @@ fn answered_by(
         pid
     };
     let name = model_name(&id, or(s(sent, "modelName"), s(u, "modelName")), names);
-    let given = or(or(s(sent, "providerName"), s(u, "providerName")), s(u, "via"));
+    let given = or(
+        or(s(sent, "providerName"), s(u, "providerName")),
+        s(u, "via"),
+    );
     (name, provider_name(pid, given), id)
 }
 
@@ -694,7 +697,10 @@ fn usage_line(u: &Value) -> String {
         parts.push(s(u, "model").to_string());
     }
     if !s(u, "provider").is_empty() {
-        parts.push(format!("via {}", provider_name(s(u, "provider"), s(u, "via"))));
+        parts.push(format!(
+            "via {}",
+            provider_name(s(u, "provider"), s(u, "via"))
+        ));
     }
     if truthy(u, "textOnly") {
         parts.push("read as text".into());
@@ -714,7 +720,10 @@ fn quiet_usage(u: &Value, sent: &Value, cx: &Cx) -> String {
     if let Some(ms) = num(u, "ms").filter(|t| *t > 0.0) {
         parts.push(sec(ms));
     }
-    let hop = or(or(s(u, "hopFrom"), s(u, "busyProvider")), s(sent, "hopFrom"));
+    let hop = or(
+        or(s(u, "hopFrom"), s(u, "busyProvider")),
+        s(sent, "hopFrom"),
+    );
     if !hop.is_empty() {
         parts.push(format!("{} was busy", provider_name(hop, "")));
     }
@@ -765,7 +774,9 @@ fn is_act(kind: &str) -> bool {
 }
 
 fn plan_index(r: &Value) -> Option<usize> {
-    r.get("planIndex").and_then(Value::as_u64).map(|i| i as usize)
+    r.get("planIndex")
+        .and_then(Value::as_u64)
+        .map(|i| i as usize)
 }
 
 fn mark(state: &str) -> &'static str {
@@ -815,7 +826,11 @@ fn plan_states(t: &Trail) -> Vec<&'static str> {
         .collect();
     let indexed = acts.iter().copied().any(|r| plan_index(r).is_some());
     let cur = if indexed {
-        acts.iter().copied().filter_map(plan_index).max().unwrap_or(0)
+        acts.iter()
+            .copied()
+            .filter_map(plan_index)
+            .max()
+            .unwrap_or(0)
     } else {
         acts.iter()
             .filter(|r| matches!(s(r, "state"), "done" | "skipped"))
@@ -828,7 +843,10 @@ fn plan_states(t: &Trail) -> Vec<&'static str> {
                 "done"
             } else if i == cur {
                 let last = if indexed {
-                    acts.iter().copied().rev().find(|r| plan_index(r) == Some(i))
+                    acts.iter()
+                        .copied()
+                        .rev()
+                        .find(|r| plan_index(r) == Some(i))
                 } else {
                     None
                 };
@@ -888,7 +906,10 @@ fn recipients(p: &Value) -> Vec<String> {
     };
     let mut out: Vec<String> = Vec::new();
     for r in list {
-        let who = or(or(or(s(r, "providerName"), s(r, "name")), s(r, "provider")), s(r, "id"));
+        let who = or(
+            or(or(s(r, "providerName"), s(r, "name")), s(r, "provider")),
+            s(r, "id"),
+        );
         let what = or(s(r, "modelName"), s(r, "model"));
         let (who, what) = (who.trim(), what.trim());
         let one = if !who.is_empty() && !what.is_empty() {
@@ -956,7 +977,8 @@ fn link_row(key: &str, text: &markdown::Inline, depth: i32, out: &mut Vec<Row>) 
         } else {
             format!("{} \u{b7} {}", l.label, l.host)
         };
-        r.buttons.push(btn(format!("open:{}", l.url), label).glyph(G_LINK));
+        r.buttons
+            .push(btn(format!("open:{}", l.url), label).glyph(G_LINK));
     }
     out.push(r);
 }
@@ -1076,7 +1098,10 @@ fn sent_row(id: u32, a: &Answer, sent: &Value, cx: &Cx) -> Row {
             Pic::Shown(_) => r.picture = id,
         }
     }
-    if let Some(w) = sent.get("windowText").filter(|w| num(w, "chars").unwrap_or(0.0) > 0.0) {
+    if let Some(w) = sent
+        .get("windowText")
+        .filter(|w| num(w, "chars").unwrap_or(0.0) > 0.0)
+    {
         let app = s(w, "app");
         let app = if app.is_empty() {
             "the window".to_string()
@@ -1199,8 +1224,14 @@ fn fault_row(id: u32, f: &Fault, cx: &Cx) -> Row {
             retry_split(&mut r, "Retry");
         } else if aid == "copy-details" {
             let done = cx.flashed(&format!("{key}/{bid}"));
-            r.buttons
-                .push(btn(bid, if done { "Copied" } else { or(label, "Copy details") }));
+            r.buttons.push(btn(
+                bid,
+                if done {
+                    "Copied"
+                } else {
+                    or(label, "Copy details")
+                },
+            ));
         } else {
             let b = btn(bid, or(label, &aid));
             r.buttons.push(if aid == "hop" || aid == "fix-key" {
@@ -1214,8 +1245,7 @@ fn fault_row(id: u32, f: &Fault, cx: &Cx) -> Row {
         retry_split(&mut r, "Retry");
     }
     if !f.retry_task.is_empty() {
-        r.buttons
-            .push(btn("retry-task", "Retry").off(f.retry_busy));
+        r.buttons.push(btn("retry-task", "Retry").off(f.retry_busy));
     }
     r
 }
@@ -1293,9 +1323,11 @@ fn trail_rows(id: u32, t: &Trail, cx: &Cx, out: &mut Vec<Row>) {
                 r.marker = mark(st).into();
                 r.gap = 6.0;
                 out.push(r);
-                for x in t.steps.iter().filter(|x| {
-                    is_act(s(&x.r, "kind")) && plan_index(&x.r) == Some(i)
-                }) {
+                for x in t
+                    .steps
+                    .iter()
+                    .filter(|x| is_act(s(&x.r, "kind")) && plan_index(&x.r) == Some(i))
+                {
                     out.push(step_row(id, x, 1));
                 }
             }
@@ -1556,7 +1588,11 @@ fn retry_rows(cat: &Value, show_paid: bool, names: &HashMap<String, String>) -> 
             if checked && mark < 0 {
                 mark = rows.len() as i32;
             }
-            let note = if truthy(m, "free") && show_paid { "free" } else { "" };
+            let note = if truthy(m, "free") && show_paid {
+                "free"
+            } else {
+                ""
+            };
             rows.push(OutMenuRow {
                 header: false,
                 text: name.as_str().into(),
@@ -1774,7 +1810,8 @@ impl OutputPage {
         while i < rows.len() {
             if i < old.len() && old[i].key == rows[i].key {
                 if old[i] != rows[i] {
-                    self.model.set_row_data(i, out_row(&rows[i], picture(st, &rows[i])));
+                    self.model
+                        .set_row_data(i, out_row(&rows[i], picture(st, &rows[i])));
                 }
                 i += 1;
                 continue;
@@ -1784,7 +1821,8 @@ impl OutputPage {
                 old.remove(i);
                 continue;
             }
-            self.model.insert(i, out_row(&rows[i], picture(st, &rows[i])));
+            self.model
+                .insert(i, out_row(&rows[i], picture(st, &rows[i])));
             old.insert(i, Row::default());
             i += 1;
         }
@@ -1806,9 +1844,10 @@ impl OutputPage {
             let st = self.st.borrow();
             let now = Instant::now();
             st.wait.is_some()
-                || st.items.iter().any(
-                    |i| matches!(&i.body, Body::Error(f) if f.ends.is_some_and(|e| e > now)),
-                )
+                || st
+                    .items
+                    .iter()
+                    .any(|i| matches!(&i.body, Body::Error(f) if f.ends.is_some_and(|e| e > now)))
         };
         if !on {
             self.tick.stop();
@@ -1878,10 +1917,7 @@ impl OutputPage {
             self.say("Couldn't copy. Try again.", true);
             return;
         }
-        self.st
-            .borrow_mut()
-            .flashes
-            .push((flash, Instant::now()));
+        self.st.borrow_mut().flashes.push((flash, Instant::now()));
         self.say(said, false);
         self.schedule();
         self.schedule_in(FLASH + Duration::from_millis(20));
@@ -2173,12 +2209,17 @@ impl OutputPage {
             let retry_ms = num(p, "retryInMs").unwrap_or(0.0);
             let provider = s(p, "provider").to_string();
             let details = if s(p, "details").is_empty() {
-                [message.as_str(), s(p, "code"), provider.as_str(), s(p, "model")]
-                    .iter()
-                    .filter(|x| !x.is_empty())
-                    .copied()
-                    .collect::<Vec<_>>()
-                    .join("\n")
+                [
+                    message.as_str(),
+                    s(p, "code"),
+                    provider.as_str(),
+                    s(p, "model"),
+                ]
+                .iter()
+                .filter(|x| !x.is_empty())
+                .copied()
+                .collect::<Vec<_>>()
+                .join("\n")
             } else {
                 s(p, "details").to_string()
             };
@@ -2411,9 +2452,9 @@ impl OutputPage {
         let wait = {
             let mut st = self.st.borrow_mut();
             let now = Instant::now();
-            let wait = st
-                .step_said
-                .map_or(Duration::ZERO, |t| (t + STEP_SAY_GAP).saturating_duration_since(now));
+            let wait = st.step_said.map_or(Duration::ZERO, |t| {
+                (t + STEP_SAY_GAP).saturating_duration_since(now)
+            });
             if wait.is_zero() {
                 st.step_said = Some(now);
                 None
@@ -2520,7 +2561,8 @@ impl OutputPage {
                 " The text that will be typed is in the card."
             };
             let again = if similar { ", Allow similar" } else { "" };
-            let heard = format!("Asking first: {text}{because}.{typed} Tab to Skip{again} or Allow.");
+            let heard =
+                format!("Asking first: {text}{because}.{typed} Tab to Skip{again} or Allow.");
             let card = Card {
                 id: p.get("id").cloned().unwrap_or(Value::Null),
                 text,
@@ -2664,7 +2706,10 @@ impl OutputPage {
             push(&mut st, Body::Consent { task, lines });
             st.focus = None;
         }
-        self.say("Let Aevaleron use your computer? Tab to Not now or Allow.", true);
+        self.say(
+            "Let Aevaleron use your computer? Tab to Not now or Allow.",
+            true,
+        );
         self.ui.set_stick(true);
         self.schedule();
     }
@@ -2699,14 +2744,19 @@ impl OutputPage {
         self.close_menu();
         let me = self.me.clone();
         let label = self.label.clone();
-        bridge::call(&self.label, "output:close", json!({ "label": label }), move |r| {
-            if let Some(p) = me.upgrade() {
-                if r.is_err() {
-                    p.send("overlay:collapse", Value::Null);
+        bridge::call(
+            &self.label,
+            "output:close",
+            json!({ "label": label }),
+            move |r| {
+                if let Some(p) = me.upgrade() {
+                    if r.is_err() {
+                        p.send("overlay:collapse", Value::Null);
+                    }
+                    p.st.borrow_mut().closing = false;
                 }
-                p.st.borrow_mut().closing = false;
-            }
-        });
+            },
+        );
     }
 
     /// Stop whatever is still coming here: the answer, or the task.
@@ -2743,22 +2793,27 @@ impl OutputPage {
         }
         let kind = {
             let st = self.st.borrow();
-            st.items.iter().find(|i| i.id == item).map(|i| match &i.body {
-                Body::Answer(_) => 1,
-                Body::Error(_) => 2,
-                Body::Trail(_) => 3,
-                Body::Consent { .. } => 4,
-                Body::Reset { .. } => 5,
-                Body::Stored { .. } => 6,
-                Body::User(_) | Body::Empty => 0,
-            })
+            st.items
+                .iter()
+                .find(|i| i.id == item)
+                .map(|i| match &i.body {
+                    Body::Answer(_) => 1,
+                    Body::Error(_) => 2,
+                    Body::Trail(_) => 3,
+                    Body::Consent { .. } => 4,
+                    Body::Reset { .. } => 5,
+                    Body::Stored { .. } => 6,
+                    Body::User(_) | Body::Empty => 0,
+                })
         };
         match kind {
             Some(1) if id == "retry-more" => self.open_retry_menu(None, at),
             Some(1) if id == "copy" => {
                 let raw = {
                     let mut st = self.st.borrow_mut();
-                    answer_mut(&mut st, item).map(|a| a.raw.clone()).unwrap_or_default()
+                    answer_mut(&mut st, item)
+                        .map(|a| a.raw.clone())
+                        .unwrap_or_default()
                 };
                 self.copy(&raw, "Copied the answer", format!("{key}/{id}"));
             }
@@ -2787,11 +2842,15 @@ impl OutputPage {
         let n = tag.get(1..).and_then(|v| v.parse::<usize>().ok());
         let text = {
             let st = self.st.borrow();
-            let lines = st.items.iter().find(|i| i.id == item).and_then(|i| match &i.body {
-                Body::Answer(a) if tag.starts_with('m') => Some(&a.md),
-                Body::Trail(t) if tag.starts_with('o') => t.outcome.as_ref().map(|o| &o.1),
-                _ => None,
-            });
+            let lines = st
+                .items
+                .iter()
+                .find(|i| i.id == item)
+                .and_then(|i| match &i.body {
+                    Body::Answer(a) if tag.starts_with('m') => Some(&a.md),
+                    Body::Trail(t) if tag.starts_with('o') => t.outcome.as_ref().map(|o| &o.1),
+                    _ => None,
+                });
             match lines.zip(n).and_then(|(l, n)| l.get(n)) {
                 Some(Line::Code { text, .. }) => text.clone(),
                 _ => String::new(),
@@ -2831,22 +2890,30 @@ impl OutputPage {
                 let task = a.offer.clone();
                 drop(st);
                 let me = self.me.clone();
-                bridge::call(&self.label, "agent:start", json!({ "task": task }), move |r| {
-                    let Some(p) = me.upgrade() else {
-                        return;
-                    };
-                    let status = r.ok().map(|v| s(&v, "status").to_string()).unwrap_or_default();
-                    {
-                        let mut st = p.st.borrow_mut();
-                        if let Some(a) = answer_mut(&mut st, item) {
-                            a.offer_busy = false;
-                            if status == "started" || status == "consent" {
-                                a.offer.clear();
+                bridge::call(
+                    &self.label,
+                    "agent:start",
+                    json!({ "task": task }),
+                    move |r| {
+                        let Some(p) = me.upgrade() else {
+                            return;
+                        };
+                        let status = r
+                            .ok()
+                            .map(|v| s(&v, "status").to_string())
+                            .unwrap_or_default();
+                        {
+                            let mut st = p.st.borrow_mut();
+                            if let Some(a) = answer_mut(&mut st, item) {
+                                a.offer_busy = false;
+                                if status == "started" || status == "consent" {
+                                    a.offer.clear();
+                                }
                             }
                         }
-                    }
-                    p.schedule();
-                });
+                        p.schedule();
+                    },
+                );
             }
             "sent" => a.sent_open = !a.sent_open,
             "view" => {
@@ -2900,35 +2967,43 @@ impl OutputPage {
             return;
         }
         if id == "retry-task" {
-            let task = {
-                let mut st = self.st.borrow_mut();
-                let Some(f) = st.items.iter_mut().find(|i| i.id == item).and_then(|i| match &mut i.body {
-                    Body::Error(f) => Some(f),
-                    _ => None,
-                }) else {
-                    return;
+            let task =
+                {
+                    let mut st = self.st.borrow_mut();
+                    let Some(f) = st.items.iter_mut().find(|i| i.id == item).and_then(|i| {
+                        match &mut i.body {
+                            Body::Error(f) => Some(f),
+                            _ => None,
+                        }
+                    }) else {
+                        return;
+                    };
+                    if f.retry_busy {
+                        return;
+                    }
+                    f.retry_busy = true;
+                    f.retry_task.clone()
                 };
-                if f.retry_busy {
-                    return;
-                }
-                f.retry_busy = true;
-                f.retry_task.clone()
-            };
             self.schedule();
             let me = self.me.clone();
-            bridge::call(&self.label, "agent:start", json!({ "task": task }), move |_| {
-                if let Some(p) = me.upgrade() {
-                    {
-                        let mut st = p.st.borrow_mut();
-                        for i in st.items.iter_mut().filter(|i| i.id == item) {
-                            if let Body::Error(f) = &mut i.body {
-                                f.retry_busy = false;
+            bridge::call(
+                &self.label,
+                "agent:start",
+                json!({ "task": task }),
+                move |_| {
+                    if let Some(p) = me.upgrade() {
+                        {
+                            let mut st = p.st.borrow_mut();
+                            for i in st.items.iter_mut().filter(|i| i.id == item) {
+                                if let Body::Error(f) = &mut i.body {
+                                    f.retry_busy = false;
+                                }
                             }
                         }
+                        p.schedule();
                     }
-                    p.schedule();
-                }
-            });
+                },
+            );
             return;
         }
         let Some(n) = id.strip_prefix('a').and_then(|v| v.parse::<usize>().ok()) else {
@@ -2936,16 +3011,26 @@ impl OutputPage {
         };
         let (a, provider, details, never_ask) = {
             let st = self.st.borrow();
-            let Some(f) = st.items.iter().find(|i| i.id == item).and_then(|i| match &i.body {
-                Body::Error(f) => Some(f),
-                _ => None,
-            }) else {
+            let Some(f) = st
+                .items
+                .iter()
+                .find(|i| i.id == item)
+                .and_then(|i| match &i.body {
+                    Body::Error(f) => Some(f),
+                    _ => None,
+                })
+            else {
                 return;
             };
             let Some(a) = f.actions.get(n) else {
                 return;
             };
-            (a.clone(), f.provider.clone(), f.details.clone(), f.never_ask)
+            (
+                a.clone(),
+                f.provider.clone(),
+                f.details.clone(),
+                f.never_ask,
+            )
         };
         let aid = or(s(&a, "id"), s(&a, "action")).to_lowercase();
         let ap = or(s(&a, "provider"), &provider).to_string();
@@ -3084,7 +3169,9 @@ impl OutputPage {
                     if let Some(p) = me.upgrade() {
                         {
                             let mut st = p.st.borrow_mut();
-                            if let Some(b) = trail_mut(&mut st, item).and_then(|t| t.banner.as_mut()) {
+                            if let Some(b) =
+                                trail_mut(&mut st, item).and_then(|t| t.banner.as_mut())
+                            {
                                 b.busy = false;
                             }
                         }
@@ -3100,15 +3187,22 @@ impl OutputPage {
     fn consent_button(&self, item: u32, id: &str) {
         let task = {
             let mut st = self.st.borrow_mut();
-            let task = st.items.iter().find(|i| i.id == item).and_then(|i| match &i.body {
-                Body::Consent { task, .. } => Some(task.clone()),
-                _ => None,
-            });
+            let task = st
+                .items
+                .iter()
+                .find(|i| i.id == item)
+                .and_then(|i| match &i.body {
+                    Body::Consent { task, .. } => Some(task.clone()),
+                    _ => None,
+                });
             st.items.retain(|i| i.id != item);
             task
         };
         if let Some(task) = task {
-            self.send("agent:consent", json!({ "allow": id == "allow", "task": task }));
+            self.send(
+                "agent:consent",
+                json!({ "allow": id == "allow", "task": task }),
+            );
         }
         self.schedule();
     }
@@ -3280,7 +3374,7 @@ impl OutputPage {
             })
             .collect();
         let texts: Vec<String> = names.iter().map(|(t, _)| (*t).to_string()).collect();
-        let picks: Vec<Pick> = names.iter().map(|(_, c)| Pick::Win(*c)).collect();
+        let picks: Vec<Pick> = names.iter().map(|(_, c)| Pick::Win(c)).collect();
         self.st.borrow_mut().menu = Some(Menu {
             from: None,
             window: true,
@@ -3355,7 +3449,13 @@ impl OutputPage {
             .ok()
             .and_then(|m| selectable.iter().position(|i| *i == m));
         let next = match k.vk {
-            vk::DOWN => cur.map_or(0, |p| if window { (p + 1) % n } else { (p + 1).min(n - 1) }),
+            vk::DOWN => cur.map_or(0, |p| {
+                if window {
+                    (p + 1) % n
+                } else {
+                    (p + 1).min(n - 1)
+                }
+            }),
             vk::UP => cur.map_or(n - 1, |p| {
                 if window {
                     (p + n - 1) % n
@@ -3476,7 +3576,10 @@ impl OutputPage {
         let n = list.len();
         {
             let mut st = self.st.borrow_mut();
-            let at = st.focus.as_ref().and_then(|f| list.iter().position(|x| x == f));
+            let at = st
+                .focus
+                .as_ref()
+                .and_then(|f| list.iter().position(|x| x == f));
             let i = match (at, back) {
                 (None, false) => 0,
                 (None, true) => n - 1,
@@ -3598,10 +3701,13 @@ impl OutputPage {
     fn trail_probe(&self) -> Value {
         let st = self.st.borrow();
         let Some(t) = st.trail.and_then(|id| {
-            st.items.iter().find(|i| i.id == id).and_then(|i| match &i.body {
-                Body::Trail(t) => Some(t),
-                _ => None,
-            })
+            st.items
+                .iter()
+                .find(|i| i.id == id)
+                .and_then(|i| match &i.body {
+                    Body::Trail(t) => Some(t),
+                    _ => None,
+                })
         }) else {
             return Value::Null;
         };
@@ -3643,10 +3749,13 @@ impl OutputPage {
     fn card_probe(&self) -> Value {
         let st = self.st.borrow();
         let card = st.trail.and_then(|id| {
-            st.items.iter().find(|i| i.id == id).and_then(|i| match &i.body {
-                Body::Trail(t) => t.card.as_ref(),
-                _ => None,
-            })
+            st.items
+                .iter()
+                .find(|i| i.id == id)
+                .and_then(|i| match &i.body {
+                    Body::Trail(t) => t.card.as_ref(),
+                    _ => None,
+                })
         });
         card.map_or(Value::Null, |c| {
             json!({

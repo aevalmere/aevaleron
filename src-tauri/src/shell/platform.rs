@@ -23,7 +23,9 @@ use std::sync::OnceLock;
 use std::time::{Duration, Instant};
 
 use parking_lot::Mutex;
-use slint::platform::software_renderer::{PremultipliedRgbaColor, RepaintBufferType, SoftwareRenderer};
+use slint::platform::software_renderer::{
+    PremultipliedRgbaColor, RepaintBufferType, SoftwareRenderer,
+};
 use slint::platform::{
     Clipboard, EventLoopProxy, Key, Platform, PointerEventButton, WindowAdapter, WindowEvent,
 };
@@ -39,14 +41,14 @@ use windows_sys::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows_sys::Win32::System::Threading::GetCurrentThreadId;
 use windows_sys::Win32::UI::HiDpi::GetDpiForWindow;
 use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
-    GetDoubleClickTime, GetKeyState, MapVirtualKeyW, ReleaseCapture, SetCapture, SetFocus, TrackMouseEvent,
-    TRACKMOUSEEVENT,
+    GetDoubleClickTime, GetKeyState, MapVirtualKeyW, ReleaseCapture, SetCapture, SetFocus,
+    TrackMouseEvent, TRACKMOUSEEVENT,
 };
 use windows_sys::Win32::UI::WindowsAndMessaging::{
-    CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW, GetClientRect, IsWindow, IsWindowVisible, IsZoomed, LoadCursorW,
-    MsgWaitForMultipleObjectsEx, PeekMessageW, PostMessageW, RegisterClassExW, SendMessageW,
-    SetForegroundWindow, SetWindowPos, ShowWindow, TranslateMessage, UpdateLayeredWindow,
-    IDC_ARROW, MSG, WNDCLASSEXW,
+    CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW, GetClientRect, IsWindow,
+    IsWindowVisible, IsZoomed, LoadCursorW, MsgWaitForMultipleObjectsEx, PeekMessageW,
+    PostMessageW, RegisterClassExW, SendMessageW, SetForegroundWindow, SetWindowPos, ShowWindow,
+    TranslateMessage, UpdateLayeredWindow, IDC_ARROW, MSG, WNDCLASSEXW,
 };
 
 use super::Result as ShellResult;
@@ -264,7 +266,7 @@ thread_local! {
     static WINS: RefCell<HashMap<isize, Weak<Win>>> = RefCell::new(HashMap::new());
     static LAST: RefCell<Option<Rc<Win>>> = const { RefCell::new(None) };
     static DISPATCHING: Cell<bool> = const { Cell::new(false) };
-    static PENDING: RefCell<VecDeque<(isize, WindowEvent)>> = RefCell::new(VecDeque::new());
+    static PENDING: RefCell<VecDeque<(isize, WindowEvent)>> = const { RefCell::new(VecDeque::new()) };
 }
 
 /// Builds a page with `make` (a Slint component's `new`), its window made
@@ -414,10 +416,7 @@ impl WindowAdapter for Win {
         };
         // SAFETY: our window, a valid out pointer.
         unsafe {
-            windows_sys::Win32::UI::WindowsAndMessaging::GetWindowRect(
-                hw(self.hwnd.get()),
-                &mut r,
-            )
+            windows_sys::Win32::UI::WindowsAndMessaging::GetWindowRect(hw(self.hwnd.get()), &mut r)
         };
         Some(slint::PhysicalPosition::new(r.left, r.top))
     }
@@ -642,7 +641,10 @@ fn client_size(hwnd: isize) -> slint::PhysicalSize {
     };
     // SAFETY: our window, a valid out pointer.
     unsafe { GetClientRect(hw(hwnd), &mut r) };
-    slint::PhysicalSize::new((r.right - r.left).max(0) as u32, (r.bottom - r.top).max(0) as u32)
+    slint::PhysicalSize::new(
+        (r.right - r.left).max(0) as u32,
+        (r.bottom - r.top).max(0) as u32,
+    )
 }
 
 fn find(hwnd: isize) -> Option<Rc<Win>> {

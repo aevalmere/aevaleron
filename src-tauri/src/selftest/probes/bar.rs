@@ -278,7 +278,11 @@ fn intent_labels(cx: &Cx) {
     }
     let n = TABLE.len();
     cx.log("intentTable", format!("{}/{n}", n - wrong.len()));
-    cx.must("intentTable", n >= 40 && wrong.is_empty(), wrong.join(" | "));
+    cx.must(
+        "intentTable",
+        n >= 40 && wrong.is_empty(),
+        wrong.join(" | "),
+    );
 
     let mut offer = Vec::new();
     for (line, want) in OFFER {

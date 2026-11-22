@@ -343,7 +343,7 @@ impl RegionPage {
     }
 
     /// The box from where the mouse went down to `(x, y)`, inside the window.
-    fn from_pointer(&self, x: f32, y: f32) {
+    fn on_pointer_at(&self, x: f32, y: f32) {
         let (vw, vh) = view(&self.ui);
         let mut p = self.pick.borrow_mut();
         let Some((sx, sy)) = p.start else { return };
@@ -363,7 +363,7 @@ impl RegionPage {
         if self.pick.borrow().start.is_none() {
             return;
         }
-        self.from_pointer(x, y);
+        self.on_pointer_at(x, y);
         self.draw();
     }
 
@@ -371,7 +371,7 @@ impl RegionPage {
         if self.pick.borrow().start.is_none() {
             return;
         }
-        self.from_pointer(x, y);
+        self.on_pointer_at(x, y);
         let sel = {
             let mut p = self.pick.borrow_mut();
             p.start = None;
@@ -461,7 +461,9 @@ impl RegionPage {
         } else {
             "Enter asks"
         };
-        self.say(format!("{size} Arrows move it, Alt+arrows resize, {enter}, Esc cancels."));
+        self.say(format!(
+            "{size} Arrows move it, Alt+arrows resize, {enter}, Esc cancels."
+        ));
         // What it said includes the size, so the size is not said again
         // until it changes.
         self.pick.borrow_mut().said = size;
@@ -1376,7 +1378,11 @@ fn signed_distance(pts: &[(f32, f32)], x: f32, y: f32) -> f32 {
         }
     }
     let d = best.sqrt();
-    if inside { -d } else { d }
+    if inside {
+        -d
+    } else {
+        d
+    }
 }
 
 fn smoothstep(e0: f32, e1: f32, x: f32) -> f32 {
