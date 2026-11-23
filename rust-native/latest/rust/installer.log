@@ -18,13 +18,13 @@ Using lzma (compress whole) compression.
 
 EXE header size:               50176 / 38912 bytes
 Install code:                          (29658 bytes)
-Install data:                          (29353996 bytes)
+Install data:                          (29426700 bytes)
 Uninstall code+data:                   (46710 bytes)
-Compressed data:             8722766 / 29430364 bytes
-CRC (0x98DA49B1):                  4 / 4 bytes
+Compressed data:             8755318 / 29503068 bytes
+CRC (0xE15D226D):                  4 / 4 bytes
 
-Total size:                  8772946 / 29469280 bytes (29.7%)
+Total size:                  8805498 / 29541984 bytes (29.8%)
 
 1 warning:
   9100: Generating version information for language "1033-English" without standard key "LegalCopyright"
-[METRIC] installerKB=8567
+[METRIC] installerKB=8599

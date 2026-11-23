@@ -9,35 +9,35 @@
 [DESKTOP] desktopOwnExcluded=ok
 [DESKTOP] ownWindowBlocked=ok
 [DESKTOP] desktopNotepadIncluded=ok
-[DESKTOP] notepadWindow=w9014C:notepad:Notepad
+[DESKTOP] notepadWindow=w80132:notepad:Notepad
 [DESKTOP] focusMethod=already
 [DESKTOP] uiaTree=ok
 [DESKTOP] uiaTreeNodes=19
-[DESKTOP] uiaTreeMs=1096
+[DESKTOP] uiaTreeMs=1090
 [DESKTOP] uiaTreeRoles=window,edit,scrollbar,button,statusbar,titlebar,menuitem
 [DESKTOP] editorCandidates=ref_2:edit:Text Editor:value+scroll:focused:752x437
 [DESKTOP] editor=ref_2:edit:Text Editor
-[DESKTOP] ocrMs=90
+[DESKTOP] ocrMs=97
 [DESKTOP] ocrWords=ok
 [DESKTOP] ocrDetail=hits=invoice|total|due words=23 inWindow=true lang=en-US
 [DESKTOP] typeFocus=element
 [DESKTOP] typeReadText="File\nEdit\nFormat\nView\nHelp\nInvoice total due 42.00\r\n Aevaleron smoke 4271\n  Ln 2, Col 22\n 100%\n Windows (CRLF)\n UTF-8\n"
 [DESKTOP] uiaTypeRead=ok
-[DESKTOP] uiaSetValueMs=15
+[DESKTOP] uiaSetValueMs=13
 [DESKTOP] uiaSetValueVia=value
 [DESKTOP] uiaSetValue=ok
 [DESKTOP] getTextSpans=10
 [DESKTOP] findEditor=ok
 [DESKTOP] findTop=edit:Text Editor:100
 [DESKTOP] elementAt=edit:ref_2
-[DESKTOP] desktopOpMs={"click":{"last":0,"max":0,"n":1},"config":{"last":0,"max":0,"n":19},"elementAt":{"last":3,"max":3,"n":1},"focusWindow":{"last":0,"max":0,"n":1},"getText":{"last":26,"max":26,"n":2},"key":{"last":16,"max":128,"n":3},"listWindows":{"last":0,"max":0,"n":4},"ocr":{"last":87,"max":87,"n":1},"ping":{"last":0,"max":0,"n":1},"readTree":{"last":26,"max":1093,"n":3},"restoreCursor":{"last":0,"max":0,"n":1},"setValue":{"last":12,"max":12,"n":1},"type":{"last":57,"max":57,"n":1}}
+[DESKTOP] desktopOpMs={"click":{"last":0,"max":0,"n":1},"config":{"last":0,"max":0,"n":17},"elementAt":{"last":3,"max":3,"n":1},"focusWindow":{"last":0,"max":0,"n":1},"getText":{"last":22,"max":22,"n":2},"key":{"last":16,"max":128,"n":3},"listWindows":{"last":0,"max":0,"n":4},"ocr":{"last":94,"max":94,"n":1},"ping":{"last":0,"max":0,"n":1},"readTree":{"last":22,"max":1086,"n":3},"restoreCursor":{"last":0,"max":0,"n":1},"setValue":{"last":10,"max":10,"n":1},"type":{"last":56,"max":56,"n":1}}
 [DESKTOP] dontSave=button:Don't Save
 [DESKTOP] notepadClosed=ok
-[DESKTOP] desktopStatus={"ready":true,"disabled":false,"deaths":0,"pid":5460,"inProcess":true,"dpi":"per-monitor-v2","watching":false,"stderr":""}
+[DESKTOP] desktopStatus={"ready":true,"disabled":false,"deaths":0,"pid":2108,"inProcess":true,"dpi":"per-monitor-v2","watching":false,"stderr":""}
 [DESKTOP] done
 
 --- stderr ---
 whisper: weights memory-mapped: 59.0 MiB in CPU_Mapped
 children seen:
-notepad.exe [4448] "notepad.exe" C:\Users\RUNNER~1\AppData\Local\Temp\aeval-desktop-check-5460-1a204f6939c.txt
+notepad.exe [7444] "notepad.exe" C:\Users\RUNNER~1\AppData\Local\Temp\aeval-desktop-check-2108-1a2061076f8.txt
 unexpected:

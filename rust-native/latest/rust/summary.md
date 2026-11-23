@@ -1,11 +1,11 @@
 # rust: success
 
 - Workflow: rust
-- Run: [45063829913](https://github.com/aevalmere/aevaleron/actions/runs/45063829913), attempt 1, on push
-- Commit: 438777c94bbd28ff1091a20dbfe1d927f4f74459
+- Run: [45094370364](https://github.com/aevalmere/aevaleron/actions/runs/45094370364), attempt 1, on push
+- Commit: 8d70b6f6c77f94ead4e08486963494166b9d7446
 - Ref: rust/native
 - Conclusion: **success**
-- Finished: 2026-11-22T20:34:08Z
+- Finished: 2026-11-23T01:41:58Z
 
 | Step | Outcome | Log |
 |---|---|---|
@@ -33,14 +33,14 @@
 
 | Metric | Value |
 |---|---|
-| exeKB | 28647 |
-| installerKB | 8567 |
+| exeKB | 28718 |
+| installerKB | 8599 |
 | upgrade | ok:from-1.1.1 |
 | processCount | 1 |
-| idlePrivateMB | 39 |
-| idleWorkingSetMB | 130.2 |
-| idleCpuPct | 0.31 |
-| idleThreads | 20 |
-| secondLaunchMs | 49 |
+| idlePrivateMB | 38.6 |
+| idleWorkingSetMB | 130.3 |
+| idleCpuPct | 0.23 |
+| idleThreads | 19 |
+| secondLaunchMs | 25 |
 
 errors.txt: 274 error and warning lines from the logs.

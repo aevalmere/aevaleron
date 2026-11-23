@@ -1,264 +1,4 @@
-   Compiling windows-link v0.2.1
-   Compiling cfg-if v1.0.5
-   Compiling critical-section v1.2.0
-   Compiling smallvec v1.16.6
-   Compiling stable_deref_trait v1.2.1
-   Compiling zerofrom v0.1.8
-   Compiling writeable v0.6.4
-   Compiling litemap v0.8.3
-   Compiling yoke v0.8.4
-   Compiling memchr v2.8.3
-   Compiling serde_core v1.0.229
-   Compiling zerovec v0.11.9
-   Compiling zerotrie v0.2.5
-   Compiling bitflags v2.13.2
-   Compiling foldhash v0.2.0
-   Compiling tinystr v0.8.5
-   Compiling potential_utf v0.1.6
-   Compiling windows-result v0.4.1
-   Compiling icu_locale_core v2.4.0
-   Compiling windows-strings v0.5.1
-   Compiling libm v0.2.16
-   Compiling utf_types v1.0.0
-   Compiling itoa v1.0.19
-   Compiling utf8_iter v1.1.0
-   Compiling hashbrown v0.17.2
-   Compiling icu_provider v2.4.0
-   Compiling num-traits v0.2.19
-   Compiling icu_collections v2.4.0
-   Compiling portable-atomic v1.15.0
-   Compiling icu_properties_data v2.4.0
-   Compiling windows-core v0.62.2
-   Compiling once_cell v1.21.4
-   Compiling icu_normalizer_data v2.4.0
-   Compiling euclid v0.22.14
-   Compiling getrandom v0.2.17
-   Compiling windows-threading v0.2.1
-   Compiling simd-adler32 v0.3.10
-   Compiling icu_normalizer v2.4.0
-   Compiling windows-collections v0.3.2
-   Compiling windows-numerics v0.3.1
-   Compiling windows-future v0.3.2
-   Compiling adler2 v2.0.1
-   Compiling zmij v1.0.23
-   Compiling icu_locale_fallback_data v2.4.0
-   Compiling icu_locale_fallback v2.4.0
-   Compiling crc32fast v1.5.5
-   Compiling miniz_oxide v0.9.1
-   Compiling font-types v0.12.7
-   Compiling memmap2 v0.9.12
-   Compiling equivalent v1.0.3
-   Compiling linebender_resource_handle v0.1.1
-   Compiling unicode-segmentation v1.13.3
-   Compiling flate2 v1.1.11
-   Compiling read-fonts v0.41.0
-   Compiling convert_case v0.10.0
-   Compiling serde_json v1.0.154
-   Compiling miniz_oxide v0.8.9
-   Compiling derive_more-impl v2.1.1
-   Compiling fdeflate v0.3.7
-   Compiling bytemuck v1.25.2
-   Compiling windows-sys v0.61.2
-   Compiling base64 v0.23.1
-   Compiling icu_decimal_data v2.4.0
-   Compiling fixed_decimal v0.7.3
-   Compiling tinyvec v1.13.3
-   Compiling typenum v1.20.1
-   Compiling unicase v2.10.0
-   Compiling pulldown-cmark v0.13.6
-   Compiling generic-array v0.14.7
-   Compiling icu_decimal v2.4.0
-   Compiling kurbo v0.13.1
-   Compiling skrifa v0.44.0
-   Compiling memoffset v0.9.1
-   Compiling png v0.18.1
-   Compiling rand_core v0.6.4
-   Compiling htmlparser v0.2.1
-   Compiling svgtypes v0.16.2
-   Compiling fontdb v0.24.0
-   Compiling harfrust v0.12.0
-   Compiling icu_properties v2.4.0
-   Compiling toml_datetime v1.1.3+spec-1.1.0
-   Compiling roxmltree v0.21.2
-   Compiling pin-project-lite v0.2.18
-   Compiling bytes v1.12.2
-   Compiling usvg v0.49.0
-   Compiling thiserror v2.0.21
-   Compiling tiny-skia v0.12.0
-   Compiling windows v0.62.2
-   Compiling rgb v0.8.53
-   Compiling futures-core v0.3.34
-   Compiling yazi v0.2.2
-   Compiling zeno v0.3.3
-   Compiling fontique v0.12.0
-   Compiling resvg v0.49.0
-   Compiling crypto-common v0.1.7
-   Compiling derive_more v2.1.1
-   Compiling indexmap v2.14.2
-   Compiling semver v1.0.28
-   Compiling slab v0.4.12
-   Compiling toml_edit v0.25.20+spec-1.1.0
-   Compiling rustc_version v0.4.1
-   Compiling i-slint-common v1.19.0
-   Compiling socket2 v0.6.5
-   Compiling mio v1.2.5
-   Compiling windows-link v0.1.3
-   Compiling tokio v1.54.1
-   Compiling idna_adapter v1.2.2
-   Compiling proc-macro-crate v3.5.0
-   Compiling field-offset v0.3.6
-   Compiling windows_x86_64_msvc v0.52.6
-   Compiling parlance v0.1.1
-   Compiling lyon_geom v1.0.20
-   Compiling arrayvec v0.7.8
-   Compiling subtle v2.6.1
-   Compiling zeroize v1.9.2
-   Compiling rustls-pki-types v1.16.0
-   Compiling lyon_path v1.0.19
-   Compiling moxcms v0.8.1
-   Compiling windows-targets v0.52.6
-   Compiling num_enum_derive v0.7.6
-   Compiling idna v1.1.0
-   Compiling icu_segmenter_data v2.4.0
-   Compiling http v1.5.0
-   Compiling percent-encoding v2.3.2
-   Compiling rowan v0.17.0
-   Compiling http-body v1.1.0
-   Compiling num_enum v0.7.6
-   Compiling lyon_extra v1.1.0
-   Compiling icu_segmenter v2.4.0
-   Compiling url v2.5.9
-   Compiling image v0.25.10
-   Compiling serde v1.0.229
-   Compiling windows-result v0.3.4
-   Compiling windows-strings v0.4.2
-   Compiling swash v0.2.10
-   Compiling parley_data v0.12.0
-   Compiling scopeguard v1.2.0
-   Compiling untrusted v0.9.0
-   Compiling parley_emoji v0.12.0
-   Compiling futures-task v0.3.34
-   Compiling futures-util v0.3.34
-   Compiling i-slint-compiler v1.19.0
-   Compiling ring v0.17.14
-   Compiling const-field-offset v0.2.1
-   Compiling transcribe-cpp-sys v0.4.2
-   Compiling windows-core v0.61.2
-   Compiling slotmap v1.1.1
-   Compiling try-lock v0.2.5
-   Compiling cpufeatures v0.2.17
-   Compiling tower-service v0.3.3
-   Compiling want v0.3.2
-   Compiling vtable v0.5.1
-   Compiling pin-project v1.2.0
-   Compiling taffy v0.15.1
-   Compiling httparse v1.10.1
-   Compiling crossbeam-utils v0.8.23
-   Compiling rustls-webpki v0.103.17
-   Compiling lyon_algorithms v1.0.22
-   Compiling form_urlencoded v1.2.3
-   Compiling parley_engine v0.12.0
-   Compiling parley v0.12.0
-   Compiling strum v0.28.0
-   Compiling inout v0.1.4
-   Compiling i-slint-core-macros v1.19.0
-   Compiling tracing-core v0.1.36
-   Compiling chrono v0.4.45
-   Compiling serde_spanned v1.1.3
-   Compiling atomic-waker v1.1.2
-   Compiling sys-locale v0.3.2
-   Compiling pin-weak v1.1.0
-   Compiling allocator-api2 v0.2.21
-   Compiling hashbrown v0.16.1
-   Compiling i-slint-core v1.19.0
-   Compiling i-slint-backend-selector v1.19.0
-   Compiling hyper v1.12.0
-   Compiling toml v1.2.2+spec-1.1.0
-   Compiling tracing v0.1.44
-   Compiling cipher v0.4.4
-   Compiling rustls v0.23.46
-   Compiling crossbeam-channel v0.5.17
-   Compiling zerocopy v0.8.64
-   Compiling libc v0.2.191
-   Compiling windows-result v0.1.2
-   Compiling universal-hash v0.5.1
-   Compiling windows-threading v0.1.0
-   Compiling sync_wrapper v1.0.2
-   Compiling futures-channel v0.3.34
-   Compiling schannel v0.1.30
-   Compiling windows-registry v0.6.1
-   Compiling keyboard-types v0.8.3
-   Compiling aho-corasick v1.1.5
-   Compiling regex-syntax v0.8.12
-   Compiling ipnet v2.12.2
-   Compiling tower-layer v0.3.3
-   Compiling opaque-debug v0.3.1
-   Compiling polyval v0.6.2
-   Compiling tower v0.5.3
-   Compiling regex-automata v0.4.19
-   Compiling hyper-util v0.1.21
-   Compiling rustls-native-certs v0.8.5
-   Compiling windows-future v0.2.1
-   Compiling windows-core v0.54.0
-   Compiling ppv-lite86 v0.2.21
-   Compiling tokio-rustls v0.26.6
-   Compiling winresource v0.1.34
-   Compiling clru v0.6.3
-   Compiling slint-build v1.19.0
-   Compiling windows-collections v0.2.0
-   Compiling windows-numerics v0.2.0
-   Compiling windows-sys v0.59.0
-   Compiling webpki-roots v1.0.12
-   Compiling block-buffer v0.10.4
-   Compiling ryu v1.0.23
-   Compiling dpi v0.1.2
-   Compiling log v0.4.35
-   Compiling futures-sink v0.3.34
-   Compiling bit-vec v0.8.0
-   Compiling bit-set v0.8.0
-   Compiling tokio-util v0.7.20
-   Compiling muda v0.21.2
-   Compiling serde_urlencoded v0.7.1
-   Compiling digest v0.10.7
-   Compiling hyper-rustls v0.27.10
-   Compiling windows v0.61.3
    Compiling aevaleron v1.1.1 (D:\a\aevaleron\aevaleron\src-tauri)
-   Compiling i-slint-renderer-software v1.19.0
-   Compiling tower-http v0.6.11
-   Compiling windows v0.54.0
-   Compiling rand_chacha v0.3.1
-   Compiling ghash v0.5.1
-   Compiling parking_lot_core v0.9.12
-   Compiling slint-macros v1.19.0
-   Compiling aes v0.8.4
-   Compiling ctr v0.9.2
-   Compiling lock_api v0.4.14
-   Compiling http-body-util v0.1.5
-   Compiling aead v0.5.2
-   Compiling windows-version v0.1.7
-   Compiling bitflags v1.3.2
-   Compiling dasp_sample v0.11.0
-   Compiling base64 v0.22.1
-   Compiling slint v1.19.0
-   Compiling reqwest v0.12.28
-   Compiling png v0.17.16
-   Compiling tauri-winrt-notification v0.7.3
-   Compiling aes-gcm v0.10.3
-   Compiling parking_lot v0.12.5
-   Compiling rand v0.8.8
-   Compiling global-hotkey v0.10.0
-   Compiling winreg v0.55.0
-   Compiling sha2 v0.10.9
-   Compiling tray-icon v0.26.1
-   Compiling fast_image_resize v5.5.0
-   Compiling fancy-regex v0.14.0
-   Compiling cpal v0.15.3
-   Compiling regex v1.13.2
-   Compiling unicode-normalization v0.1.26
-   Compiling jpeg-decoder v0.3.2
-   Compiling raw-window-handle v0.6.2
-   Compiling jpeg-encoder v0.6.1
-   Compiling transcribe-cpp v0.4.2
 warning: aevaleron@1.1.1: The property 'viewport-height' has been deprecated: Please use 'content-height' instead
 warning: aevaleron@1.1.1:    --> D:\a\aevaleron\aevaleron\src-tauri\ui\settings-widgets.slint:568:43
 warning: aevaleron@1.1.1:     |
@@ -298,41 +38,41 @@ warning: aevaleron@1.1.1:     |                                                 
 warning: aevaleron@1.1.1: The binding for the property 'head-avail' is part of a binding loop (root.head-avail -> title-text.width -> HorizontalLayout -> head-col -> head -> col -> Rectangle -> root -> root.head-avail)
 warning: aevaleron@1.1.1:          Compute 'head-avail' without depending on a size or a position the layout produces, or set an 'x' or a 'y' on 'head-col', so its parent stops sizing itself from it
 warning: aevaleron@1.1.1:          This was allowed in previous version of Slint, but is deprecated and may cause panic at runtime
-warning: aevaleron@1.1.1:    --> D:\a\aevaleron\aevaleron\src-tauri\ui\card-agents.slint:83:35
+warning: aevaleron@1.1.1:    --> D:\a\aevaleron\aevaleron\src-tauri\ui\card-agents.slint:82:35
 warning: aevaleron@1.1.1:     |
-warning: aevaleron@1.1.1:  83 |     property <length> head-avail: root.width - root.text-x - root.head-right;
+warning: aevaleron@1.1.1:  82 |     property <length> head-avail: root.width - root.text-x - root.head-right;
 warning: aevaleron@1.1.1:     |                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-warning: aevaleron@1.1.1: note: setting an 'x' or a 'y' here takes 'head-col' out of its parent's size, one way out of the binding loop reported for 'head-avail' at line 83
-warning: aevaleron@1.1.1:    --> D:\a\aevaleron\aevaleron\src-tauri\ui\card-agents.slint:151:29
+warning: aevaleron@1.1.1: note: setting an 'x' or a 'y' here takes 'head-col' out of its parent's size, one way out of the binding loop reported for 'head-avail' at line 82
+warning: aevaleron@1.1.1:    --> D:\a\aevaleron\aevaleron\src-tauri\ui\card-agents.slint:150:29
 warning: aevaleron@1.1.1:     |
-warning: aevaleron@1.1.1: 151 |                 head-col := VerticalLayout {
+warning: aevaleron@1.1.1: 150 |                 head-col := VerticalLayout {
 warning: aevaleron@1.1.1:     |                             ^^^^^^^^^^^^^^^
-warning: aevaleron@1.1.1: note: 'width' is part of the binding loop reported for 'head-avail' at line 83
-warning: aevaleron@1.1.1:    --> D:\a\aevaleron\aevaleron\src-tauri\ui\card-agents.slint:163:36
+warning: aevaleron@1.1.1: note: 'width' is part of the binding loop reported for 'head-avail' at line 82
+warning: aevaleron@1.1.1:    --> D:\a\aevaleron\aevaleron\src-tauri\ui\card-agents.slint:162:36
 warning: aevaleron@1.1.1:     |
-warning: aevaleron@1.1.1: 163 | ...                   width: max(0px, min(self.preferred-width, root.head-avail - place-text.width - 5px));
+warning: aevaleron@1.1.1: 162 | ...                   width: max(0px, min(self.preferred-width, root.head-avail - place-text.width - 5px));
 warning: aevaleron@1.1.1:     |                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 warning: aevaleron@1.1.1: The binding for the property 'head-avail' is part of a binding loop (root.head-avail -> place-text.width -> title-text.width -> HorizontalLayout -> head-col -> head -> col -> Rectangle -> root -> root.head-avail)
 warning: aevaleron@1.1.1:          Compute 'head-avail' without depending on a size or a position the layout produces, or set an 'x' or a 'y' on 'head-col', so its parent stops sizing itself from it
 warning: aevaleron@1.1.1:          This was allowed in previous version of Slint, but is deprecated and may cause panic at runtime
-warning: aevaleron@1.1.1:    --> D:\a\aevaleron\aevaleron\src-tauri\ui\card-agents.slint:83:35
+warning: aevaleron@1.1.1:    --> D:\a\aevaleron\aevaleron\src-tauri\ui\card-agents.slint:82:35
 warning: aevaleron@1.1.1:     |
-warning: aevaleron@1.1.1:  83 |     property <length> head-avail: root.width - root.text-x - root.head-right;
+warning: aevaleron@1.1.1:  82 |     property <length> head-avail: root.width - root.text-x - root.head-right;
 warning: aevaleron@1.1.1:     |                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-warning: aevaleron@1.1.1: note: setting an 'x' or a 'y' here takes 'head-col' out of its parent's size, one way out of the binding loop reported for 'head-avail' at line 83
-warning: aevaleron@1.1.1:    --> D:\a\aevaleron\aevaleron\src-tauri\ui\card-agents.slint:151:29
+warning: aevaleron@1.1.1: note: setting an 'x' or a 'y' here takes 'head-col' out of its parent's size, one way out of the binding loop reported for 'head-avail' at line 82
+warning: aevaleron@1.1.1:    --> D:\a\aevaleron\aevaleron\src-tauri\ui\card-agents.slint:150:29
 warning: aevaleron@1.1.1:     |
-warning: aevaleron@1.1.1: 151 |                 head-col := VerticalLayout {
+warning: aevaleron@1.1.1: 150 |                 head-col := VerticalLayout {
 warning: aevaleron@1.1.1:     |                             ^^^^^^^^^^^^^^^
-warning: aevaleron@1.1.1: note: 'width' is part of the binding loop reported for 'head-avail' at line 83
-warning: aevaleron@1.1.1:    --> D:\a\aevaleron\aevaleron\src-tauri\ui\card-agents.slint:174:36
+warning: aevaleron@1.1.1: note: 'width' is part of the binding loop reported for 'head-avail' at line 82
+warning: aevaleron@1.1.1:    --> D:\a\aevaleron\aevaleron\src-tauri\ui\card-agents.slint:173:36
 warning: aevaleron@1.1.1:     |
-warning: aevaleron@1.1.1: 174 | ...                   width: min(self.want, max(min(64px, self.want), root.head-avail - title-text.preferred-width - 5px));
+warning: aevaleron@1.1.1: 173 | ...                   width: min(self.want, max(min(64px, self.want), root.head-avail - title-text.preferred-width - 5px));
 warning: aevaleron@1.1.1:     |                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-warning: aevaleron@1.1.1: note: 'width' is part of the binding loop reported for 'head-avail' at line 83
-warning: aevaleron@1.1.1:    --> D:\a\aevaleron\aevaleron\src-tauri\ui\card-agents.slint:163:36
+warning: aevaleron@1.1.1: note: 'width' is part of the binding loop reported for 'head-avail' at line 82
+warning: aevaleron@1.1.1:    --> D:\a\aevaleron\aevaleron\src-tauri\ui\card-agents.slint:162:36
 warning: aevaleron@1.1.1:     |
-warning: aevaleron@1.1.1: 163 | ...                   width: max(0px, min(self.preferred-width, root.head-avail - place-text.width - 5px));
+warning: aevaleron@1.1.1: 162 | ...                   width: max(0px, min(self.preferred-width, root.head-avail - place-text.width - 5px));
 warning: aevaleron@1.1.1:     |                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 warning: aevaleron@1.1.1: The binding for the property 'layoutinfo-h' is part of a binding loop (root.layoutinfo-h -> HorizontalLayout.layoutinfo-h -> VerticalLayout.layoutinfo-h -> root.layoutinfo-h)
 warning: aevaleron@1.1.1:          Set an 'x' or a 'y' on 'VerticalLayout', so its parent stops sizing itself from it
@@ -357,7 +97,7 @@ warning: linker stdout: LINK : warning LNK4098: defaultlib 'libvcruntime.lib' co
   = note: `#[warn(linker_messages)]` on by default
 
 warning: `aevaleron` (lib test) generated 1 warning
-    Finished `test` profile [unoptimized + debuginfo] target(s) in 7m 23s
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2m 14s
      Running unittests src\lib.rs (target\debug\build\aevaleron/52e755588ea5837f\out\aevaleron_lib-52e755588ea5837f.exe)
 
 running 674 tests
@@ -365,8 +105,8 @@ test agent::auto::tests::blocks_end_automatic_mode_for_the_task ... ok
 test agent::auto::tests::only_a_clear_allow_allows ... ok
 test agent::auto::tests::the_prompt_keeps_screen_text_inside_its_block ... ok
 test agent::describe::tests::passwords_are_dotted_and_errors_named ... ok
-test agent::auto::tests::money_secrets_commands_and_the_unread_always_ask ... ok
 test agent::auto::tests::ordinary_flagged_steps_go_to_the_reviewer ... ok
+test agent::auto::tests::money_secrets_commands_and_the_unread_always_ask ... ok
 test agent::gate::tests::chords_are_canonical ... ok
 test agent::gate::tests::chord_risks ... ok
 test agent::describe::tests::the_card_value_is_the_whole_text ... ok
@@ -378,9 +118,9 @@ test agent::gate::tests::open_and_plans_and_keys ... ok
 test agent::gate::tests::space_in_text_field_is_free ... ok
 test agent::gate::tests::space_on_focused_send_button_asks ... ok
 test agent::gate::tests::typed_space_on_button_asks ... ok
+test agent::run::tests::a_claim_turns_away_other_starts ... ok
 test agent::gate::tests::localized_send_asks ... ok
 test agent::gate::tests::unknown_named_button_asks ... ok
-test agent::run::tests::a_claim_turns_away_other_starts ... ok
 test agent::gate::tests::web_dialog_text_is_read ... ok
 test agent::run::tests::a_timed_out_step_is_an_unknown_outcome ... ok
 test agent::run::tests::app_label_kelvin_and_dotted_i ... ok
@@ -389,14 +129,14 @@ test agent::run::tests::automatic_mode_asks_when_its_check_is_unclear ... ok
 test agent::run::tests::automatic_mode_blocks_without_asking_or_acting ... ok
 test agent::run::tests::bad_coordinates_are_rejected ... ok
 test agent::run::tests::concurrent_starts_yield_one_run ... ok
-test agent::run::tests::confirm_payload_carries_full_value ... ok
-test agent::run::tests::a_plain_allow_asks_again_for_the_same_step ... ok
 test agent::run::tests::automatic_mode_runs_a_step_its_check_allows ... ok
+test agent::run::tests::a_plain_allow_asks_again_for_the_same_step ... ok
 test agent::run::tests::allow_similar_runs_the_same_step_again_without_a_card ... ok
+test agent::run::tests::confirm_payload_carries_full_value ... ok
 test agent::run::tests::only_the_newest_observation_and_image_go_in_full ... ok
-test agent::run::tests::final_text_is_remedy_only_after_failed_step ... ok
-test agent::run::tests::page_text_is_redacted ... ok
 test agent::run::tests::dialect_switch_rewrites_system_prompt ... ok
+test agent::run::tests::page_text_is_redacted ... ok
+test agent::run::tests::final_text_is_remedy_only_after_failed_step ... ok
 test agent::run::tests::points_scale_from_the_last_screenshot ... ok
 test agent::run::tests::retry_after_is_honoured ... ok
 test agent::run::tests::point_outside_the_region_is_refused_before_it_asks ... ok
@@ -454,6 +194,7 @@ test agents::specs::tests::hooks_from_before_the_rename_are_replaced ... ok
 test agents::specs::tests::hooks_go_in_once_and_come_out_clean ... ok
 test agents::specs::tests::places_name_the_agent_and_its_app ... ok
 test agents::tests::background_cards_follow_their_own_switches ... ok
+test agent::run::tests::pause_during_dodge_drops_the_action ... ok
 test agents::tests::hooks_sync_into_a_profile_and_back_out ... ok
 test agents::tests::rows_list_the_other_sessions ... ok
 test agents::tests::settings_merge_field_by_field ... ok
@@ -462,9 +203,7 @@ test agents::tests::the_tray_lists_sessions_that_need_you_first ... ok
 test ask::tests::chat_ids_look_like_electron_ones ... ok
 test ask::tests::fractions_take_grid_or_pixels ... ok
 test ask::tests::history_never_starts_with_assistant ... ok
-test ask::tests::visual_regex_matches_the_renderer ... ok
 test autostart::tests::value_is_the_quoted_exe ... ok
-test agent::run::tests::pause_during_dodge_drops_the_action ... ok
 test backdrop::contrast::tests::alpha_text_is_blended_and_invisible_text_skipped ... ok
 test backdrop::contrast::tests::black_on_white_passes_grey_fails ... ok
 test backdrop::contrast::tests::colours_parse ... ok
@@ -478,6 +217,7 @@ test buddy::tests::a_put_away_hides_once_and_a_new_session_keeps_the_window ... 
 test buddy::tests::steps_apply_by_whether_a_key_exists ... ok
 test buddy::tests::walkthrough_order_and_no_double_spaces ... ok
 test buddy::tests::watchdog_restores_click_through ... ok
+test ask::tests::visual_regex_matches_the_renderer ... ok
 test capture::dxgi::tests::open_failure_backs_off ... ok
 test capture::dxgi::tests::pointer_only_first_frame_is_skipped ... ok
 test capture::dxgi::tests::scrgb_to_srgb_at_sdr_white ... ok
@@ -509,8 +249,8 @@ test capture::screen::tests::primary_comes_first_and_is_the_fallback ... ok
 test capture::screen::tests::rect_in_old_overlap_maps_to_primary ... ok
 test capture::screen::tests::ties_go_to_the_primary_then_the_centre ... ok
 test capture::dxgi::tests::empty_first_frame_falls_back ... ok
-test agent::smoke::tests::every_smoke_line_holds ... ok
 test capture::tests::area_on_primary_crops_primary ... ok
+test agent::smoke::tests::every_smoke_line_holds ... ok
 test capture::tests::whole_screen_is_the_whole_target ... ok
 test crash::tests::guard_async_catches_and_logs ... ok
 test crash::tests::guard_catches_and_logs ... ok
@@ -570,16 +310,16 @@ test desktop::win::tests::descendants_walks_the_tree_once ... ok
 test desktop::win::tests::mouse_through_sets_and_clears_both_bits ... ok
 test desktop::win::tests::our_own_pid_is_always_listed ... ok
 test desktop::win::tests::sheets_never_change_style_through_tauri ... ok
-test capture::tests::hung_worker_is_replaced ... ok
-test history::tests::caps_at_two_hundred_newest_first ... ok
 test capture::tests::area_on_the_scaled_display_crops_its_pixels ... ok
+test history::tests::caps_at_two_hundred_newest_first ... ok
+test capture::tests::hung_worker_is_replaced ... ok
 test history::tests::disabled_writes_nothing_and_keeps_rows ... ok
 test history::tests::emoji_title_cut_on_unit_boundary ... ok
 test history::tests::corrupt_file_is_kept_aside_not_overwritten ... ok
 test history::tests::flush_writes_the_electron_shape_and_reads_back ... ok
 test history::tests::cjk_budget_matches_electron ... ok
 test history::tests::titles ... ok
-test agent::run::tests::overload_529_retries ... ok
+test history::tests::trim_result_serializes_under_4mb ... ok
 test history::tests::unreadable_file_is_an_empty_list ... ok
 test history::tests::unreadable_file_is_never_written ... ok
 test history::tests::upsert_filter_and_search ... ok
@@ -603,7 +343,7 @@ test host::ask::tests::second_window_does_not_abort_first ... ok
 test host::ask::tests::sent_images_keep_last_three ... ok
 test host::ask::tests::stale_pick_shot_is_not_reused ... ok
 test host::ask::tests::the_document_goes_only_when_it_adds_to_what_is_in_view ... ok
-test history::tests::flush_now_and_timer_never_overlap ... ok
+test host::ask::tests::third_query_waits_for_a_slot ... ok
 test host::ask::tests::what_was_sent_counts_the_document ... ok
 test host::desktop_ops::tests::click_spreads_options_over_the_target ... ok
 test host::desktop_ops::tests::whole_keeps_fractions_and_strings ... ok
@@ -611,31 +351,31 @@ test host::menu::tests::edit_and_selection_templates_match_main_js ... ok
 test host::menu::tests::menus_match_main_js ... ok
 test host::menu::tests::pending_lock_not_held_while_building ... ok
 test host::settings::tests::answers_mark_and_clear_cooldowns ... ok
-test host::ask::tests::third_query_waits_for_a_slot ... ok
+test host::settings::tests::cli_and_role_picks_are_stored ... ok
 test host::settings::tests::clipboard_keys_are_recognised_for_all_four ... ok
 test host::settings::tests::failover_prefs_merge_field_by_field ... ok
 test host::settings::tests::native_pick_is_saved_per_provider_and_not_healed ... ok
 test host::settings::tests::payload_provider_defaults_to_openrouter ... ok
 test host::settings::tests::save_key_tests_before_storing ... ok
-test host::settings::tests::cli_and_role_picks_are_stored ... ok
+test host::settings::tests::settings_extra_shape ... ok
 test host::settings::tests::wrong_prefix_reports_detected ... ok
 test host::tests::try_card_prefills_haiku ... ok
-test host::settings::tests::settings_extra_shape ... ok
 test hotkeys::tests::a_taken_chord_is_retried_alone ... ok
 test hotkeys::tests::apply_skips_unchanged_set ... ok
 test hotkeys::tests::capture_mode_lets_go_and_keeps_results ... ok
-test hotkeys::tests::escape_depth_counter ... ok
 test hotkeys::tests::electron_forms ... ok
+test hotkeys::tests::escape_depth_counter ... ok
 test hotkeys::tests::labels ... ok
 test hotkeys::tests::taken_returns_free_alternatives ... ok
 test hotkeys::tests::unparseable_is_an_error_not_a_panic ... ok
 test hotkeys::tests::validation_matches_main_js ... ok
 test instance::tests::an_open_during_boot_is_answered_once_ready ... ok
 test instance::tests::lock_is_per_folder_and_case_blind ... ok
+test instance::tests::stalled_client_does_not_block_server ... ok
 test ipc::tests::clipboard_keys_are_matched_and_masked ... ok
 test ipc::tests::every_invoke_channel_has_a_label_rule ... ok
-test history::tests::steady_saves_still_write_within_400ms ... ok
 test ipc::tests::every_invoke_channel_has_a_route ... ok
+test agent::run::tests::overload_529_retries ... ok
 test ipc::tests::first_request_needs_text ... ok
 test ipc::tests::history_list_has_enabled ... ok
 test ipc::tests::history_row_question_is_the_whole_first_message ... ok
@@ -652,7 +392,7 @@ test ipc::tests::the_copy_text_note_calls_only_its_own_channel ... ok
 test ipc::tests::unknown_channel_is_refused_with_the_electron_wording ... ok
 test lens::tests::frame_goes_to_its_own_display_only ... ok
 test llm::auth::tests::callback_parses_code_and_rejects_bad_requests ... ok
-test history::tests::trim_result_serializes_under_4mb ... ok
+test history::tests::flush_now_and_timer_never_overlap ... ok
 test llm::auth::tests::pkce_challenge_is_s256_of_verifier ... ok
 test llm::auth::tests::the_approval_url_has_the_documented_parameters ... ok
 test llm::catalogue::tests::curated_table_order_and_tiers ... ok
@@ -666,17 +406,17 @@ test llm::catalogue::tests::retired_ids_heal_to_a_live_free_model ... ok
 test llm::catalogue::tests::stand_in_is_live_and_sees_images ... ok
 test llm::cli::args::tests::claude_takes_the_image_on_stdin_with_no_tools ... ok
 test llm::cli::args::tests::codex_and_gemini_take_files ... ok
-test llm::cli::find::tests::npm_shims_run_their_script_with_node ... ok
+test llm::auth::tests::no_answer_times_out_with_the_paste_hint ... ok
 test llm::cli::find::tests::path_entries_are_expanded ... ok
 test llm::cli::find::tests::search_prefers_the_native_program ... ok
 test llm::cli::input::tests::history_becomes_a_transcript ... ok
 test llm::cli::input::tests::one_message_with_the_screen ... ok
+test llm::cli::find::tests::npm_shims_run_their_script_with_node ... ok
 test llm::cli::parse::tests::claude_failures ... ok
 test llm::cli::parse::tests::claude_stream_json ... ok
 test llm::cli::parse::tests::codex_json_lines ... ok
 test llm::cli::parse::tests::gemini_stream_json ... ok
-test llm::auth::tests::no_answer_times_out_with_the_paste_hint ... ok
-test instance::tests::stalled_client_does_not_block_server ... ok
+test history::tests::steady_saves_still_write_within_400ms ... ok
 test ipc::tests::every_listen_channel_has_a_sender ... ok
 test llm::cli::run::tests::exit_codes_and_words_are_mapped ... ok
 test llm::cli::run::tests::each_cli_streams_an_answer ... ok
@@ -819,22 +559,22 @@ test skills::tests::built_ins_load_in_picker_order ... ok
 test skills::tests::folder_path_is_exe_relative ... ok
 test skills::tests::large_skill_is_truncated ... ok
 test skills::tests::parse_handles_bom_crlf_and_missing_front_matter ... ok
-test llm::client::tests::idle_stream_times_out_as_408 ... ok
+test skills::tests::routing_matches_the_self_test ... ok
 test skills::tests::unknown_skills_sort_after_the_known_ones_by_name ... ok
 test state::tests::base36_matches_javascript ... ok
 test state::tests::chat_ids_look_like_electrons ... ok
 test state::tests::queries_are_per_window_and_busy_is_any ... ok
 test state::tests::rect_overlap ... ok
-test skills::tests::routing_matches_the_self_test ... ok
-test store::crypto::tests::dpapi_round_trip ... ok
 test store::crypto::tests::bom_local_state_keeps_its_key ... ok
+test store::crypto::tests::dpapi_round_trip ... ok
+test store::crypto::tests::local_state_is_created_then_reused ... ok
 test store::crypto::tests::opens_a_blob_sealed_by_node ... ok
 test store::crypto::tests::round_trip_through_the_ring ... ok
 test store::crypto::tests::seals_byte_for_byte_like_chromium ... ok
-test store::crypto::tests::local_state_is_created_then_reused ... ok
-test store::crypto::tests::wrong_key_or_garbage_is_none_not_a_panic ... ok
 test store::crypto::tests::unreadable_local_state_is_left_alone ... ok
+test store::crypto::tests::wrong_key_or_garbage_is_none_not_a_panic ... ok
 test store::durable::tests::replaces_a_target_another_handle_has_open ... ok
+test llm::client::tests::idle_stream_times_out_as_408 ... ok
 test store::durable::tests::sweep_removes_only_our_temps ... ok
 test store::durable::tests::replaces_and_leaves_no_temp ... ok
 test store::tests::automatic_becomes_the_default_once ... ok
@@ -1032,11 +772,11 @@ test windows::tests::overlay_state_has_target_and_count ... ok
 test windows::tests::overlay_state_lock_scope ... ok
 test windows::tests::settings_history_have_no_max ... ok
 test windows::tests::text_scale_clamps_and_multiplies ... ok
-test voice::capture::tests::a_fixture_records_like_a_microphone ... ok
 test store::tests::input_history ... ok
+test voice::capture::tests::a_fixture_records_like_a_microphone ... ok
 test store::tests::concurrent_sets_never_lose_or_corrupt ... ok
 
-test result: ok. 674 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 15.40s
+test result: ok. 674 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 15.21s
 
      Running unittests src\main.rs (target\debug\build\aevaleron/8dffef4170609190\out\aevaleron-8dffef4170609190.exe)
 

@@ -1,7 +1,8 @@
 # ci-logs
 
 Results of every CI run on rust-rewrite and rust/** (workflows rust and
-ui-shots), written by tools/ci-publish.mjs at the end of each run, pass or
+ui-shots), with a metrics table when a log printed "[METRIC] name=value"
+lines, written by tools/ci-publish.mjs at the end of each run, pass or
 fail. Wait for a push's results with git alone:
 
     node tools/ci-wait.mjs <sha> [rust|ui-shots] [--timeout-min 30]
