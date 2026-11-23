@@ -87,7 +87,7 @@ pub trait Page {
 
 thread_local! {
     static PAGES: RefCell<HashMap<String, Rc<dyn Page>>> = RefCell::new(HashMap::new());
-    static DARK: Cell<bool> = Cell::new(shell::sys::dark_mode());
+    static DARK: Cell<bool> = const { Cell::new(false) };
     static SCALES: RefCell<HashMap<String, f32>> = RefCell::new(HashMap::new());
 }
 
@@ -135,8 +135,10 @@ pub fn deliver(label: &str, channel: &str, payload: &Value) {
     }
 }
 
-/// Windows switched between light and dark: every page follows.
-pub fn on_theme_change(now: bool) {
+/// Windows switched between light and dark. The pages stay paper, as
+/// Aevalsistant does, so `now` is not used; they redraw all the same.
+pub fn on_theme_change(_now: bool) {
+    let now = false;
     let _ = platform::post(Box::new(move || {
         DARK.with(|d| d.set(now));
         let all: Vec<(String, Rc<dyn Page>)> = PAGES.with(|p| {

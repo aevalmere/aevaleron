@@ -70,13 +70,17 @@ pub fn dark_mode() -> bool {
 }
 
 /// The window background behind every page before it draws (COLORREF,
-/// 0x00BBGGRR): DESIGN.md's base surface for the theme.
+/// 0x00BBGGRR): Aevalsistant's paper #FFF6F1, whatever Windows' theme
+/// (the pages are paper too, ui::dark).
 pub fn theme_background() -> u32 {
-    if dark_mode() {
-        0x0031_231A
-    } else {
-        0x00F0_F7FA
-    }
+    0x00F1_F6FF
+}
+
+/// The frame DWM draws around every opaque window (COLORREF): the paper
+/// edge #F0DDD3, Aevalsistant's card hairline. One crisp line that follows
+/// the rounded corners, so paper on a white app still has an edge.
+pub fn frame_border() -> u32 {
+    0x00D3_DDF0
 }
 
 /// Who hears that the theme changed (ui::theme).

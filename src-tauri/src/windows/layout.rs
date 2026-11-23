@@ -139,11 +139,18 @@ pub fn docked_bounds(wa: Rect, bar: Rect, size: (f64, f64), bar_v: &str) -> Rect
     )
 }
 
-/// NEW-01 with B-099: where a new output window opens. The slot against
-/// the bar on its free side first; while an open window already sits there,
-/// 24 px further along the bar's edge toward the middle of the screen,
-/// wrapping within the work area. Every window keeps the 12 px gap to the
-/// bar, so the page's glob can reach it.
+/// Whether two rectangles share any area (touching edges do not).
+pub fn overlaps(a: Rect, b: Rect) -> bool {
+    a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height
+}
+
+/// NEW-01 with B-099: where a new output window opens. The windows are
+/// opaque, so they never land on each other or on the bar while there is
+/// room: the slot against the bar on its free side first, then the next
+/// free column along the bar's edge, one window width plus the 12 px gap
+/// over, toward the middle of the screen and then the other way. Only when
+/// no column is free do they cascade 24 px apart (`cascade_output`). Every
+/// window keeps the 12 px gap to the bar's edge.
 pub fn place_output(
     wa: Rect,
     bar: Rect,
@@ -152,6 +159,43 @@ pub fn place_output(
     open: &[Rect],
 ) -> Rect {
     let first = docked_bounds(wa, bar, size, &bar_anchor.v);
+    let free = |r: Rect| !overlaps(r, bar) && !open.iter().any(|o| overlaps(r, *o));
+    if free(first) {
+        return first;
+    }
+    let toward_middle = if bar.x + bar.width / 2.0 > wa.x + wa.width / 2.0 {
+        -1.0
+    } else {
+        1.0
+    };
+    let pitch = size.0 + OUTPUT_GAP;
+    let fits = |x: f64| x >= wa.x && x + size.0 <= wa.x + wa.width;
+    for dir in [toward_middle, -toward_middle] {
+        let mut k = 1.0;
+        loop {
+            let x = first.x + dir * pitch * k;
+            if !fits(x) {
+                break;
+            }
+            let r = Rect::new(x, first.y, size.0, size.1);
+            if free(r) {
+                return r;
+            }
+            k += 1.0;
+        }
+    }
+    cascade_output(wa, first, bar_anchor, size, open)
+}
+
+/// The fallback when every column is taken: 24 px further along the bar's
+/// edge per window already there, wrapping within the work area.
+fn cascade_output(
+    wa: Rect,
+    first: Rect,
+    bar_anchor: &Anchor,
+    size: (f64, f64),
+    open: &[Rect],
+) -> Rect {
     // Open windows are taller than a new sheet (B-027): compare the edge
     // that faces the bar, which both of them share.
     let edge = |r: &Rect| {
@@ -384,11 +428,13 @@ mod tests {
         let first = place_output(wa(), bar, &top, (420.0, 200.0), &[]);
         // 12 px under the bar's glass.
         assert_eq!(first, Rect::new(1484.0, 104.0, 420.0, 200.0));
-        // B-099: along the bar's edge, the gap kept.
+        // B-099: the next free column along the bar's edge, toward the
+        // middle, 12 px apart: opaque windows never cover each other.
         let second = place_output(wa(), bar, &top, (420.0, 200.0), &[first]);
-        assert_eq!(second, Rect::new(1460.0, 104.0, 420.0, 200.0));
+        assert_eq!(second, Rect::new(1052.0, 104.0, 420.0, 200.0));
         let third = place_output(wa(), bar, &top, (420.0, 200.0), &[first, second]);
-        assert_eq!(third, Rect::new(1436.0, 104.0, 420.0, 200.0));
+        assert_eq!(third, Rect::new(620.0, 104.0, 420.0, 200.0));
+        assert!(!overlaps(first, second) && !overlaps(second, third));
         // A window moved away frees the first slot again.
         let moved = Rect::new(200.0, 500.0, 420.0, 200.0);
         assert_eq!(
@@ -472,7 +518,8 @@ mod tests {
         let tall = output_glass(wa(), first, 686.0, true);
         assert_ne!(tall.y, first.y);
         let next = place_output(wa(), bar, &bottom, size, &[tall]);
-        assert_eq!(next.x, first.x + CASCADE);
+        assert_eq!(next.x, first.x + size.0 + OUTPUT_GAP);
+        assert!(!overlaps(next, tall));
         assert_eq!(next.y + next.height, first.y + first.height);
     }
 
@@ -504,15 +551,24 @@ mod tests {
             assert!(!open.contains(&r));
             open.push(r);
         }
-        assert_eq!(open[7].x, 1484.0 - 7.0 * CASCADE);
-        // At the edge the cascade wraps to the far side, still inside.
+        // Four columns fit in 1920 px; none of them overlap.
+        assert_eq!(
+            open[..4].iter().map(|r| r.x).collect::<Vec<_>>(),
+            vec![1484.0, 1052.0, 620.0, 188.0]
+        );
+        for (i, a) in open[..4].iter().enumerate() {
+            assert!(open[..4].iter().skip(i + 1).all(|b| !overlaps(*a, *b)));
+        }
+        // Then the cascade, 24 px along from the first slot.
+        assert_eq!(open[4].x, 1484.0 - CASCADE);
+        // A bar at the left edge: the columns go right, still inside.
         let edge = Rect::new(0.0, 16.0, 420.0, 76.0);
         let first = place_output(wa(), edge, &top, size, &[]);
         assert_eq!(first.x, 0.0);
-        let wrapped = place_output(wa(), edge, &top, size, &[first]);
-        assert_eq!(wrapped.x, 1476.0);
-        assert!(wrapped.x + size.0 <= 1920.0);
-        assert_eq!(wrapped.y, first.y);
+        let beside = place_output(wa(), edge, &top, size, &[first]);
+        assert_eq!(beside.x, 432.0);
+        assert!(beside.x + size.0 <= 1920.0);
+        assert_eq!(beside.y, first.y);
     }
 
     /// B-097: every layout constant against main.js on `main`, with the

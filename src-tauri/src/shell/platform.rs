@@ -628,17 +628,18 @@ fn create_adapter() -> std::result::Result<Rc<Win>, PlatformError> {
     Ok(win)
 }
 
-/// Windows 11 rounds and shadows the opaque windows; the frame colour goes,
-/// and the frame follows the system's light or dark mode.
+/// Windows 11 rounds and shadows the opaque windows and draws their one
+/// border: a paper-edge hairline (sys::frame_border), on a light frame to
+/// match the paper pages.
 fn dwm_frame(hwnd: isize) {
     let round: i32 = 2; // DWMWCP_ROUND
-    let no_border: u32 = 0xFFFF_FFFE; // DWMWA_COLOR_NONE
-    let dark: i32 = i32::from(super::sys::dark_mode());
+    let border: u32 = super::sys::frame_border();
+    let dark: i32 = 0;
     // SAFETY: attributes with their documented sizes; unsupported ones
     // (Windows 10) fail harmlessly.
     unsafe {
         DwmSetWindowAttribute(hw(hwnd), 33, &round as *const i32 as *const _, 4);
-        DwmSetWindowAttribute(hw(hwnd), 34, &no_border as *const u32 as *const _, 4);
+        DwmSetWindowAttribute(hw(hwnd), 34, &border as *const u32 as *const _, 4);
         DwmSetWindowAttribute(hw(hwnd), 20, &dark as *const i32 as *const _, 4);
     }
 }

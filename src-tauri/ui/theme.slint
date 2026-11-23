@@ -1,38 +1,48 @@
-// DESIGN.md v2.2 without the glass: Ethan Zhang's palette on opaque
-// surfaces, the same type ramp, radii and 4-grid spacing. Every page
-// window sets `dark` (the Windows app theme) and `text-scale` (Windows'
-// text size times the app's own, ui:text-scale) on its own copy.
+// DESIGN.md v2.2 without the glass, in Aevalsistant's colours
+// (aevalsistant docs/DESIGN.md): warm paper, ink titles, slate secondary
+// text and controls, blush for what needs you, the maroon clip for what
+// destroys. Like Aevalsistant it is paper whatever Windows' app theme is
+// (ui::dark() is always false); the dark values stay for a later choice.
+// Same type ramp, radii and 4-grid spacing. Every page window sets
+// `text-scale` (Windows' text size times the app's own, ui:text-scale).
+// Contrast on paper: ink 11.2:1, slate 5.1:1, label-3 4.9:1, clip 6.1:1.
 
 export global Theme {
-    in-out property <bool> dark: true;
+    in-out property <bool> dark: false;
     in-out property <float> text-scale: 1.0;
 
-    // Surfaces.
-    out property <color> base: dark ? #1A2331 : #FAF7F0;
-    out property <brush> body: dark ? @linear-gradient(180deg, #2A3545 0%, #1A2331 100%) : @linear-gradient(180deg, #FFFDF8 0%, #FAF7F0 100%);
-    out property <color> raised: dark ? #2A3545 : #FFFFFF;
-    out property <color> plate: dark ? #222C3B : #F2EEE5;
+    // Surfaces: paper, a touch lighter for raised, the keycap tone for plates.
+    out property <color> base: dark ? #1A2331 : #FFF6F1;
+    out property <brush> body: dark ? @linear-gradient(180deg, #2A3545 0%, #1A2331 100%) : @linear-gradient(180deg, #FFF9F6 0%, #FFF6F1 100%);
+    out property <color> raised: dark ? #2A3545 : #FFFBF8;
+    out property <color> plate: dark ? #222C3B : #FBEBE3;
 
-    // Labels.
-    out property <color> label: dark ? #F7F3EA : #16202D;
-    out property <color> label-2: dark ? #C9D4E2 : #3B4656;
-    out property <color> label-3: dark ? #B4BFCE : #4A5668;
+    // Labels: ink, slate, a softer slate.
+    out property <color> label: dark ? #F7F3EA : #3E3438;
+    out property <color> label-2: dark ? #C9D4E2 : #586C7D;
+    out property <color> label-3: dark ? #B4BFCE : #5E6F7E;
 
-    // Fills: cream washes on the dark tone, ink on the light one.
-    out property <color> fill-1: dark ? #F7F3EA12 : #16202D0D;
-    out property <color> fill-2: dark ? #F7F3EA1F : #16202D14;
-    out property <color> fill-3: dark ? #F7F3EA2E : #16202D1F;
-    out property <color> hairline: dark ? #F7F3EA1A : #16202D1A;
+    // Fills: warm ink washes on paper (hover, pressed, chips).
+    out property <color> fill-1: dark ? #F7F3EA12 : #8E4A520A;
+    out property <color> fill-2: dark ? #F7F3EA1F : #8E4A5212;
+    out property <color> fill-3: dark ? #F7F3EA2E : #8E4A521C;
+    // Paper edge: the card hairline and separators.
+    out property <color> hairline: dark ? #F7F3EA1A : #F0DDD3;
 
-    // Accent.
-    out property <color> accent: dark ? #A9C6E4 : #2E4E75;
-    out property <color> accent-text: dark ? #CFE0F1 : #2E4E75;
-    out property <color> on-accent: dark ? #16202D : #FAF7F0;
-    out property <color> accent-wash: dark ? #A9C6E42E : #2E4E751F;
-    out property <color> signal: #5E86B4;
-    out property <color> danger: dark ? #F2A0A8 : #A33A46;
-    out property <color> focus-ring: dark ? #CFE0F1 : #2E4E75;
-    out property <color> selection: dark ? #A9C6E466 : #2E4E7540;
+    // Accent: slate for controls (switches, the prominent button, focus).
+    out property <color> accent: dark ? #A9C6E4 : #586C7D;
+    out property <color> accent-text: dark ? #CFE0F1 : #586C7D;
+    out property <color> on-accent: dark ? #16202D : #FFF6F1;
+    out property <color> accent-wash: dark ? #A9C6E42E : #586C7D1F;
+    out property <color> signal: dark ? #5E86B4 : #46586A;
+    // Blush: the "needs you" dot and the selection.
+    out property <color> blush: #E9A9AE;
+    // Slate hair: the "done" dot, and the elbows under a session.
+    out property <color> slate-soft: dark ? #9DB0B9 : #9DB0B9;
+    out property <color> slate-mist: dark ? #586C7D : #C9D5DA;
+    out property <color> danger: dark ? #F2A0A8 : #8E4A52;
+    out property <color> focus-ring: dark ? #CFE0F1 : #586C7D;
+    out property <color> selection: dark ? #A9C6E466 : #E9A9AE66;
 
     // Type ramp (size / line height), scaled with the text size.
     out property <length> meta: 12px * text-scale;
@@ -45,7 +55,7 @@ export global Theme {
     out property <length> page: 22px * text-scale;
     out property <length> code: 13px * text-scale;
 
-    out property <string> font: "Segoe UI";
+    out property <string> font: "Segoe UI Variable Text";
     out property <string> mono: "Cascadia Mono";
     out property <string> icons: "Segoe MDL2 Assets";
 
