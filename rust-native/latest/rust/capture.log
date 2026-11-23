@@ -4,7 +4,7 @@
 [CAPTURE] display=1024x768 phys, 1024x768 dip, scale 1
 [CAPTURE] fixtureShown=ok
 [CAPTURE] probeShown=ok
-[CAPTURE] dxgiFirstFrameMs=23
+[CAPTURE] dxgiFirstFrameMs=22
 [CAPTURE] dxgiFirstFrame=ok
 [CAPTURE] hdr=off
 [CAPTURE] dxgiOpensPerTick=1
@@ -12,11 +12,11 @@
 [CAPTURE] dxgi.frame=1024x768 in 13ms
 [CAPTURE] dxgi.probe=magenta=0.000 black=0.000 mean=255 controlMean=255
 [CAPTURE] dxgiExcludesOwnWithoutBlanking=ok
-[CAPTURE] gdi.frame=1024x768 in 35ms
+[CAPTURE] gdi.frame=1024x768 in 19ms
 [CAPTURE] gdi.probe=magenta=0.000 black=0.000 mean=255 controlMean=255
 [CAPTURE] gdiExcludesOwnWithoutBlanking=ok
 [CAPTURE] captureExcludesOwn=ok
-[CAPTURE] capture=1024x768 bytes=9516 q=88 backend=dxgi ms=34
+[CAPTURE] capture=1024x768 bytes=9516 q=88 backend=dxgi ms=35
 [CAPTURE] captureSize=ok
 [CAPTURE] captureJpeg=ok
 [CAPTURE] wholeScreenShowsFixture=ok

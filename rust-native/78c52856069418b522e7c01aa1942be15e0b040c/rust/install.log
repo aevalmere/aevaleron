@@ -1,0 +1,43 @@
+[METRIC] installerKB=8600
+previous installer: Aevaleron_1.1.1_x64-setup.exe from run 44041820735
+previous setup exited 0
+[CHECK] ok previous.install code=0 Aevaleron_1.1.1_x64-setup.exe
+setup over previous exited 0
+[CHECK] ok upgrade.exitCode code=0 from=1.1.1
+[CHECK] ok upgrade.exe C:\Users\runneradmin\AppData\Local\Aevaleron\Aevaleron.exe
+[CHECK] ok upgrade.exeIsThisBuild installed Aevaleron.exe is the built aevaleron.exe
+[CHECK] ok upgrade.exeVersion exe=1.1.1 want=1.1.1
+[CHECK] ok upgrade.noHelperDll desktop\ present: False
+[CHECK] ok upgrade.uninstaller C:\Users\runneradmin\AppData\Local\Aevaleron\uninstall.exe
+[CHECK] ok upgrade.startMenuShortcut C:\Users\runneradmin\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Aevaleron.lnk
+[CHECK] ok upgrade.desktopShortcut C:\Users\runneradmin\Desktop\Aevaleron.lnk
+[CHECK] ok upgrade.shortcutAumid aumid=com.aevaleron.app
+[CHECK] ok upgrade.oneUninstallEntry entries=1: Aevaleron
+[CHECK] ok upgrade.uninstallKey HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\Aevaleron
+[CHECK] ok upgrade.displayVersion registered=1.1.1
+[CHECK] ok upgrade.publisher publisher=darkelights
+[CHECK] ok upgrade.uninstallFields missing=
+[CHECK] ok upgrade.noWebView2Data C:\Users\runneradmin\AppData\Local\aevaleron\WebView2
+[CHECK] ok upgrade.notLaunched processes=0
+[METRIC] upgrade=ok:from-1.1.1
+[CHECK] ok run.started pid=5420 exited=False
+[CHECK] ok run.oneProcess Aevaleron.exe processes=1
+[CHECK] ok run.noWebView2 inTree=0 before=0 after=0
+[METRIC] processCount=1
+[METRIC] idlePrivateMB=38.5
+[METRIC] idleWorkingSetMB=130.4
+[METRIC] idleCpuPct=0.39
+[METRIC] idleThreads=22
+[CHECK] ok singleInstance.secondExits exited=True after 22ms
+[CHECK] ok singleInstance.oneLeft processes=1
+[METRIC] secondLaunchMs=22
+[CHECK] ok uninstall.exe C:\Users\runneradmin\AppData\Local\Aevaleron\Aevaleron.exe
+[CHECK] ok uninstall.uninstaller C:\Users\runneradmin\AppData\Local\Aevaleron\uninstall.exe
+[CHECK] ok uninstall.desktopHelper C:\Users\runneradmin\AppData\Local\Aevaleron\desktop
+[CHECK] ok uninstall.startMenuShortcut 
+[CHECK] ok uninstall.desktopShortcut 
+[CHECK] ok uninstall.key HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\Aevaleron
+[CHECK] ok uninstall.noEntries entries=0
+[CHECK] ok uninstall.runValue Run\com.aevaleron.app=
+[CHECK] ok uninstall.userDataKept C:\Users\runneradmin\AppData\Roaming\aevaleron\ci-keep.txt
+::notice title=native install%3A 31 of 31 passed::installerKB=8600 upgrade=ok:from-1.1.1 processCount=1 idlePrivateMB=38.5 idleWorkingSetMB=130.4 idleCpuPct=0.39 idleThreads=22 secondLaunchMs=22

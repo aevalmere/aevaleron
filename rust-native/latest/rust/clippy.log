@@ -106,4 +106,4 @@ warning: aevaleron@1.1.1:    --> D:\a\aevaleron\aevaleron\src-tauri\ui\settings.
 warning: aevaleron@1.1.1:     |
 warning: aevaleron@1.1.1:  73 |     VerticalLayout {
 warning: aevaleron@1.1.1:     |     ^^^^^^^^^^^^^^^
-    Finished `dev` profile [unoptimized + debuginfo] target(s) in 53.93s
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 57.98s
